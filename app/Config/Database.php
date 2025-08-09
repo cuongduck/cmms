@@ -9,9 +9,9 @@ class Database extends Config
 
     public array $default = [
         'DSN'          => '',
-        'hostname'     => 'localhost',
+        'hostname'     => '10.18.15.43',
         'username'     => 'mmb',
-        'password'     => 'zzzz',
+        'password'     => 'Masan@2025',
         'database'     => 'iot_cmms',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
