@@ -10,7 +10,7 @@ class Database extends Config
         'DSN'          => '',
         'hostname'     => 'localhost',
         'username'     => 'mmb',
-        'password'     => 'Masan@2025',
+        'password'     => 'xccxcxc',
         'database'     => 'iot_cmms',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
