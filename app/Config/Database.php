@@ -1,3 +1,4 @@
+<?php
 namespace Config;
 
 use CodeIgniter\Database\Config;
@@ -10,7 +11,7 @@ class Database extends Config
         'DSN'          => '',
         'hostname'     => 'localhost',
         'username'     => 'mmb',
-        'password'     => 'xccxcxc',
+        'password'     => 'zzzz',
         'database'     => 'iot_cmms',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',

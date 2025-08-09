@@ -47,4 +47,10 @@ $routes->group('api', ['filter' => 'auth'], static function ($routes) {
     $routes->get('line/(:num)', 'Api::getLineByXuong/$1');
     $routes->get('khu-vuc/(:num)', 'Api::getKhuVucByLine/$1');
     $routes->get('dong-may/(:num)', 'Api::getDongMayByKhuVuc/$1');
+    $routes->get('equipment-qr', 'Api::getEquipmentByQR');
+    $routes->get('search-vat-tu', 'Api::searchVatTu');
+    $routes->get('dashboard-stats', 'Api::getDashboardStats');
+    $routes->post('upload-file', 'Api::uploadFile');
+    $routes->post('delete-file', 'Api::deleteFile');
+    $routes->get('system-status', 'Api::systemStatus');
 });
