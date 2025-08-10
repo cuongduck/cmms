@@ -9,6 +9,10 @@ switch ($action) {
         checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         listEquipment();
         break;
+    case 'list_simple':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
+        getEquipmentListSimple();
+        break;
     case 'detail':
         checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         getEquipmentDetail();
@@ -26,15 +30,19 @@ switch ($action) {
         deleteEquipment();
         break;
     case 'get_xuong':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         getXuongList();
         break;
     case 'get_lines':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         getLinesList();
         break;
     case 'get_khu_vuc':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         getKhuVucList();
         break;
     case 'get_dong_may':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         getDongMayList();
         break;
     case 'export':
@@ -42,8 +50,9 @@ switch ($action) {
         exportEquipment();
         break;
     case 'search_by_id':
+        checkApiPermission(['admin', 'to_truong', 'user', 'viewer']);
         searchEquipmentById();
-        break;    
+        break;
     default:
         jsonResponse(['success' => false, 'message' => 'Action không hợp lệ'], 400);
 }
@@ -51,142 +60,230 @@ switch ($action) {
 function listEquipment() {
     global $db;
     
-    $page = $_POST['page'] ?? 1;
-    $search = $_POST['search'] ?? '';
-    $xuong = $_POST['xuong'] ?? '';
-    $line = $_POST['line'] ?? '';
-    $tinh_trang = $_POST['tinh_trang'] ?? '';
-    
-    $where_conditions = [];
-    $params = [];
-    
-    if (!empty($search)) {
-        $where_conditions[] = "(tb.id_thiet_bi LIKE ? OR tb.ten_thiet_bi LIKE ? OR tb.nganh LIKE ?)";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
+    try {
+        $page = $_POST['page'] ?? 1;
+        $search = $_POST['search'] ?? '';
+        $xuong = $_POST['xuong'] ?? '';
+        $line = $_POST['line'] ?? '';
+        $tinh_trang = $_POST['tinh_trang'] ?? '';
+        
+        $where_conditions = [];
+        $params = [];
+        
+        if (!empty($search)) {
+            $where_conditions[] = "(tb.id_thiet_bi LIKE ? OR tb.ten_thiet_bi LIKE ? OR tb.nganh LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        
+        if (!empty($xuong)) {
+            $where_conditions[] = "tb.id_xuong = ?";
+            $params[] = $xuong;
+        }
+        
+        if (!empty($line)) {
+            $where_conditions[] = "tb.id_line = ?";
+            $params[] = $line;
+        }
+        
+        if (!empty($tinh_trang)) {
+            $where_conditions[] = "tb.tinh_trang = ?";
+            $params[] = $tinh_trang;
+        }
+        
+        $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+        
+        // Count total records
+        $count_sql = "SELECT COUNT(*) as total FROM thiet_bi tb $where_clause";
+        $count_stmt = $db->prepare($count_sql);
+        $count_stmt->execute($params);
+        $total_records = $count_stmt->fetch()['total'];
+        
+        // Get paginated data
+        $pagination = getPagination($page, $total_records);
+        
+        $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
+                       dm.ten_dong_may, u.full_name as chu_quan_name
+                FROM thiet_bi tb
+                LEFT JOIN xuong x ON tb.id_xuong = x.id
+                LEFT JOIN production_line pl ON tb.id_line = pl.id
+                LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
+                LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
+                LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
+                $where_clause
+                ORDER BY tb.created_at DESC
+                LIMIT {$pagination['records_per_page']} OFFSET {$pagination['offset']}";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $equipment = $stmt->fetchAll();
+        
+        jsonResponse([
+            'success' => true,
+            'data' => $equipment,
+            'pagination' => $pagination
+        ]);
+        
+    } catch (Exception $e) {
+        error_log("Equipment list error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách thiết bị: ' . $e->getMessage()], 500);
     }
+}
+
+function getEquipmentListSimple() {
+    global $db;
     
-    if (!empty($xuong)) {
-        $where_conditions[] = "tb.id_xuong = ?";
-        $params[] = $xuong;
+    try {
+        $sql = "SELECT id, id_thiet_bi, ten_thiet_bi 
+                FROM thiet_bi 
+                ORDER BY id_thiet_bi";
+        
+        $stmt = $db->query($sql);
+        $equipment = $stmt->fetchAll();
+        
+        jsonResponse(['success' => true, 'data' => $equipment]);
+        
+    } catch (Exception $e) {
+        error_log("Equipment list_simple error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách thiết bị: ' . $e->getMessage()], 500);
     }
-    
-    if (!empty($line)) {
-        $where_conditions[] = "tb.id_line = ?";
-        $params[] = $line;
-    }
-    
-    if (!empty($tinh_trang)) {
-        $where_conditions[] = "tb.tinh_trang = ?";
-        $params[] = $tinh_trang;
-    }
-    
-    $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-    
-    // Count total records
-    $count_sql = "SELECT COUNT(*) as total FROM thiet_bi tb $where_clause";
-    $count_stmt = $db->prepare($count_sql);
-    $count_stmt->execute($params);
-    $total_records = $count_stmt->fetch()['total'];
-    
-    // Get paginated data
-    $pagination = getPagination($page, $total_records);
-    
-    $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
-                   dm.ten_dong_may, u.full_name as chu_quan_name
-            FROM thiet_bi tb
-            LEFT JOIN xuong x ON tb.id_xuong = x.id
-            LEFT JOIN production_line pl ON tb.id_line = pl.id
-            LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
-            LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
-            LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
-            $where_clause
-            ORDER BY tb.created_at DESC
-            LIMIT {$pagination['records_per_page']} OFFSET {$pagination['offset']}";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-    $equipment = $stmt->fetchAll();
-    
-    jsonResponse([
-        'success' => true,
-        'data' => $equipment,
-        'pagination' => $pagination
-    ]);
 }
 
 function getEquipmentDetail() {
     global $db;
     
-    $id = $_GET['id'];
-    
-    $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
-                   dm.ten_dong_may, u.full_name as chu_quan_name
-            FROM thiet_bi tb
-            LEFT JOIN xuong x ON tb.id_xuong = x.id
-            LEFT JOIN production_line pl ON tb.id_line = pl.id
-            LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
-            LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
-            LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
-            WHERE tb.id = ?";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->execute([$id]);
-    $equipment = $stmt->fetch();
-    
-    if ($equipment) {
-        jsonResponse(['success' => true, 'data' => $equipment]);
-    } else {
-        jsonResponse(['success' => false, 'message' => 'Không tìm thấy thiết bị'], 404);
+    try {
+        $id = $_GET['id'];
+        
+        $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
+                       dm.ten_dong_may, u.full_name as chu_quan_name
+                FROM thiet_bi tb
+                LEFT JOIN xuong x ON tb.id_xuong = x.id
+                LEFT JOIN production_line pl ON tb.id_line = pl.id
+                LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
+                LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
+                LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
+                WHERE tb.id = ?";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$id]);
+        $equipment = $stmt->fetch();
+        
+        if ($equipment) {
+            jsonResponse(['success' => true, 'data' => $equipment]);
+        } else {
+            jsonResponse(['success' => false, 'message' => 'Không tìm thấy thiết bị'], 404);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Equipment detail error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải chi tiết thiết bị: ' . $e->getMessage()], 500);
     }
 }
 
 function getXuongList() {
     global $db;
     
-    $stmt = $db->query("SELECT id, ten_xuong FROM xuong ORDER BY ten_xuong");
-    $xuong = $stmt->fetchAll();
-    
-    jsonResponse(['success' => true, 'data' => $xuong]);
+    try {
+        $stmt = $db->query("SELECT id, ten_xuong FROM xuong ORDER BY ten_xuong");
+        $xuong = $stmt->fetchAll();
+        
+        jsonResponse(['success' => true, 'data' => $xuong]);
+        
+    } catch (Exception $e) {
+        error_log("Xuong list error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách xưởng: ' . $e->getMessage()], 500);
+    }
 }
 
 function getLinesList() {
     global $db;
     
-    $xuong_id = $_GET['xuong_id'];
-    
-    $stmt = $db->prepare("SELECT id, ten_line FROM production_line WHERE id_xuong = ? ORDER BY ten_line");
-    $stmt->execute([$xuong_id]);
-    $lines = $stmt->fetchAll();
-    
-    jsonResponse(['success' => true, 'data' => $lines]);
+    try {
+        $xuong_id = $_GET['xuong_id'];
+        
+        $stmt = $db->prepare("SELECT id, ten_line FROM production_line WHERE id_xuong = ? ORDER BY ten_line");
+        $stmt->execute([$xuong_id]);
+        $lines = $stmt->fetchAll();
+        
+        jsonResponse(['success' => true, 'data' => $lines]);
+        
+    } catch (Exception $e) {
+        error_log("Lines list error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách line: ' . $e->getMessage()], 500);
+    }
 }
 
 function getKhuVucList() {
     global $db;
     
-    $line_id = $_GET['line_id'];
-    
-    $stmt = $db->prepare("SELECT id, ten_khu_vuc FROM khu_vuc WHERE id_line = ? ORDER BY ten_khu_vuc");
-    $stmt->execute([$line_id]);
-    $khu_vuc = $stmt->fetchAll();
-    
-    jsonResponse(['success' => true, 'data' => $khu_vuc]);
+    try {
+        $line_id = $_GET['line_id'];
+        
+        $stmt = $db->prepare("SELECT id, ten_khu_vuc FROM khu_vuc WHERE id_line = ? ORDER BY ten_khu_vuc");
+        $stmt->execute([$line_id]);
+        $khu_vuc = $stmt->fetchAll();
+        
+        jsonResponse(['success' => true, 'data' => $khu_vuc]);
+        
+    } catch (Exception $e) {
+        error_log("Khu vuc list error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách khu vực: ' . $e->getMessage()], 500);
+    }
 }
 
 function getDongMayList() {
     global $db;
     
-    $khu_vuc_id = $_GET['khu_vuc_id'];
-    
-    $stmt = $db->prepare("SELECT id, ten_dong_may FROM dong_may WHERE id_khu_vuc = ? ORDER BY ten_dong_may");
-    $stmt->execute([$khu_vuc_id]);
-    $dong_may = $stmt->fetchAll();
-    
-    jsonResponse(['success' => true, 'data' => $dong_may]);
+    try {
+        $khu_vuc_id = $_GET['khu_vuc_id'];
+        
+        $stmt = $db->prepare("SELECT id, ten_dong_may FROM dong_may WHERE id_khu_vuc = ? ORDER BY ten_dong_may");
+        $stmt->execute([$khu_vuc_id]);
+        $dong_may = $stmt->fetchAll();
+        
+        jsonResponse(['success' => true, 'data' => $dong_may]);
+        
+    } catch (Exception $e) {
+        error_log("Dong may list error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tải danh sách dòng máy: ' . $e->getMessage()], 500);
+    }
 }
 
+function searchEquipmentById() {
+    global $db;
+    
+    try {
+        $equipment_id = $_GET['equipment_id'];
+        
+        $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
+                       dm.ten_dong_may, u.full_name as chu_quan_name
+                FROM thiet_bi tb
+                LEFT JOIN xuong x ON tb.id_xuong = x.id
+                LEFT JOIN production_line pl ON tb.id_line = pl.id
+                LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
+                LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
+                LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
+                WHERE tb.id_thiet_bi = ?";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$equipment_id]);
+        $equipment = $stmt->fetch();
+        
+        if ($equipment) {
+            jsonResponse(['success' => true, 'data' => $equipment]);
+        } else {
+            jsonResponse(['success' => false, 'message' => 'Không tìm thấy thiết bị'], 404);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Search equipment error: " . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Lỗi tìm kiếm thiết bị: ' . $e->getMessage()], 500);
+    }
+}
+
+// Các function khác (createEquipment, updateEquipment, deleteEquipment, exportEquipment) giữ nguyên...
 function createEquipment() {
     global $db;
     
@@ -456,30 +553,5 @@ function exportEquipment() {
     
     fclose($output);
     exit();
-}
-function searchEquipmentById() {
-    global $db;
-    
-    $equipment_id = $_GET['equipment_id'];
-    
-    $sql = "SELECT tb.*, x.ten_xuong, pl.ten_line, kv.ten_khu_vuc, 
-                   dm.ten_dong_may, u.full_name as chu_quan_name
-            FROM thiet_bi tb
-            LEFT JOIN xuong x ON tb.id_xuong = x.id
-            LEFT JOIN production_line pl ON tb.id_line = pl.id
-            LEFT JOIN khu_vuc kv ON tb.id_khu_vuc = kv.id
-            LEFT JOIN dong_may dm ON tb.id_dong_may = dm.id
-            LEFT JOIN users u ON tb.nguoi_chu_quan = u.id
-            WHERE tb.id_thiet_bi = ?";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->execute([$equipment_id]);
-    $equipment = $stmt->fetch();
-    
-    if ($equipment) {
-        jsonResponse(['success' => true, 'data' => $equipment]);
-    } else {
-        jsonResponse(['success' => false, 'message' => 'Không tìm thấy thiết bị'], 404);
-    }
 }
 ?>
