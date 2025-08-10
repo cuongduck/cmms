@@ -1,6 +1,15 @@
 <?php
-// config/functions.php
-session_start();
+// config/functions.php - Thêm vào đầu file
+
+// Cấu hình session an toàn
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_secure', 1); // Đổi thành 1 nếu dùng HTTPS
+
+// Khởi tạo session nếu chưa có
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Hàm kiểm tra đăng nhập
 function isLoggedIn() {

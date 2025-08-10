@@ -1,56 +1,85 @@
 <?php
-// auth/check_auth.php - File kiểm tra quyền truy cập cho API
-require_once '../config/database.php';
-require_once '../config/functions.php';
+// auth/check_auth.php - Fixed paths version
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
 
-// Debug logging
-error_log("Check auth called. Session ID: " . session_id());
-error_log("User ID in session: " . ($_SESSION['user_id'] ?? 'not set'));
-error_log("HTTP_X_REQUESTED_WITH: " . ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'not set'));
+// Sử dụng absolute path từ document root
+$root_path = dirname(dirname(__FILE__)); // /var/www/html
 
-// Kiểm tra AJAX request - RELAXED CHECK
-$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest';
-$is_api_call = strpos($_SERVER['REQUEST_URI'], '/api.php') !== false;
+require_once $root_path . '/config/database.php';
+require_once $root_path . '/config/functions.php';
 
-// Chỉ kiểm tra strict cho API calls thực sự quan trọng
-if (!$is_ajax && $is_api_call) {
-    // Cho phép các GET requests đơn giản
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $allowed_actions = ['get_xuong', 'get_lines', 'get_khu_vuc', 'get_dong_may', 'list_simple', 'search_by_id'];
-        $action = $_GET['action'] ?? '';
-        
-        if (!in_array($action, $allowed_actions)) {
-            error_log("Blocked non-AJAX request for action: " . $action);
-            http_response_code(403);
-            exit('Access denied');
-        }
-    } else {
-        // POST requests phải có AJAX header
-        error_log("Blocked non-AJAX POST request");
-        http_response_code(403);
-        exit('Access denied');
-    }
+// Session check
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Kiểm tra đăng nhập
+// Request analysis
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+           $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest';
+$is_api_call = strpos($_SERVER['REQUEST_URI'], '/api.php') !== false;
+
+// Minimal AJAX check - chỉ block những action thực sự nguy hiểm
+if ($is_api_call) {
+    $action = $_GET['action'] ?? $_POST['action'] ?? '';
+    $method = $_SERVER['REQUEST_METHOD'];
+    
+    // Chỉ block delete action không có AJAX header
+    if ($action === 'delete' && $method === 'POST' && !$is_ajax) {
+        error_log("BLOCKED: Delete action without AJAX header");
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Access denied']);
+        exit();
+    }
+    
+    // Log API calls
+    error_log("API Call: method=$method, action=$action, ajax=" . ($is_ajax ? 'yes' : 'no'));
+}
+
+// Login check
 if (!isLoggedIn()) {
     error_log("User not logged in");
+    
     if ($is_ajax || $is_api_call) {
-        jsonResponse(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn'], 401);
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Phiên đăng nhập đã hết hạn',
+            'redirect' => '/auth/login.php'
+        ]);
+        exit();
     } else {
-        header('Location: ../auth/login.php');
+        // Tính toán đường dẫn login đúng
+        $login_path = '/auth/login.php';
+        header('Location: ' . $login_path);
         exit();
     }
 }
 
-// Log successful auth
-error_log("Auth successful for user: " . $_SESSION['user_id']);
-
-// Hàm kiểm tra quyền cho API
+// Permission check function
 function checkApiPermission($required_roles) {
     if (!hasPermission($required_roles)) {
-        error_log("Permission denied for user: " . $_SESSION['user_id'] . ", required: " . implode(',', (array)$required_roles));
-        jsonResponse(['success' => false, 'message' => 'Bạn không có quyền thực hiện hành động này'], 403);
+        $user_role = $_SESSION['user_role'] ?? 'unknown';
+        $required_str = is_array($required_roles) ? implode(',', $required_roles) : $required_roles;
+        
+        error_log("Permission denied - user_role: $user_role, required: $required_str");
+        
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Bạn không có quyền thực hiện hành động này'
+        ]);
+        exit();
     }
+}
+
+// Set JSON header for API calls
+if ($is_api_call) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-cache, must-revalidate');
 }
 ?>

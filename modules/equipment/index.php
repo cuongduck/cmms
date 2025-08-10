@@ -170,28 +170,34 @@ require_once '../../includes/sidebar.php';
         let totalPages = 1;
         
         // Initialize when ready
-        $(document).ready(function() {
-            loadXuongOptions();
-            loadEquipmentData();
-            
-            // Filter form submit
-            $('#filterForm').on('submit', function(e) {
-                e.preventDefault();
-                currentPage = 1;
-                loadEquipmentData();
-            });
-            
-            // Xuong change event
-            $('#filter_xuong').on('change', function() {
-                const xuongId = $(this).val();
-                loadLineOptions(xuongId);
-            });
-            
-            // Select all checkbox
-            $('#selectAll').on('change', function() {
-                $('.equipment-checkbox').prop('checked', $(this).prop('checked'));
-            });
-        });
+        // Trong file modules/equipment/index.php, tìm phần $(document).ready và sửa:
+
+$(document).ready(function() {
+    loadXuongOptions();
+    
+    // Auto load equipment data after xuong options loaded
+    setTimeout(function() {
+        loadEquipmentData();
+    }, 1000);
+    
+    // Filter form submit
+    $('#filterForm').on('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        loadEquipmentData();
+    });
+    
+    // Xuong change event
+    $('#filter_xuong').on('change', function() {
+        const xuongId = $(this).val();
+        loadLineOptions(xuongId);
+    });
+    
+    // Select all checkbox
+    $('#selectAll').on('change', function() {
+        $('.equipment-checkbox').prop('checked', $(this).prop('checked'));
+    });
+});
         
         // Load xưởng options
         function loadXuongOptions() {

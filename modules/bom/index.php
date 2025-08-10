@@ -282,42 +282,49 @@ $equipment_filter = $_GET['equipment_id'] ?? '';
         let editingBOMId = null;
         
         // Initialize when ready
-        $(document).ready(function() {
-            loadEquipmentOptions();
-            loadVatTuOptions();
-            
-            // Set equipment filter if specified
-            const equipmentFilter = '<?= $equipment_filter ?>';
-            if (equipmentFilter) {
-                setTimeout(function() {
-                    $('#filter_equipment').val(equipmentFilter).trigger('change');
-                    loadBOMData();
-                }, 1000);
-            }
-            
-            // Form submission
-            $('#filterForm').on('submit', function(e) {
-                e.preventDefault();
-                currentPage = 1;
-                loadBOMData();
-            });
-            
-            // Equipment change event for modal
-            $('#equipment_id').on('change', function() {
-                const equipmentId = $(this).val();
-                loadDongMayOptions(equipmentId);
-            });
-            
-            // Vat tu change event
-            $('#vat_tu_id').on('change', function() {
-                showVatTuInfo($(this).val());
-            });
-            
-            // Select all checkbox
-            $('#selectAll').on('change', function() {
-                $('.bom-checkbox').prop('checked', $(this).prop('checked'));
-            });
-        });
+        // Trong file modules/bom/index.php, tìm phần $(document).ready và sửa như sau:
+
+$(document).ready(function() {
+    loadEquipmentOptions();
+    loadVatTuOptions();
+    
+    // Set equipment filter if specified
+    const equipmentFilter = '<?= $equipment_filter ?>';
+    if (equipmentFilter) {
+        setTimeout(function() {
+            $('#filter_equipment').val(equipmentFilter).trigger('change');
+            loadBOMData();
+        }, 1000);
+    } else {
+        // Auto load BOM data for all equipment
+        setTimeout(function() {
+            loadBOMData();
+        }, 1000);
+    }
+    
+    // Form submission
+    $('#filterForm').on('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        loadBOMData();
+    });
+    
+    // Equipment change event for modal
+    $('#equipment_id').on('change', function() {
+        const equipmentId = $(this).val();
+        loadDongMayOptions(equipmentId);
+    });
+    
+    // Vat tu change event
+    $('#vat_tu_id').on('change', function() {
+        showVatTuInfo($(this).val());
+    });
+    
+    // Select all checkbox
+    $('#selectAll').on('change', function() {
+        $('.bom-checkbox').prop('checked', $(this).prop('checked'));
+    });
+});
         
         // Load equipment options
         function loadEquipmentOptions() {
