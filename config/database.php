@@ -4,7 +4,7 @@ class Database {
     private $host = '10.18.15.43';
     private $db_name = 'iot_cmms';
     private $username = 'mmb';
-    private $password = 'ssss5';
+    private $password = 'Masan@2025';
     private $charset = 'utf8mb4';
     public $conn;
 

@@ -85,7 +85,7 @@ function loadModuleJS() {
     } else if (currentPath.includes('/modules/maintenance/')) {
         loadScript('/assets/js/modules/maintenance.js');
     } else if (currentPath.includes('/modules/bom/')) {
-        loadScript('/assets/js/modules/bom.js');
+        loadScript('/assets/js/modules/boms.js');
     } else if (currentPath.includes('/modules/tasks/')) {
         loadScript('/assets/js/modules/tasks.js');
     } else if (currentPath.includes('/modules/qr-scanner/')) {
