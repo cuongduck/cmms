@@ -11,10 +11,10 @@
     </div>
 </footer>
 
-<!-- Load jQuery FIRST -->
+<!-- Load jQuery FIRST - Critical! -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 
-<!-- Load other dependencies -->
+<!-- Load other dependencies AFTER jQuery -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/datatables.net@1.13.4/js/jquery.dataTables.min.js"></script>
@@ -22,11 +22,20 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-<!-- Load CMMS Core -->
+<!-- Load CMMS Core AFTER jQuery -->
 <script src="/assets/js/common/cmms-core.js"></script>
 
 <script>
-$(document).ready(function() {
+// Wait for jQuery to be fully loaded before initializing
+function initializeCMMS() {
+    if (typeof $ === 'undefined' || typeof jQuery === 'undefined') {
+        console.log('Waiting for jQuery...');
+        setTimeout(initializeCMMS, 100);
+        return;
+    }
+    
+    console.log('jQuery loaded, initializing CMMS...');
+    
     // Initialize CMMS Core
     CMMS.init({
         baseUrl: '/',
@@ -44,10 +53,18 @@ $(document).ready(function() {
     
     // Trigger event that components are ready
     $(document).trigger('cmms-ready');
-});
+    
+    // Load module-specific JS after CMMS is ready
+    setTimeout(loadModuleJS, 500);
+}
+
+// Start initialization
+initializeCMMS();
 
 // Load notifications
 function loadNotifications() {
+    if (typeof CMMS === 'undefined') return;
+    
     CMMS.ajax(CMMS.baseUrl + 'api/notifications.php', {
         method: 'GET'
     }).then(response => {
@@ -78,18 +95,71 @@ function updateNotificationUI(notifications) {
 // Load module-specific JavaScript based on current page
 function loadModuleJS() {
     const currentPath = window.location.pathname;
+    const currentFile = currentPath.split('/').pop().split('.')[0]; // Get filename without extension
+    
+    console.log('Loading modules for path:', currentPath, 'file:', currentFile);
     
     // Check which module we're in and load appropriate JS
     if (currentPath.includes('/modules/equipment/')) {
-        loadScript('/assets/js/modules/equipment.js');
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/equipment-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/equipment-add.js');
+        } else {
+            loadScript('/assets/js/modules/equipment.js');
+        }
     } else if (currentPath.includes('/modules/maintenance/')) {
-        loadScript('/assets/js/modules/maintenance.js');
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/maintenance-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/maintenance-add.js');
+        } else {
+            loadScript('/assets/js/modules/maintenance.js');
+        }
     } else if (currentPath.includes('/modules/bom/')) {
-        loadScript('/assets/js/modules/boms.js');
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/bom-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/bom-add.js');
+        } else {
+            loadScript('/assets/js/modules/boms.js');
+        }
     } else if (currentPath.includes('/modules/tasks/')) {
-        loadScript('/assets/js/modules/tasks.js');
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/tasks-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/tasks-add.js');
+        } else {
+            loadScript('/assets/js/modules/tasks.js');
+        }
     } else if (currentPath.includes('/modules/qr-scanner/')) {
         loadScript('/assets/js/modules/qr-scanner.js');
+    } else if (currentPath.includes('/modules/inventory/')) {
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/inventory-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/inventory-add.js');
+        } else {
+            loadScript('/assets/js/modules/inventory.js');
+        }
+    } else if (currentPath.includes('/modules/calibration/')) {
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/calibration-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/calibration-add.js');
+        } else {
+            loadScript('/assets/js/modules/calibration.js');
+        }
+    } else if (currentPath.includes('/modules/users/')) {
+        if (currentFile === 'edit') {
+            loadScript('/assets/js/modules/users-edit.js');
+        } else if (currentFile === 'add') {
+            loadScript('/assets/js/modules/users-add.js');
+        } else {
+            loadScript('/assets/js/modules/users.js');
+        }
+    } else if (currentPath.includes('/modules/reports/')) {
+        loadScript('/assets/js/modules/reports.js');
     }
 }
 
@@ -110,11 +180,6 @@ function loadScript(src) {
     document.head.appendChild(script);
 }
 
-// Load module JS after CMMS core is ready
-$(document).on('cmms-ready', function() {
-    loadModuleJS();
-});
-
 // Debug functions (keep these for development)
 window.debugCMMS = function() {
     console.log('CMMS Debug Info:');
@@ -122,6 +187,7 @@ window.debugCMMS = function() {
     console.log('User Role:', CMMS.userRole);
     console.log('Base URL:', CMMS.baseUrl);
     console.log('jQuery version:', $.fn.jquery);
+    console.log('jQuery available:', typeof $ !== 'undefined');
 };
 
 window.testEquipmentAPI = function() {

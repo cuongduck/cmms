@@ -1,6 +1,7 @@
 /**
- * Equipment Module JavaScript
- * Chứa tất cả logic cho module quản lý thiết bị
+ * Equipment Module JavaScript - Updated Version
+ * Chứa tất cả logic cho module quản lý thiết bị (index page)
+ * File: assets/js/modules/equipment.js
  */
 
 var EquipmentModule = (function() {
@@ -9,6 +10,7 @@ var EquipmentModule = (function() {
     // Private variables
     let currentPage = 1;
     let totalPages = 1;
+    let isLoading = false;
     
     // Private methods
     function loadXuongOptions() {
@@ -57,6 +59,9 @@ var EquipmentModule = (function() {
     }
     
     function loadEquipmentData() {
+        if (isLoading) return Promise.resolve([]);
+        isLoading = true;
+        
         const formData = new FormData(document.getElementById('filterForm'));
         formData.append('action', 'list');
         formData.append('page', currentPage);
@@ -70,6 +75,7 @@ var EquipmentModule = (function() {
         }).then(response => {
             console.log('Equipment response:', response);
             CMMS.hideLoading('#equipmentTableBody');
+            isLoading = false;
             
             if (response && response.success) {
                 displayEquipmentData(response.data);
@@ -85,6 +91,7 @@ var EquipmentModule = (function() {
         }).catch(error => {
             console.error('Equipment AJAX error:', error);
             CMMS.hideLoading('#equipmentTableBody');
+            isLoading = false;
             $('#equipmentTableBody').html('<tr><td colspan="7" class="text-center text-danger">Lỗi kết nối API</td></tr>');
             throw error;
         });
@@ -216,6 +223,12 @@ var EquipmentModule = (function() {
             $('#selectAll').on('change', function() {
                 $('.equipment-checkbox').prop('checked', $(this).prop('checked'));
             });
+            
+            // Auto-search on input
+            $('#filter_search').on('input', debounce(() => {
+                currentPage = 1;
+                this.loadData();
+            }, 500));
         },
         
         // Load xuong options
@@ -226,7 +239,7 @@ var EquipmentModule = (function() {
         
         // Change page
         changePage: function(page) {
-            if (page >= 1 && page <= totalPages) {
+            if (page >= 1 && page <= totalPages && !isLoading) {
                 currentPage = page;
                 this.loadData();
             }
@@ -332,14 +345,50 @@ var EquipmentModule = (function() {
             window.print();
             document.body.innerHTML = originalContent;
             location.reload();
+        },
+        
+        // Quick filter functions
+        quickFilter: function(type) {
+            document.getElementById('filterForm').reset();
+            
+            switch (type) {
+                case 'active':
+                    $('#filter_tinh_trang').val('hoat_dong');
+                    break;
+                case 'maintenance':
+                    $('#filter_tinh_trang').val('bao_tri');
+                    break;
+                case 'broken':
+                    $('#filter_tinh_trang').val('hong');
+                    break;
+                case 'inactive':
+                    $('#filter_tinh_trang').val('ngung_hoat_dong');
+                    break;
+            }
+            
+            currentPage = 1;
+            this.loadData();
         }
     };
 })();
 
+// Utility function for debouncing
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Auto-initialize when DOM is ready
 $(document).ready(function() {
-    // Check if we're on equipment page before initializing
-    if ($('#equipmentTable').length) {
+    // Check if we're on equipment index page before initializing
+    if ($('#equipmentTable').length && window.location.pathname.includes('/equipment/index.php')) {
         EquipmentModule.init();
     }
 });

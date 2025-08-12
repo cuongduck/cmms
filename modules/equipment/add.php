@@ -45,6 +45,9 @@ $users = $users_stmt->fetchAll();
                                     <label class="form-label">ID thiết bị <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" name="id_thiet_bi" required 
                                            placeholder="Ví dụ: TB001">
+                                    <div class="invalid-feedback">
+                                        Vui lòng nhập ID thiết bị
+                                    </div>
                                 </div>
                             </div>
                             
@@ -53,6 +56,9 @@ $users = $users_stmt->fetchAll();
                                     <label class="form-label">Tên thiết bị <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" name="ten_thiet_bi" required 
                                            placeholder="Tên thiết bị">
+                                    <div class="invalid-feedback">
+                                        Vui lòng nhập tên thiết bị
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -65,6 +71,9 @@ $users = $users_stmt->fetchAll();
                                     <select class="form-select select2" name="id_xuong" id="id_xuong" required>
                                         <option value="">Chọn xưởng</option>
                                     </select>
+                                    <div class="invalid-feedback">
+                                        Vui lòng chọn xưởng
+                                    </div>
                                 </div>
                             </div>
                             
@@ -74,6 +83,9 @@ $users = $users_stmt->fetchAll();
                                     <select class="form-select select2" name="id_line" id="id_line" required disabled>
                                         <option value="">Chọn line</option>
                                     </select>
+                                    <div class="invalid-feedback">
+                                        Vui lòng chọn line sản xuất
+                                    </div>
                                 </div>
                             </div>
                             
@@ -83,6 +95,9 @@ $users = $users_stmt->fetchAll();
                                     <select class="form-select select2" name="id_khu_vuc" id="id_khu_vuc" required disabled>
                                         <option value="">Chọn khu vực</option>
                                     </select>
+                                    <div class="invalid-feedback">
+                                        Vui lòng chọn khu vực
+                                    </div>
                                 </div>
                             </div>
                             
@@ -180,6 +195,9 @@ $users = $users_stmt->fetchAll();
                         </div>
 
                         <div class="text-end">
+                            <button type="button" class="btn btn-outline-secondary me-2" onclick="EquipmentAddModule.resetForm()">
+                                <i class="fas fa-undo me-2"></i>Đặt lại
+                            </button>
                             <button type="button" class="btn btn-outline-secondary me-2" onclick="history.back()">
                                 <i class="fas fa-times me-2"></i>Hủy
                             </button>
@@ -237,168 +255,130 @@ $users = $users_stmt->fetchAll();
                     </ul>
                 </div>
             </div>
+            
+            <!-- Equipment Form Progress -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-clipboard-check me-2"></i>Tiến độ nhập liệu
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-2" style="height: 10px;">
+                        <div class="progress-bar bg-success" id="formProgress" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-muted" id="progressText">0% hoàn thành</small>
+                    
+                    <div class="mt-3">
+                        <div class="checklist">
+                            <div class="form-check form-check-sm" id="check-basic">
+                                <input class="form-check-input" type="checkbox" disabled>
+                                <label class="form-check-label text-muted">
+                                    Thông tin cơ bản
+                                </label>
+                            </div>
+                            <div class="form-check form-check-sm" id="check-location">
+                                <input class="form-check-input" type="checkbox" disabled>
+                                <label class="form-check-label text-muted">
+                                    Vị trí lắp đặt
+                                </label>
+                            </div>
+                            <div class="form-check form-check-sm" id="check-technical">
+                                <input class="form-check-input" type="checkbox" disabled>
+                                <label class="form-check-label text-muted">
+                                    Thông số kỹ thuật
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- Load Equipment Add Module -->
 <script>
-$(document).ready(function() {
-    loadXuongOptions();
-    
-    // Form submission
-    $('#equipmentForm').on('submit', function(e) {
-        e.preventDefault();
-        submitForm();
-    });
-    
-    // Cascading dropdowns
-    $('#id_xuong').change(function() {
-        const xuongId = $(this).val();
-        loadLineOptions(xuongId);
-        resetDownstreamDropdowns(['id_line', 'id_khu_vuc', 'id_dong_may']);
-    });
-    
-    $('#id_line').change(function() {
-        const lineId = $(this).val();
-        loadKhuVucOptions(lineId);
-        resetDownstreamDropdowns(['id_khu_vuc', 'id_dong_may']);
-    });
-    
-    $('#id_khu_vuc').change(function() {
-        const khuVucId = $(this).val();
-        loadDongMayOptions(khuVucId);
-        resetDownstreamDropdowns(['id_dong_may']);
-    });
-    
-    // QR Preview
-    $('input[name="id_thiet_bi"]').on('input', function() {
-        updateQRPreview($(this).val());
-    });
-});
+// Debug: log that we're on add page
+console.log('Equipment add page loaded');
 
-function loadXuongOptions() {
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_xuong' }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn xưởng</option>';
-            response.data.forEach(item => {
-                options += `<option value="${item.id}">${item.ten_xuong}</option>`;
-            });
-            $('#id_xuong').html(options);
-        }
-    });
-}
-
-function loadLineOptions(xuongId) {
-    const lineSelect = $('#id_line');
-    
-    if (!xuongId) {
-        lineSelect.prop('disabled', true);
+// Form progress tracking - will be initialized after jQuery loads
+function initFormProgress() {
+    if (typeof $ === 'undefined') {
+        setTimeout(initFormProgress, 100);
         return;
     }
     
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_lines', xuong_id: xuongId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn line</option>';
-            response.data.forEach(item => {
-                options += `<option value="${item.id}">${item.ten_line}</option>`;
-            });
-            lineSelect.prop('disabled', false).html(options);
-        }
-    });
-}
-
-function loadKhuVucOptions(lineId) {
-    const khuVucSelect = $('#id_khu_vuc');
-    
-    if (!lineId) {
-        khuVucSelect.prop('disabled', true);
-        return;
-    }
-    
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_khu_vuc', line_id: lineId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn khu vực</option>';
-            response.data.forEach(item => {
-                options += `<option value="${item.id}">${item.ten_khu_vuc}</option>`;
-            });
-            khuVucSelect.prop('disabled', false).html(options);
-        }
-    });
-}
-
-function loadDongMayOptions(khuVucId) {
-    const dongMaySelect = $('#id_dong_may');
-    
-    if (!khuVucId) {
-        dongMaySelect.prop('disabled', true);
-        return;
-    }
-    
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_dong_may', khu_vuc_id: khuVucId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn dòng máy</option>';
-            response.data.forEach(item => {
-                options += `<option value="${item.id}">${item.ten_dong_may}</option>`;
-            });
-            dongMaySelect.prop('disabled', false).html(options);
-        }
-    });
-}
-
-function resetDownstreamDropdowns(dropdownIds) {
-    dropdownIds.forEach(id => {
-        $(`#${id}`).prop('disabled', true).html('<option value="">Chọn...</option>');
-    });
-}
-
-function updateQRPreview(equipmentId) {
-    if (!equipmentId.trim()) {
-        $('#qrPreview').html(`
-            <div class="text-muted">
-                <i class="fas fa-qrcode fa-3x mb-3 opacity-50"></i>
-                <p>Nhập ID thiết bị để xem QR Code</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const qrUrl = `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${encodeURIComponent(equipmentId)}`;
-    
-    $('#qrPreview').html(`
-        <h6>${equipmentId}</h6>
-        <img src="${qrUrl}" class="img-fluid" alt="QR Code">
-        <p class="mt-2 text-muted small">QR Code sẽ được tạo tự động</p>
-    `);
-}
-
-function submitForm() {
-    const formData = new FormData(document.getElementById('equipmentForm'));
-    formData.append('action', 'create');
-    
-    CMMS.ajax('api.php', {
-        data: formData
-    }).then(response => {
-        if (response.success) {
-            CMMS.showAlert('Tạo thiết bị thành công!', 'success');
-            setTimeout(() => {
-                window.location.href = 'index.php';
-            }, 1500);
+    function updateFormProgress() {
+        let completedSections = 0;
+        const totalSections = 3;
+        
+        // Check basic info (ID + Name)
+        const basicComplete = $('input[name="id_thiet_bi"]').val().trim() !== '' && 
+                             $('input[name="ten_thiet_bi"]').val().trim() !== '';
+        if (basicComplete) {
+            completedSections++;
+            $('#check-basic input').prop('checked', true);
+            $('#check-basic label').removeClass('text-muted').addClass('text-success');
         } else {
-            CMMS.showAlert(response.message, 'error');
+            $('#check-basic input').prop('checked', false);
+            $('#check-basic label').removeClass('text-success').addClass('text-muted');
         }
+        
+        // Check location info (Xuong + Line + Khu vuc)
+        const locationComplete = $('#id_xuong').val() !== '' && 
+                                $('#id_line').val() !== '' && 
+                                $('#id_khu_vuc').val() !== '';
+        if (locationComplete) {
+            completedSections++;
+            $('#check-location input').prop('checked', true);
+            $('#check-location label').removeClass('text-muted').addClass('text-success');
+        } else {
+            $('#check-location input').prop('checked', false);
+            $('#check-location label').removeClass('text-success').addClass('text-muted');
+        }
+        
+        // Check technical info (at least status selected)
+        const technicalComplete = $('select[name="tinh_trang"]').val() !== '';
+        if (technicalComplete) {
+            completedSections++;
+            $('#check-technical input').prop('checked', true);
+            $('#check-technical label').removeClass('text-muted').addClass('text-success');
+        } else {
+            $('#check-technical input').prop('checked', false);
+            $('#check-technical label').removeClass('text-success').addClass('text-muted');
+        }
+        
+        // Update progress bar
+        const progress = Math.round((completedSections / totalSections) * 100);
+        $('#formProgress').css('width', progress + '%').attr('aria-valuenow', progress);
+        $('#progressText').text(progress + '% hoàn thành');
+        
+        // Change color based on progress
+        $('#formProgress').removeClass('bg-danger bg-warning bg-success');
+        if (progress < 33) {
+            $('#formProgress').addClass('bg-danger');
+        } else if (progress < 66) {
+            $('#formProgress').addClass('bg-warning');
+        } else {
+            $('#formProgress').addClass('bg-success');
+        }
+    }
+    
+    // Update progress on form changes
+    $('#equipmentForm input, #equipmentForm select').on('input change', function() {
+        setTimeout(updateFormProgress, 100);
     });
+    
+    // Initial progress update
+    updateFormProgress();
+}
+
+// Initialize form progress when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFormProgress);
+} else {
+    initFormProgress();
 }
 </script>
 

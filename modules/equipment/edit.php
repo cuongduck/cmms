@@ -249,205 +249,53 @@ $users = $users_stmt->fetchAll();
                         <h6><?= htmlspecialchars($equipment['id_thiet_bi']) ?></h6>
                         <img src="<?= $qrUrl ?>" class="img-fluid" alt="QR Code">
                         <div class="mt-3">
-                            <button class="btn btn-outline-primary btn-sm" onclick="printQR()">
+                            <button class="btn btn-outline-primary btn-sm" onclick="EquipmentEditModule.printQR()">
                                 <i class="fas fa-print me-2"></i>In QR
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
+            
+            <!-- Help Card -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Hướng dẫn
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            ID thiết bị phải duy nhất trong hệ thống
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Chọn đúng vị trí để dễ dàng quản lý
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Hình ảnh giúp nhận diện thiết bị nhanh hơn
+                        </li>
+                        <li class="mb-0">
+                            <i class="fas fa-check text-success me-2"></i>
+                            QR Code sẽ được cập nhật tự động
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- Load Equipment Edit Module -->
 <script>
-$(document).ready(function() {
-    loadFormData();
-    
-    // Form submission
-    $('#equipmentForm').on('submit', function(e) {
-        e.preventDefault();
-        submitForm();
-    });
-    
-    // Cascading dropdowns
-    $('#id_xuong').change(function() {
-        const xuongId = $(this).val();
-        loadLineOptions(xuongId);
-    });
-    
-    $('#id_line').change(function() {
-        const lineId = $(this).val();
-        loadKhuVucOptions(lineId);
-    });
-    
-    $('#id_khu_vuc').change(function() {
-        const khuVucId = $(this).val();
-        loadDongMayOptions(khuVucId);
-    });
-    
-    // QR Preview update
-    $('input[name="id_thiet_bi"]').on('input', function() {
-        updateQRPreview($(this).val());
-    });
-});
+// Pass equipment data to JavaScript
+window.EQUIPMENT_DATA = <?= json_encode($equipment) ?>;
 
-function loadFormData() {
-    // Load initial data
-    const equipmentData = <?= json_encode($equipment) ?>;
-    
-    // Load xưởng first
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_xuong' }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn xưởng</option>';
-            response.data.forEach(item => {
-                const selected = item.id == equipmentData.id_xuong ? 'selected' : '';
-                options += `<option value="${item.id}" ${selected}>${item.ten_xuong}</option>`;
-            });
-            $('#id_xuong').html(options);
-            
-            // Load lines if xuong is selected
-            if (equipmentData.id_xuong) {
-                loadLineOptions(equipmentData.id_xuong, equipmentData.id_line);
-            }
-        }
-    });
-}
-
-function loadLineOptions(xuongId, selectedLineId = null) {
-    const lineSelect = $('#id_line');
-    
-    if (!xuongId) {
-        lineSelect.prop('disabled', true);
-        return;
-    }
-    
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_lines', xuong_id: xuongId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn line</option>';
-            response.data.forEach(item => {
-                const selected = item.id == selectedLineId ? 'selected' : '';
-                options += `<option value="${item.id}" ${selected}>${item.ten_line}</option>`;
-            });
-            lineSelect.prop('disabled', false).html(options);
-            
-            // Load khu vuc if line is selected
-            const equipmentData = <?= json_encode($equipment) ?>;
-            if (selectedLineId && equipmentData.id_khu_vuc) {
-                loadKhuVucOptions(selectedLineId, equipmentData.id_khu_vuc);
-            }
-        }
-    });
-}
-
-function loadKhuVucOptions(lineId, selectedKhuVucId = null) {
-    const khuVucSelect = $('#id_khu_vuc');
-    
-    if (!lineId) {
-        khuVucSelect.prop('disabled', true);
-        return;
-    }
-    
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_khu_vuc', line_id: lineId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn khu vực</option>';
-            response.data.forEach(item => {
-                const selected = item.id == selectedKhuVucId ? 'selected' : '';
-                options += `<option value="${item.id}" ${selected}>${item.ten_khu_vuc}</option>`;
-            });
-            khuVucSelect.prop('disabled', false).html(options);
-            
-            // Load dong may if khu vuc is selected
-            const equipmentData = <?= json_encode($equipment) ?>;
-            if (selectedKhuVucId && equipmentData.id_dong_may) {
-                loadDongMayOptions(selectedKhuVucId, equipmentData.id_dong_may);
-            }
-        }
-    });
-}
-
-function loadDongMayOptions(khuVucId, selectedDongMayId = null) {
-    const dongMaySelect = $('#id_dong_may');
-    
-    if (!khuVucId) {
-        dongMaySelect.prop('disabled', true);
-        return;
-    }
-    
-    CMMS.ajax('api.php', {
-        method: 'GET',
-        data: { action: 'get_dong_may', khu_vuc_id: khuVucId }
-    }).then(response => {
-        if (response.success) {
-            let options = '<option value="">Chọn dòng máy</option>';
-            response.data.forEach(item => {
-                const selected = item.id == selectedDongMayId ? 'selected' : '';
-                options += `<option value="${item.id}" ${selected}>${item.ten_dong_may}</option>`;
-            });
-            dongMaySelect.prop('disabled', false).html(options);
-        }
-    });
-}
-
-function updateQRPreview(equipmentId) {
-    if (!equipmentId.trim()) {
-        return;
-    }
-    
-    const qrUrl = `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${encodeURIComponent(equipmentId)}`;
-    
-    $('#qrPreview').html(`
-        <h6>${equipmentId}</h6>
-        <img src="${qrUrl}" class="img-fluid" alt="QR Code">
-        <div class="mt-3">
-            <button class="btn btn-outline-primary btn-sm" onclick="printQR()">
-                <i class="fas fa-print me-2"></i>In QR
-            </button>
-        </div>
-    `);
-}
-
-function printQR() {
-    const printContent = document.getElementById('qrPreview').innerHTML;
-    const originalContent = document.body.innerHTML;
-    
-    document.body.innerHTML = `
-        <div style="text-align: center; padding: 20px;">
-            ${printContent}
-        </div>
-    `;
-    
-    window.print();
-    document.body.innerHTML = originalContent;
-    location.reload();
-}
-
-function submitForm() {
-    const formData = new FormData(document.getElementById('equipmentForm'));
-    formData.append('action', 'update');
-    
-    CMMS.ajax('api.php', {
-        data: formData
-    }).then(response => {
-        if (response.success) {
-            CMMS.showAlert('Cập nhật thiết bị thành công!', 'success');
-            setTimeout(() => {
-                window.location.href = 'index.php';
-            }, 1500);
-        } else {
-            CMMS.showAlert(response.message, 'error');
-        }
-    });
-}
+// Debug: log equipment data
+console.log('Equipment data passed to JS:', window.EQUIPMENT_DATA);
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>
