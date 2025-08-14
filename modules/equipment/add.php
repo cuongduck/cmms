@@ -1,5 +1,5 @@
 <?php
-// modules/equipment/add.php - Thêm thiết bị mới
+// modules/equipment/add.php - Thêm thiết bị mới - Updated for new DB structure
 require_once '../../config/database.php';
 require_once '../../config/functions.php';
 
@@ -34,20 +34,29 @@ $users = $users_stmt->fetchAll();
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Thông tin thiết bị</h5>
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>Thông tin thiết bị
+                    </h5>
                 </div>
                 <div class="card-body">
                     <form id="equipmentForm" enctype="multipart/form-data">
-                        <div class="row">
-                            <!-- Basic Information -->
+                        <!-- Basic Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>Thông tin cơ bản
+                                </h6>
+                            </div>
+                            
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">ID thiết bị <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" name="id_thiet_bi" required 
-                                           placeholder="Ví dụ: TB001">
+                                           placeholder="Ví dụ: OMORI_1.1">
                                     <div class="invalid-feedback">
                                         Vui lòng nhập ID thiết bị
                                     </div>
+                                    <div class="form-text">ID phải duy nhất trong hệ thống</div>
                                 </div>
                             </div>
                             
@@ -63,9 +72,15 @@ $users = $users_stmt->fetchAll();
                             </div>
                         </div>
 
-                        <!-- Location Information -->
-                        <div class="row">
-                            <div class="col-md-3">
+                        <!-- Location Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-map-marker-alt me-2"></i>Vị trí lắp đặt
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">Xưởng <span class="text-danger">*</span></label>
                                     <select class="form-select select2" name="id_xuong" id="id_xuong" required>
@@ -77,19 +92,7 @@ $users = $users_stmt->fetchAll();
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Line sản xuất <span class="text-danger">*</span></label>
-                                    <select class="form-select select2" name="id_line" id="id_line" required disabled>
-                                        <option value="">Chọn line</option>
-                                    </select>
-                                    <div class="invalid-feedback">
-                                        Vui lòng chọn line sản xuất
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">Khu vực <span class="text-danger">*</span></label>
                                     <select class="form-select select2" name="id_khu_vuc" id="id_khu_vuc" required disabled>
@@ -98,40 +101,71 @@ $users = $users_stmt->fetchAll();
                                     <div class="invalid-feedback">
                                         Vui lòng chọn khu vực
                                     </div>
+                                    <div class="form-text">Công nghệ hoặc Đóng gói</div>
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Line sản xuất</label>
+                                    <select class="form-select select2" name="id_line" id="id_line" disabled>
+                                        <option value="">Chọn line</option>
+                                    </select>
+                                    <div class="form-text">Line sản xuất trong xưởng</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Equipment Hierarchy Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-sitemap me-2"></i>Phân cấp thiết bị (Tùy chọn)
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Dòng máy</label>
                                     <select class="form-select select2" name="id_dong_may" id="id_dong_may" disabled>
                                         <option value="">Chọn dòng máy</option>
                                     </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Vị trí cụ thể</label>
-                                    <input type="text" class="form-control" name="vi_tri" 
-                                           placeholder="Vị trí cụ thể trong line">
+                                    <div class="form-text">Ví dụ: Omori, Chảo chiên, Lô cán...</div>
                                 </div>
                             </div>
                             
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Ngành</label>
-                                    <input type="text" class="form-control" name="nganh" 
-                                           placeholder="Ngành sản xuất">
+                                    <label class="form-label">Cụm thiết bị</label>
+                                    <select class="form-select select2" name="id_cum_thiet_bi" id="id_cum_thiet_bi" disabled>
+                                        <option value="">Chọn cụm thiết bị</option>
+                                    </select>
+                                    <div class="form-text">Cụm con trong dòng máy</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Technical Information -->
-                        <div class="row">
-                            <div class="col-md-4">
+                        <!-- Technical Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-cog me-2"></i>Thông số kỹ thuật
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Ngành sản xuất</label>
+                                    <select class="form-select" name="nganh">
+                                        <option value="">Chọn ngành</option>
+                                        <option value="Mì">Mì ăn liền</option>
+                                        <option value="Phở">Phở gói</option>
+                                        <option value="Nêm">Nêm gia vị</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label class="form-label">Năm sản xuất</label>
                                     <input type="number" class="form-control" name="nam_san_xuat" 
@@ -139,17 +173,17 @@ $users = $users_stmt->fetchAll();
                                 </div>
                             </div>
                             
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label class="form-label">Công suất</label>
                                     <input type="text" class="form-control" name="cong_suat" 
-                                           placeholder="Ví dụ: 5.5kW">
+                                           placeholder="Ví dụ: 8kW, 120 gói/phút">
                                 </div>
                             </div>
                             
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label class="form-label">Tình trạng</label>
+                                    <label class="form-label">Tình trạng <span class="text-danger">*</span></label>
                                     <select class="form-select" name="tinh_trang" required>
                                         <option value="hoat_dong" selected>Hoạt động</option>
                                         <option value="bao_tri">Bảo trì</option>
@@ -160,7 +194,14 @@ $users = $users_stmt->fetchAll();
                             </div>
                         </div>
 
-                        <div class="row">
+                        <!-- Management Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-user-cog me-2"></i>Thông tin quản lý
+                                </h6>
+                            </div>
+                            
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Người chủ quản</label>
@@ -170,6 +211,7 @@ $users = $users_stmt->fetchAll();
                                             <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['full_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text">Người phụ trách thiết bị này</div>
                                 </div>
                             </div>
                             
@@ -182,40 +224,63 @@ $users = $users_stmt->fetchAll();
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Thông số kỹ thuật</label>
-                            <textarea class="form-control" name="thong_so_ky_thuat" rows="3" 
-                                      placeholder="Mô tả thông số kỹ thuật của thiết bị"></textarea>
+                        <!-- Additional Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-file-alt me-2"></i>Thông tin bổ sung
+                                </h6>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Thông số kỹ thuật chi tiết</label>
+                                    <textarea class="form-control" name="thong_so_ky_thuat" rows="3" 
+                                              placeholder="Mô tả chi tiết thông số kỹ thuật, tốc độ, nhiệt độ, dung tích..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Ghi chú</label>
+                                    <textarea class="form-control" name="ghi_chu" rows="2" 
+                                              placeholder="Ghi chú thêm về thiết bị, lưu ý đặc biệt..."></textarea>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Ghi chú</label>
-                            <textarea class="form-control" name="ghi_chu" rows="2" 
-                                      placeholder="Ghi chú thêm về thiết bị"></textarea>
-                        </div>
-
-                        <div class="text-end">
-                            <button type="button" class="btn btn-outline-secondary me-2" onclick="EquipmentAddModule.resetForm()">
-                                <i class="fas fa-undo me-2"></i>Đặt lại
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary me-2" onclick="history.back()">
-                                <i class="fas fa-times me-2"></i>Hủy
-                            </button>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>Lưu thiết bị
-                            </button>
+                        <!-- Form Actions -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="EquipmentAddModule.resetForm()">
+                                            <i class="fas fa-undo me-2"></i>Đặt lại
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-outline-secondary me-2" onclick="history.back()">
+                                            <i class="fas fa-times me-2"></i>Hủy
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i>Lưu thiết bị
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
         
-        <!-- Preview Panel -->
+        <!-- Right Sidebar -->
         <div class="col-lg-4">
+            <!-- QR Preview Card -->
             <div class="card">
                 <div class="card-header">
                     <h6 class="mb-0">
-                        <i class="fas fa-eye me-2"></i>Xem trước QR Code
+                        <i class="fas fa-qrcode me-2"></i>Xem trước QR Code
                     </h6>
                 </div>
                 <div class="card-body text-center">
@@ -228,35 +293,7 @@ $users = $users_stmt->fetchAll();
                 </div>
             </div>
             
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-lightbulb me-2"></i>Hướng dẫn
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0">
-                        <li class="mb-2">
-                            <i class="fas fa-check text-success me-2"></i>
-                            ID thiết bị phải duy nhất trong hệ thống
-                        </li>
-                        <li class="mb-2">
-                            <i class="fas fa-check text-success me-2"></i>
-                            Chọn đúng vị trí để dễ dàng quản lý
-                        </li>
-                        <li class="mb-2">
-                            <i class="fas fa-check text-success me-2"></i>
-                            Hình ảnh giúp nhận diện thiết bị nhanh hơn
-                        </li>
-                        <li class="mb-0">
-                            <i class="fas fa-check text-success me-2"></i>
-                            QR Code sẽ được tạo tự động
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Equipment Form Progress -->
+            <!-- Progress Card -->
             <div class="card mt-3">
                 <div class="card-header">
                     <h6 class="mb-0">
@@ -265,7 +302,8 @@ $users = $users_stmt->fetchAll();
                 </div>
                 <div class="card-body">
                     <div class="progress mb-2" style="height: 10px;">
-                        <div class="progress-bar bg-success" id="formProgress" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar bg-success" id="formProgress" role="progressbar" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                     <small class="text-muted" id="progressText">0% hoàn thành</small>
                     
@@ -293,9 +331,114 @@ $users = $users_stmt->fetchAll();
                     </div>
                 </div>
             </div>
+            
+            <!-- Help Card -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Hướng dẫn
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info small">
+                        <strong>Cấu trúc phân cấp mới:</strong><br>
+                        Xưởng → Khu vực → Line → Dòng máy → Cụm thiết bị
+                    </div>
+                    
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Bắt buộc:</strong> ID, Tên, Xưởng, Khu vực
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-info text-info me-2"></i>
+                            <strong>Khu vực:</strong> Công nghệ hoặc Đóng gói
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-info text-info me-2"></i>
+                            <strong>Line:</strong> Dây chuyền sản xuất cụ thể
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Dòng máy và Cụm là tùy chọn
+                        </li>
+                        <li class="mb-0">
+                            <i class="fas fa-camera text-secondary me-2"></i>
+                            Hình ảnh giúp nhận diện thiết bị
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Equipment Structure Example -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-tree me-2"></i>Ví dụ cấu trúc
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <div class="text-primary fw-bold">Xưởng F2</div>
+                        <div class="ms-2">
+                            <div class="text-info">├── Khu công nghệ</div>
+                            <div class="ms-3">
+                                <div>├── Line 1</div>
+                                <div class="ms-3">
+                                    <div class="text-warning">├── Dòng Omori</div>
+                                    <div class="ms-3">
+                                        <div class="text-success">└── Omori chính</div>
+                                        <div class="ms-4 text-muted">└── OMORI_1.1</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Custom Styles -->
+<style>
+.form-section {
+    border-left: 3px solid #667eea;
+    padding-left: 15px;
+    margin-bottom: 2rem;
+}
+
+.form-check-sm .form-check-input {
+    margin-top: 0.1rem;
+}
+
+.form-check-sm .form-check-label {
+    font-size: 0.875rem;
+}
+
+.checklist .form-check {
+    margin-bottom: 0.5rem;
+}
+
+.progress {
+    background-color: #e9ecef;
+    border-radius: 0.5rem;
+}
+
+.alert-info {
+    border-left: 4px solid #0dcaf0;
+}
+
+.card-header h6 {
+    font-weight: 600;
+}
+
+.tree-item {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+</style>
 
 <!-- Load Equipment Add Module -->
 <script>
@@ -325,9 +468,8 @@ function initFormProgress() {
             $('#check-basic label').removeClass('text-success').addClass('text-muted');
         }
         
-        // Check location info (Xuong + Line + Khu vuc)
+        // Check location info (Xuong + Khu vuc)
         const locationComplete = $('#id_xuong').val() !== '' && 
-                                $('#id_line').val() !== '' && 
                                 $('#id_khu_vuc').val() !== '';
         if (locationComplete) {
             completedSections++;

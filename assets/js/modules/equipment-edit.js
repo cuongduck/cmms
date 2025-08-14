@@ -1,5 +1,5 @@
 /**
- * Equipment Edit Module JavaScript
+ * Equipment Edit Module JavaScript - Updated for new database structure
  * Chứa logic cho trang sửa thiết bị
  * File: assets/js/modules/equipment-edit.js
  */
@@ -26,22 +26,25 @@ var EquipmentEditModule = (function() {
             
             console.log('Equipment data:', equipmentData);
             
-            // Step 1: Load Xưởng
+            // Step 1: Load Xưởng first
             await loadXuongOptions(equipmentData.id_xuong);
             
-            // Step 2: Load Line if xuong exists
+            // Step 2: Load Khu vuc and Line if xuong exists
             if (equipmentData.id_xuong) {
-                await loadLineOptions(equipmentData.id_xuong, equipmentData.id_line);
+                await Promise.all([
+                    loadKhuVucOptions(equipmentData.id_xuong, equipmentData.id_khu_vuc),
+                    loadLineOptions(equipmentData.id_xuong, equipmentData.id_line)
+                ]);
             }
             
-            // Step 3: Load Khu vuc if line exists
+            // Step 3: Load Dong may if line exists
             if (equipmentData.id_line) {
-                await loadKhuVucOptions(equipmentData.id_line, equipmentData.id_khu_vuc);
+                await loadDongMayOptions(equipmentData.id_line, equipmentData.id_dong_may);
             }
             
-            // Step 4: Load Dong may if khu vuc exists
-            if (equipmentData.id_khu_vuc) {
-                await loadDongMayOptions(equipmentData.id_khu_vuc, equipmentData.id_dong_may);
+            // Step 4: Load Cum thiet bi if dong may exists
+            if (equipmentData.id_dong_may) {
+                await loadCumThietBiOptions(equipmentData.id_dong_may, equipmentData.id_cum_thiet_bi);
             }
             
             console.log('Form data loaded successfully');
@@ -80,6 +83,45 @@ var EquipmentEditModule = (function() {
                 }
             }).catch(error => {
                 console.error('Xuong API error:', error);
+                reject(error);
+            });
+        });
+    }
+    
+    function loadKhuVucOptions(xuongId, selectedKhuVucId = null) {
+        return new Promise((resolve, reject) => {
+            const khuVucSelect = $('#id_khu_vuc');
+            
+            if (!xuongId) {
+                khuVucSelect.prop('disabled', true).html('<option value="">Chọn khu vực</option>');
+                resolve([]);
+                return;
+            }
+            
+            console.log('Loading khu vuc options for xuong:', xuongId);
+            
+            CMMS.ajax('api.php', {
+                method: 'GET',
+                data: { action: 'get_khu_vuc', xuong_id: xuongId }
+            }).then(response => {
+                console.log('Khu vuc response:', response);
+                
+                if (response && response.success) {
+                    let options = '<option value="">Chọn khu vực</option>';
+                    response.data.forEach(item => {
+                        const selected = item.id == selectedKhuVucId ? 'selected' : '';
+                        options += `<option value="${item.id}" ${selected}>${item.ten_khu_vuc}</option>`;
+                    });
+                    khuVucSelect.prop('disabled', false).html(options);
+                    
+                    console.log('Khu vuc loaded, selected:', selectedKhuVucId);
+                    resolve(response.data);
+                } else {
+                    console.error('Failed to load khu vuc:', response);
+                    reject(new Error('Failed to load khu vuc'));
+                }
+            }).catch(error => {
+                console.error('Khu vuc API error:', error);
                 reject(error);
             });
         });
@@ -124,60 +166,21 @@ var EquipmentEditModule = (function() {
         });
     }
     
-    function loadKhuVucOptions(lineId, selectedKhuVucId = null) {
-        return new Promise((resolve, reject) => {
-            const khuVucSelect = $('#id_khu_vuc');
-            
-            if (!lineId) {
-                khuVucSelect.prop('disabled', true).html('<option value="">Chọn khu vực</option>');
-                resolve([]);
-                return;
-            }
-            
-            console.log('Loading khu vuc options for line:', lineId);
-            
-            CMMS.ajax('api.php', {
-                method: 'GET',
-                data: { action: 'get_khu_vuc', line_id: lineId }
-            }).then(response => {
-                console.log('Khu vuc response:', response);
-                
-                if (response && response.success) {
-                    let options = '<option value="">Chọn khu vực</option>';
-                    response.data.forEach(item => {
-                        const selected = item.id == selectedKhuVucId ? 'selected' : '';
-                        options += `<option value="${item.id}" ${selected}>${item.ten_khu_vuc}</option>`;
-                    });
-                    khuVucSelect.prop('disabled', false).html(options);
-                    
-                    console.log('Khu vuc loaded, selected:', selectedKhuVucId);
-                    resolve(response.data);
-                } else {
-                    console.error('Failed to load khu vuc:', response);
-                    reject(new Error('Failed to load khu vuc'));
-                }
-            }).catch(error => {
-                console.error('Khu vuc API error:', error);
-                reject(error);
-            });
-        });
-    }
-    
-    function loadDongMayOptions(khuVucId, selectedDongMayId = null) {
+    function loadDongMayOptions(lineId, selectedDongMayId = null) {
         return new Promise((resolve, reject) => {
             const dongMaySelect = $('#id_dong_may');
             
-            if (!khuVucId) {
+            if (!lineId) {
                 dongMaySelect.prop('disabled', true).html('<option value="">Chọn dòng máy</option>');
                 resolve([]);
                 return;
             }
             
-            console.log('Loading dong may options for khu vuc:', khuVucId);
+            console.log('Loading dong may options for line:', lineId);
             
             CMMS.ajax('api.php', {
                 method: 'GET',
-                data: { action: 'get_dong_may', khu_vuc_id: khuVucId }
+                data: { action: 'get_dong_may', line_id: lineId }
             }).then(response => {
                 console.log('Dong may response:', response);
                 
@@ -202,9 +205,65 @@ var EquipmentEditModule = (function() {
         });
     }
     
+    function loadCumThietBiOptions(dongMayId, selectedCumThietBiId = null) {
+        return new Promise((resolve, reject) => {
+            const cumThietBiSelect = $('#id_cum_thiet_bi');
+            
+            if (!dongMayId) {
+                cumThietBiSelect.prop('disabled', true).html('<option value="">Chọn cụm thiết bị</option>');
+                resolve([]);
+                return;
+            }
+            
+            console.log('Loading cum thiet bi options for dong may:', dongMayId);
+            
+            CMMS.ajax('api.php', {
+                method: 'GET',
+                data: { action: 'get_cum_thiet_bi', dong_may_id: dongMayId }
+            }).then(response => {
+                console.log('Cum thiet bi response:', response);
+                
+                if (response && response.success) {
+                    let options = '<option value="">Chọn cụm thiết bị</option>';
+                    response.data.forEach(item => {
+                        const selected = item.id == selectedCumThietBiId ? 'selected' : '';
+                        options += `<option value="${item.id}" ${selected}>${item.ten_cum}</option>`;
+                    });
+                    cumThietBiSelect.prop('disabled', false).html(options);
+                    
+                    console.log('Cum thiet bi loaded, selected:', selectedCumThietBiId);
+                    resolve(response.data);
+                } else {
+                    console.error('Failed to load cum thiet bi:', response);
+                    reject(new Error('Failed to load cum thiet bi'));
+                }
+            }).catch(error => {
+                console.error('Cum thiet bi API error:', error);
+                reject(error);
+            });
+        });
+    }
+    
     function resetDownstreamDropdowns(dropdownIds) {
         dropdownIds.forEach(id => {
-            $(`#${id}`).prop('disabled', true).html('<option value="">Chọn...</option>');
+            let defaultText = 'Chọn...';
+            
+            switch (id) {
+                case 'id_khu_vuc':
+                    defaultText = 'Chọn khu vực';
+                    break;
+                case 'id_line':
+                    defaultText = 'Chọn line';
+                    break;
+                case 'id_dong_may':
+                    defaultText = 'Chọn dòng máy';
+                    break;
+                case 'id_cum_thiet_bi':
+                    defaultText = 'Chọn cụm thiết bị';
+                    break;
+            }
+            
+            $(`#${id}`).prop('disabled', true).html(`<option value="">${defaultText}</option>`);
         });
     }
     
@@ -229,27 +288,38 @@ var EquipmentEditModule = (function() {
     function handleXuongChange() {
         const xuongId = $('#id_xuong').val();
         if (xuongId) {
-            loadLineOptions(xuongId);
+            // Reset and reload dependent dropdowns
+            resetDownstreamDropdowns(['id_khu_vuc', 'id_line', 'id_dong_may', 'id_cum_thiet_bi']);
+            
+            Promise.all([
+                loadKhuVucOptions(xuongId),
+                loadLineOptions(xuongId)
+            ]).catch(error => {
+                console.error('Error loading xuong dependent data:', error);
+                CMMS.showAlert('Lỗi tải dữ liệu', 'error');
+            });
         } else {
-            resetDownstreamDropdowns(['id_line', 'id_khu_vuc', 'id_dong_may']);
+            resetDownstreamDropdowns(['id_khu_vuc', 'id_line', 'id_dong_may', 'id_cum_thiet_bi']);
         }
     }
     
     function handleLineChange() {
         const lineId = $('#id_line').val();
         if (lineId) {
-            loadKhuVucOptions(lineId);
+            resetDownstreamDropdowns(['id_dong_may', 'id_cum_thiet_bi']);
+            loadDongMayOptions(lineId);
         } else {
-            resetDownstreamDropdowns(['id_khu_vuc', 'id_dong_may']);
+            resetDownstreamDropdowns(['id_dong_may', 'id_cum_thiet_bi']);
         }
     }
     
-    function handleKhuVucChange() {
-        const khuVucId = $('#id_khu_vuc').val();
-        if (khuVucId) {
-            loadDongMayOptions(khuVucId);
+    function handleDongMayChange() {
+        const dongMayId = $('#id_dong_may').val();
+        if (dongMayId) {
+            resetDownstreamDropdowns(['id_cum_thiet_bi']);
+            loadCumThietBiOptions(dongMayId);
         } else {
-            resetDownstreamDropdowns(['id_dong_may']);
+            resetDownstreamDropdowns(['id_cum_thiet_bi']);
         }
     }
     
@@ -314,7 +384,7 @@ var EquipmentEditModule = (function() {
             // Cascading dropdowns - only for manual changes
             $('#id_xuong').change(handleXuongChange);
             $('#id_line').change(handleLineChange);
-            $('#id_khu_vuc').change(handleKhuVucChange);
+            $('#id_dong_may').change(handleDongMayChange);
             
             // QR Preview update
             $('input[name="id_thiet_bi"]').on('input', handleEquipmentIdChange);
@@ -350,6 +420,23 @@ var EquipmentEditModule = (function() {
         // Get current equipment data
         getEquipmentData: function() {
             return equipmentData;
+        },
+        
+        // Manual cascade loading for testing
+        loadKhuVucForXuong: function(xuongId, selectedId = null) {
+            return loadKhuVucOptions(xuongId, selectedId);
+        },
+        
+        loadLineForXuong: function(xuongId, selectedId = null) {
+            return loadLineOptions(xuongId, selectedId);
+        },
+        
+        loadDongMayForLine: function(lineId, selectedId = null) {
+            return loadDongMayOptions(lineId, selectedId);
+        },
+        
+        loadCumThietBiForDongMay: function(dongMayId, selectedId = null) {
+            return loadCumThietBiOptions(dongMayId, selectedId);
         }
     };
 })();
