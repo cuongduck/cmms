@@ -1,5 +1,5 @@
 <?php
-// includes/sidebar.php
+// includes/sidebar.php - Updated with Organization module
 $current_page = basename($_SERVER['PHP_SELF'], '.php');
 $current_module = basename(dirname($_SERVER['PHP_SELF']));
 
@@ -21,6 +21,16 @@ function isActiveMenu($page, $module = '') {
                 <span>Dashboard</span>
             </a>
         </li>
+        
+        <?php if (hasPermission(['admin', 'to_truong'])): ?>
+        <!-- Organization Structure Management -->
+        <li>
+            <a href="/modules/organization/" class="<?= isActiveMenu('', 'organization') ?>">
+                <i class="fas fa-sitemap"></i>
+                <span>Cấu trúc tổ chức</span>
+            </a>
+        </li>
+        <?php endif; ?>
         
         <?php if (hasPermission(['admin', 'to_truong'])): ?>
         <li>
