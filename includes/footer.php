@@ -100,6 +100,7 @@ function loadModuleJS() {
     console.log('Loading modules for path:', currentPath, 'file:', currentFile);
     
     // Check which module we're in and load appropriate JS
+    
     if (currentPath.includes('/modules/equipment/')) {
         if (currentFile === 'edit') {
             loadScript('/assets/js/modules/equipment-edit.js');

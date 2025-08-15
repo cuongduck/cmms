@@ -7,9 +7,6 @@
 window.CMMSModules = {
     // Module mapping configuration
     config: {
-        organization: {
-            index: '/assets/js/modules/organization.js'
-        },
         equipment: {
             index: '/assets/js/modules/equipment.js',
             add: '/assets/js/modules/equipment-add.js',
