@@ -1,125 +1,171 @@
 <?php
-// includes/sidebar.php - Updated with Organization module
-$current_page = basename($_SERVER['PHP_SELF'], '.php');
-$current_module = basename(dirname($_SERVER['PHP_SELF']));
-
-function isActiveMenu($page, $module = '') {
-    global $current_page, $current_module;
-    if ($module) {
-        return ($current_module === $module) ? 'active' : '';
-    }
-    return ($current_page === $page) ? 'active' : '';
-}
+$modules = getConfig('modules');
+$currentUser = getCurrentUser();
 ?>
 
-<!-- Sidebar -->
-<aside class="main-sidebar" id="mainSidebar">
-    <ul class="sidebar-menu">
-        <li>
-            <a href="/" class="<?= isActiveMenu('index') ?>">
+<div class="position-sticky pt-3">
+    <ul class="nav flex-column">
+        <!-- Dashboard -->
+        <li class="nav-item">
+            <a class="nav-link <?php echo ($currentModule === 'dashboard') ? 'active' : ''; ?>" 
+               href="/index.php">
                 <i class="fas fa-tachometer-alt"></i>
-                <span>Dashboard</span>
+                Tổng quan
             </a>
         </li>
         
-        <?php if (hasPermission(['admin', 'to_truong'])): ?>
-        <!-- Organization Structure Management -->
-        <li>
-            <a href="/modules/organization/" class="<?= isActiveMenu('', 'organization') ?>">
-                <i class="fas fa-sitemap"></i>
-                <span>Cấu trúc tổ chức</span>
-            </a>
-        </li>
-        <?php endif; ?>
+        <?php foreach ($modules as $moduleKey => $module): ?>
+            <?php if (hasPermission($moduleKey, 'view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo ($currentModule === $moduleKey) ? 'active' : ''; ?>" 
+                       href="<?php echo $module['url']; ?>">
+                        <i class="<?php echo $module['icon']; ?>"></i>
+                        <?php echo $module['name']; ?>
+                    </a>
+                </li>
+            <?php endif; ?>
+        <?php endforeach; ?>
         
-        <?php if (hasPermission(['admin', 'to_truong'])): ?>
-        <li>
-            <a href="/modules/equipment/" class="<?= isActiveMenu('', 'equipment') ?>">
-                <i class="fas fa-cogs"></i>
-                <span>Quản lý thiết bị</span>
-            </a>
-        </li>
-        <?php endif; ?>
+        <!-- Divider -->
+        <li><hr class="dropdown-divider my-3 opacity-25"></li>
         
-        <?php if (hasPermission(['admin', 'to_truong'])): ?>
-        <li>
-            <a href="/modules/bom/" class="<?= isActiveMenu('', 'bom') ?>">
-                <i class="fas fa-list-alt"></i>
-                <span>BOM thiết bị</span>
-            </a>
-        </li>
-        <?php endif; ?>
-        
-        <li>
-            <a href="/modules/maintenance/" class="<?= isActiveMenu('', 'maintenance') ?>">
-                <i class="fas fa-wrench"></i>
-                <span>Kế hoạch bảo trì</span>
-            </a>
-        </li>
-        
-        <li>
-            <a href="/modules/maintenance/history.php" class="<?= isActiveMenu('history', 'maintenance') ?>">
-                <i class="fas fa-history"></i>
-                <span>Lịch sử bảo trì</span>
-            </a>
-        </li>
-        
-        <?php if (hasPermission(['admin', 'to_truong'])): ?>
-        <li>
-            <a href="/modules/inventory/" class="<?= isActiveMenu('', 'inventory') ?>">
-                <i class="fas fa-boxes"></i>
-                <span>Tồn kho vật tư</span>
-            </a>
-        </li>
-        <?php endif; ?>
-        
-        <li>
-            <a href="/modules/calibration/" class="<?= isActiveMenu('', 'calibration') ?>">
-                <i class="fas fa-balance-scale"></i>
-                <span>Hiệu chuẩn thiết bị</span>
-            </a>
-        </li>
-        
-        <li>
-            <a href="/modules/tasks/" class="<?= isActiveMenu('', 'tasks') ?>">
-                <i class="fas fa-tasks"></i>
-                <span>Quản lý công việc</span>
-            </a>
-        </li>
-        
-        <?php if (hasPermission(['admin', 'truong_ca'])): ?>
-        <li>
-            <a href="/modules/tasks/requests.php" class="<?= isActiveMenu('requests', 'tasks') ?>">
-                <i class="fas fa-paper-plane"></i>
-                <span>Yêu cầu công việc</span>
-            </a>
-        </li>
-        <?php endif; ?>
-        
-        <li>
-            <a href="/modules/qr-scanner/" class="<?= isActiveMenu('', 'qr-scanner') ?>">
-                <i class="fas fa-qrcode"></i>
-                <span>Quét mã QR</span>
-            </a>
-        </li>
-        
-        <?php if (hasPermission('admin')): ?>
-        <li>
-            <a href="/modules/users/" class="<?= isActiveMenu('', 'users') ?>">
-                <i class="fas fa-users"></i>
-                <span>Quản lý người dùng</span>
-            </a>
-        </li>
-        <?php endif; ?>
-        
-        <li>
-            <a href="/modules/reports/" class="<?= isActiveMenu('', 'reports') ?>">
+        <!-- Reports -->
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#reportsSubmenu" aria-expanded="false">
                 <i class="fas fa-chart-bar"></i>
-                <span>Báo cáo</span>
+                Báo cáo
+                <i class="fas fa-chevron-down ms-auto"></i>
             </a>
+            <div class="collapse" id="reportsSubmenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/reports/equipment.php">
+                            <i class="fas fa-circle"></i>
+                            Báo cáo thiết bị
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/reports/maintenance.php">
+                            <i class="fas fa-circle"></i>
+                            Báo cáo bảo trì
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/reports/inventory.php">
+                            <i class="fas fa-circle"></i>
+                            Báo cáo tồn kho
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </li>
+        
+        <!-- Settings -->
+        <?php if ($currentUser['role'] === 'Admin'): ?>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#settingsSubmenu" aria-expanded="false">
+                <i class="fas fa-cog"></i>
+                Cài đặt
+                <i class="fas fa-chevron-down ms-auto"></i>
+            </a>
+            <div class="collapse" id="settingsSubmenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/system.php">
+                            <i class="fas fa-circle"></i>
+                            Cài đặt hệ thống
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/backup.php">
+                            <i class="fas fa-circle"></i>
+                            Sao lưu dữ liệu
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/logs.php">
+                            <i class="fas fa-circle"></i>
+                            Nhật ký hệ thống
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        <?php endif; ?>
     </ul>
-</aside>
+    
+    <!-- Quick Actions -->
+    <div class="mt-4">
+        <h6 class="text-light opacity-75 text-uppercase small fw-bold">Thao tác nhanh</h6>
+        
+        <?php if (hasPermission('equipment', 'create')): ?>
+        <div class="d-grid gap-2 mt-2">
+            <a href="<?php echo APP_URL; ?>/modules/equipment/add.php" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-plus me-1"></i>
+                Thêm thiết bị
+            </a>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (hasPermission('maintenance', 'create')): ?>
+        <div class="d-grid gap-2 mt-2">
+            <a href="<?php echo APP_URL; ?>/modules/maintenance/add.php" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-wrench me-1"></i>
+                Tạo kế hoạch BT
+            </a>
+        </div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- System Info -->
+    <div class="mt-4 pt-3 border-top border-light border-opacity-25">
+        <small class="text-light opacity-50">
+            <div>Version: <?php echo APP_VERSION; ?></div>
+            <div>User: <?php echo $currentUser['username']; ?></div>
+            <div>Role: <?php echo $currentUser['role']; ?></div>
+        </small>
+    </div>
+</div>
 
-<!-- Main Content -->
-<main class="main-content">
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto expand active submenu
+    const activeLink = document.querySelector('.nav-link.active');
+    if (activeLink) {
+        const parentCollapse = activeLink.closest('.collapse');
+        if (parentCollapse) {
+            parentCollapse.classList.add('show');
+        }
+    }
+    
+    // Handle sidebar toggle for mobile
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('show');
+            sidebarOverlay.classList.toggle('show');
+        });
+    }
+    
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+        });
+    }
+    
+    // Auto hide sidebar on mobile when clicking nav links
+    const navLinks = document.querySelectorAll('.sidebar .nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            if (window.innerWidth < 992) {
+                sidebar.classList.remove('show');
+                sidebarOverlay.classList.remove('show');
+            }
+        });
+    });
+});
+</script>
