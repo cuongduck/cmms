@@ -215,11 +215,11 @@ try {
                 <?php
                 try {
                     $stats = [
-                        'industries' => $db->fetch("SELECT COUNT(*) as count FROM industries WHERE status = 'active'")['count'],
-                        'workshops' => $db->fetch("SELECT COUNT(*) as count FROM workshops WHERE status = 'active'")['count'],
-                        'lines' => $db->fetch("SELECT COUNT(*) as count FROM production_lines WHERE status = 'active'")['count'],
-                        'areas' => $db->fetch("SELECT COUNT(*) as count FROM areas WHERE status = 'active'")['count'],
-                        'machine_types' => $db->fetch("SELECT COUNT(*) as count FROM machine_types WHERE status = 'active'")['count'],
+                        'industries' => $db->fetch("SELECT COUNT(DISTINCT code) as count FROM industries WHERE status = 'active'")['count'],
+                        'workshops' => $db->fetch("SELECT COUNT(DISTINCT code) as count FROM workshops WHERE status = 'active'")['count'],
+                        'lines' => $db->fetch("SELECT COUNT(DISTINCT code) as count FROM production_lines WHERE status = 'active'")['count'],
+                        'areas' => $db->fetch("SELECT COUNT(DISTINCT code) as count FROM areas WHERE status = 'active'")['count'],
+                        'machine_types' => $db->fetch("SELECT COUNT(DISTINCT code) as count FROM machine_types WHERE status = 'active'")['count'],
                         'equipment_groups' => $db->fetch("SELECT COUNT(*) as count FROM equipment_groups WHERE status = 'active'")['count']
                     ];
                 } catch (Exception $e) {
@@ -229,8 +229,8 @@ try {
                 <div class="row g-2">
                     <div class="col-6">
                         <div class="text-center p-2 bg-primary bg-opacity-10 rounded">
-                            <div class="h4 mb-1 text-primary"><?php echo $stats['industries']; ?></div>
-                            <small class="text-muted">Ngành</small>
+                            <div class="h4 mb-1 text-white"><?php echo $stats['industries']; ?></div>
+                            <small class="text-white stat-label">Ngành</small>
                         </div>
                     </div>
                     <div class="col-6">
@@ -284,6 +284,9 @@ try {
                     <a href="views/lines.php" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-building me-2"></i>Quản lý Lines
                     </a>
+                    <a href="views/areas.php" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-building me-2"></i>Quản lý khu vực
+                    </a>                    
                     <a href="views/machine_types.php" class="btn btn-outline-danger btn-sm">
                         <i class="fas fa-cogs me-2"></i>Quản lý dòng máy
                     </a>
