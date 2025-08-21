@@ -1,14 +1,14 @@
 <?php
 /**
- * Industries Management View - /modules/structure/views/industries.php
+ * Workshops Management View - /modules/structure/views/workshops.php
  */
 
-$pageTitle = 'Quản lý ngành sản xuất';
+$pageTitle = 'Quản lý xưởng sản xuất';
 $currentModule = 'structure';
 
 $breadcrumb = [
     ['title' => 'Cấu trúc thiết bị', 'url' => '/modules/structure/'],
-    ['title' => 'Quản lý ngành']
+    ['title' => 'Quản lý xưởng']
 ];
 
 require_once '../../../config/config.php';
@@ -24,11 +24,14 @@ if (hasPermission('structure', 'create')) {
     $pageActions = '
     <div class="btn-group">
         <button type="button" class="btn btn-primary" onclick="showAddModal()">
-            <i class="fas fa-plus me-1"></i> Thêm ngành
+            <i class="fas fa-plus me-1"></i> Thêm xưởng
         </button>
         <button type="button" class="btn btn-outline-success" onclick="exportData()">
             <i class="fas fa-download me-1"></i> Xuất Excel
         </button>
+        <a href="industries.php" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Quản lý ngành
+        </a>
     </div>';
 }
 
@@ -36,7 +39,7 @@ require_once '../../../includes/header.php';
 ?>
 
 <style>
-.industries-container {
+.workshops-container {
     background: #f8fafc;
 }
 
@@ -157,6 +160,15 @@ require_once '../../../includes/header.php';
     border-color: #1e3a8a;
 }
 
+.industry-badge {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    display: inline-block;
+}
+
 @media (max-width: 768px) {
     .table-responsive {
         border-radius: 12px;
@@ -173,18 +185,27 @@ require_once '../../../includes/header.php';
 }
 </style>
 
-<div class="industries-container">
+<div class="workshops-container">
     <!-- Filters -->
     <div class="filter-card">
         <div class="card-body">
             <form id="filterForm" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-floating">
                         <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm...">
-                        <label for="searchInput">Tìm kiếm tên, mã ngành...</label>
+                        <label for="searchInput">Tìm kiếm tên, mã xưởng...</label>
                     </div>
                 </div>
                 <div class="col-md-3">
+                    <div class="form-floating">
+                        <select class="form-select" id="industryFilter">
+                            <option value="">Tất cả ngành</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                        <label for="industryFilter">Ngành sản xuất</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <div class="form-floating">
                         <select class="form-select" id="statusFilter">
                             <option value="all">Tất cả trạng thái</option>
@@ -197,14 +218,15 @@ require_once '../../../includes/header.php';
                 <div class="col-md-2">
                     <div class="form-floating">
                         <select class="form-select" id="sortBy">
-                            <option value="name">Tên ngành</option>
-                            <option value="code">Mã ngành</option>
+                            <option value="name">Tên xưởng</option>
+                            <option value="code">Mã xưởng</option>
+                            <option value="industry_name">Ngành</option>
                             <option value="created_at">Ngày tạo</option>
                         </select>
                         <label for="sortBy">Sắp xếp theo</label>
                     </div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <div class="form-floating">
                         <select class="form-select" id="sortOrder">
                             <option value="ASC">Tăng dần</option>
@@ -235,12 +257,14 @@ require_once '../../../includes/header.php';
                 <thead>
                     <tr>
                         <th style="width: 60px;">#</th>
-                        <th>Tên ngành</th>
-                        <th style="width: 120px;">Mã ngành</th>
+                        <th>Tên xưởng</th>
+                        <th style="width: 100px;">Mã xưởng</th>
+                        <th style="width: 140px;">Ngành</th>
                         <th>Mô tả</th>
-                        <th style="width: 100px;">Số xưởng</th>
-                        <th style="width: 120px;">Trạng thái</th>
-                        <th style="width: 140px;">Ngày tạo</th>
+                        <th style="width: 80px;">Lines</th>
+                        <th style="width: 80px;">Thiết bị</th>
+                        <th style="width: 100px;">Trạng thái</th>
+                        <th style="width: 120px;">Ngày tạo</th>
                         <th style="width: 120px;">Thao tác</th>
                     </tr>
                 </thead>
@@ -252,12 +276,12 @@ require_once '../../../includes/header.php';
 
         <!-- Empty State -->
         <div class="empty-state d-none" id="emptyState">
-            <i class="fas fa-industry"></i>
-            <h5>Chưa có ngành sản xuất</h5>
-            <p>Bắt đầu bằng cách thêm ngành sản xuất đầu tiên</p>
+            <i class="fas fa-building"></i>
+            <h5>Chưa có xưởng sản xuất</h5>
+            <p>Bắt đầu bằng cách thêm xưởng sản xuất đầu tiên</p>
             <?php if (hasPermission('structure', 'create')): ?>
             <button type="button" class="btn btn-primary" onclick="showAddModal()">
-                <i class="fas fa-plus me-1"></i> Thêm ngành
+                <i class="fas fa-plus me-1"></i> Thêm xưởng
             </button>
             <?php endif; ?>
         </div>
@@ -277,55 +301,65 @@ require_once '../../../includes/header.php';
 </div>
 
 <!-- Add/Edit Modal -->
-<div class="modal fade" id="industryModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog">
+<div class="modal fade" id="workshopModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">
-                    <i class="fas fa-industry me-2"></i>
-                    <span id="modalTitleText">Thêm ngành mới</span>
+                    <i class="fas fa-building me-2"></i>
+                    <span id="modalTitleText">Thêm xưởng mới</span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="industryForm" novalidate>
-                    <input type="hidden" id="industryId" name="id">
+                <form id="workshopForm" novalidate>
+                    <input type="hidden" id="workshopId" name="id">
                     
                     <div class="row g-3">
                         <div class="col-md-8">
                             <div class="form-floating">
-                                <input type="text" class="form-control" id="industryName" name="name" 
-                                       placeholder="Tên ngành" required maxlength="255">
-                                <label for="industryName">Tên ngành *</label>
+                                <input type="text" class="form-control" id="workshopName" name="name" 
+                                       placeholder="Tên xưởng" required maxlength="255">
+                                <label for="workshopName">Tên xưởng *</label>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-floating">
-                                <input type="text" class="form-control text-uppercase" id="industryCode" name="code" 
-                                       placeholder="Mã ngành" required maxlength="10" pattern="[A-Z0-9_]+">
-                                <label for="industryCode">Mã ngành *</label>
+                                <input type="text" class="form-control text-uppercase" id="workshopCode" name="code" 
+                                       placeholder="Mã xưởng" required maxlength="10" pattern="[A-Z0-9_]+">
+                                <label for="workshopCode">Mã xưởng *</label>
                                 <div class="invalid-feedback"></div>
                                 <div class="form-text">Chỉ chữ hoa, số và dấu _</div>
                             </div>
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-8">
                             <div class="form-floating">
-                                <textarea class="form-control" id="industryDescription" name="description" 
-                                          placeholder="Mô tả" style="height: 100px;" maxlength="1000"></textarea>
-                                <label for="industryDescription">Mô tả</label>
-                                <div class="form-text">
-                                    <span id="descriptionCounter">0</span>/1000 ký tự
-                                </div>
+                                <select class="form-select" id="workshopIndustry" name="industry_id" required>
+                                    <option value="">Chọn ngành...</option>
+                                    <!-- Will be populated by JavaScript -->
+                                </select>
+                                <label for="workshopIndustry">Ngành sản xuất *</label>
+                                <div class="invalid-feedback"></div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-floating">
-                                <select class="form-select" id="industryStatus" name="status" required>
+                                <select class="form-select" id="workshopStatus" name="status" required>
                                     <option value="active">Hoạt động</option>
                                     <option value="inactive">Không hoạt động</option>
                                 </select>
-                                <label for="industryStatus">Trạng thái *</label>
+                                <label for="workshopStatus">Trạng thái *</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="workshopDescription" name="description" 
+                                          placeholder="Mô tả" style="height: 100px;" maxlength="1000"></textarea>
+                                <label for="workshopDescription">Mô tả</label>
+                                <div class="form-text">
+                                    <span id="descriptionCounter">0</span>/1000 ký tự
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -335,7 +369,7 @@ require_once '../../../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-1"></i> Hủy
                 </button>
-                <button type="button" class="btn btn-primary" onclick="saveIndustry()">
+                <button type="button" class="btn btn-primary" onclick="saveWorkshop()">
                     <i class="fas fa-save me-1"></i> Lưu
                 </button>
             </div>
@@ -355,8 +389,8 @@ require_once '../../../includes/header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa ngành <strong id="deleteItemName"></strong>?</p>
-                <p class="text-muted small">Hành động này không thể hoàn tác.</p>
+                <p>Bạn có chắc chắn muốn xóa xưởng <strong id="deleteItemName"></strong>?</p>
+                <p class="text-muted small">Hành động này sẽ xóa tất cả dữ liệu liên quan và không thể hoàn tác.</p>
                 <input type="hidden" id="deleteItemId">
             </div>
             <div class="modal-footer">
@@ -372,17 +406,20 @@ require_once '../../../includes/header.php';
 // Global variables
 let currentPage = 1;
 let currentData = [];
+let industriesData = [];
 let currentFilters = {
     search: '',
     status: 'all',
+    industry_id: '',
     sort_by: 'name',
     sort_order: 'ASC'
 };
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Industries page loaded, initializing...');
+    console.log('Workshops page loaded, initializing...');
     initializeEventListeners();
+    loadIndustries();
     loadData();
 });
 
@@ -427,16 +464,16 @@ function initializeEventListeners() {
     }
 
     // Form validation
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('workshopForm');
     if (form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            saveIndustry();
+            saveWorkshop();
         });
     }
 
     // Code input formatting
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('workshopCode');
     if (codeInput) {
         codeInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '');
@@ -444,8 +481,16 @@ function initializeEventListeners() {
         });
     }
 
+    // Industry selection change
+    const industrySelect = document.getElementById('workshopIndustry');
+    if (industrySelect) {
+        industrySelect.addEventListener('change', function() {
+            validateCode(); // Re-validate code when industry changes
+        });
+    }
+
     // Description counter
-    const descInput = document.getElementById('industryDescription');
+    const descInput = document.getElementById('workshopDescription');
     const counter = document.getElementById('descriptionCounter');
     if (descInput && counter) {
         descInput.addEventListener('input', function() {
@@ -454,7 +499,7 @@ function initializeEventListeners() {
     }
 
     // Modal events
-    const modal = document.getElementById('industryModal');
+    const modal = document.getElementById('workshopModal');
     if (modal) {
         modal.addEventListener('hidden.bs.modal', function() {
             resetForm();
@@ -462,21 +507,59 @@ function initializeEventListeners() {
     }
 }
 
+// Load industries for dropdowns
+async function loadIndustries() {
+    try {
+        const response = await fetch('../api/workshops.php?action=get_industries');
+        const result = await response.json();
+        
+        if (result.success && result.data.industries) {
+            industriesData = result.data.industries;
+            populateIndustryDropdowns();
+        }
+    } catch (error) {
+        console.error('Error loading industries:', error);
+    }
+}
+
+// Populate industry dropdowns
+function populateIndustryDropdowns() {
+    // Filter dropdown
+    const filterSelect = document.getElementById('industryFilter');
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">Tất cả ngành</option>';
+        industriesData.forEach(industry => {
+            filterSelect.innerHTML += `<option value="${industry.id}">${industry.name} (${industry.code})</option>`;
+        });
+    }
+
+    // Form dropdown
+    const formSelect = document.getElementById('workshopIndustry');
+    if (formSelect) {
+        formSelect.innerHTML = '<option value="">Chọn ngành...</option>';
+        industriesData.forEach(industry => {
+            formSelect.innerHTML += `<option value="${industry.id}">${industry.name} (${industry.code})</option>`;
+        });
+    }
+}
+
 // Load data from API
 async function loadData() {
-    console.log('Loading data...');
+    console.log('Loading workshops data...');
     try {
         showLoading(true);
         
         // Get filter values with fallback
         const searchEl = document.getElementById('searchInput');
         const statusEl = document.getElementById('statusFilter');
+        const industryEl = document.getElementById('industryFilter');
         const sortByEl = document.getElementById('sortBy');
         const sortOrderEl = document.getElementById('sortOrder');
         
         currentFilters = {
             search: searchEl ? searchEl.value.trim() : '',
             status: statusEl ? statusEl.value : 'all',
+            industry_id: industryEl ? industryEl.value : '',
             sort_by: sortByEl ? sortByEl.value : 'name',
             sort_order: sortOrderEl ? sortOrderEl.value : 'ASC'
         };
@@ -488,7 +571,7 @@ async function loadData() {
             ...currentFilters
         });
 
-        const apiUrl = `../api/industries.php?${params}`;
+        const apiUrl = `../api/workshops.php?${params}`;
         console.log('Fetching:', apiUrl);
 
         const response = await fetch(apiUrl);
@@ -501,7 +584,7 @@ async function loadData() {
         console.log('API Response:', result);
 
         if (result.success && result.data) {
-            currentData = result.data.industries || [];
+            currentData = result.data.workshops || [];
             renderTable(currentData);
             renderPagination(result.data.pagination);
             updatePaginationInfo(result.data.pagination);
@@ -554,7 +637,12 @@ function renderTable(data) {
                     <div class="fw-semibold">${escapeHtml(item.name)}</div>
                 </td>
                 <td>
-                    <span class="badge bg-primary">${escapeHtml(item.code)}</span>
+                    <span class="badge bg-info">${escapeHtml(item.code)}</span>
+                </td>
+                <td>
+                    <span class="industry-badge" title="${escapeHtml(item.industry_name)}">
+                        ${escapeHtml(item.industry_code)}
+                    </span>
                 </td>
                 <td>
                     <div class="text-truncate" style="max-width: 200px;" title="${escapeHtml(item.description || '')}">
@@ -562,7 +650,10 @@ function renderTable(data) {
                     </div>
                 </td>
                 <td class="text-center">
-                    <span class="badge bg-secondary">${item.workshop_count || 0}</span>
+                    <span class="badge bg-success">${item.lines_count || 0}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-warning">${item.equipment_count || 0}</span>
                 </td>
                 <td>
                     <span class="badge ${item.status_class}" style="cursor: pointer;" 
@@ -575,18 +666,18 @@ function renderTable(data) {
                 <td>
                     <div class="btn-group btn-group-sm">
                         <button type="button" class="btn btn-outline-info btn-action" 
-                                onclick="viewIndustry(${item.id})" title="Xem chi tiết">
+                                onclick="viewWorkshop(${item.id})" title="Xem chi tiết">
                             <i class="fas fa-eye"></i>
                         </button>
                         ${canEdit ? `
                         <button type="button" class="btn btn-outline-primary btn-action" 
-                                onclick="editIndustry(${item.id})" title="Chỉnh sửa">
+                                onclick="editWorkshop(${item.id})" title="Chỉnh sửa">
                             <i class="fas fa-edit"></i>
                         </button>
                         ` : ''}
                         ${canDelete ? `
                         <button type="button" class="btn btn-outline-danger btn-action" 
-                                onclick="deleteIndustry(${item.id}, '${escapeHtml(item.name)}')" title="Xóa">
+                                onclick="deleteWorkshop(${item.id}, '${escapeHtml(item.name)}')" title="Xóa">
                             <i class="fas fa-trash"></i>
                         </button>
                         ` : ''}
@@ -676,43 +767,44 @@ function changePage(page) {
 
 // Show add modal
 function showAddModal() {
-    document.getElementById('modalTitleText').textContent = 'Thêm ngành mới';
-    document.getElementById('industryId').value = '';
+    document.getElementById('modalTitleText').textContent = 'Thêm xưởng mới';
+    document.getElementById('workshopId').value = '';
     resetForm();
     
-    const modal = new bootstrap.Modal(document.getElementById('industryModal'));
+    const modal = new bootstrap.Modal(document.getElementById('workshopModal'));
     modal.show();
     
     // Focus on name input
     setTimeout(() => {
-        const nameInput = document.getElementById('industryName');
+        const nameInput = document.getElementById('workshopName');
         if (nameInput) nameInput.focus();
     }, 500);
 }
 
-// Edit industry
-async function editIndustry(id) {
+// Edit workshop
+async function editWorkshop(id) {
     try {
         showLoading(true);
         
-        const response = await fetch(`../api/industries.php?action=get&id=${id}`);
+        const response = await fetch(`../api/workshops.php?action=get&id=${id}`);
         const result = await response.json();
         
         if (result.success && result.data) {
             const data = result.data;
             
-            document.getElementById('modalTitleText').textContent = 'Chỉnh sửa ngành';
-            document.getElementById('industryId').value = data.id;
-            document.getElementById('industryName').value = data.name;
-            document.getElementById('industryCode').value = data.code;
-            document.getElementById('industryDescription').value = data.description || '';
-            document.getElementById('industryStatus').value = data.status;
+            document.getElementById('modalTitleText').textContent = 'Chỉnh sửa xưởng';
+            document.getElementById('workshopId').value = data.id;
+            document.getElementById('workshopName').value = data.name;
+            document.getElementById('workshopCode').value = data.code;
+            document.getElementById('workshopIndustry').value = data.industry_id;
+            document.getElementById('workshopDescription').value = data.description || '';
+            document.getElementById('workshopStatus').value = data.status;
             
             // Update description counter
             const counter = document.getElementById('descriptionCounter');
             if (counter) counter.textContent = (data.description || '').length;
             
-            const modal = new bootstrap.Modal(document.getElementById('industryModal'));
+            const modal = new bootstrap.Modal(document.getElementById('workshopModal'));
             modal.show();
         } else {
             showNotification(result.message || 'Lỗi khi tải dữ liệu', 'error');
@@ -724,12 +816,12 @@ async function editIndustry(id) {
     }
 }
 
-// View industry details
-async function viewIndustry(id) {
+// View workshop details
+async function viewWorkshop(id) {
     try {
         showLoading(true);
         
-        const response = await fetch(`../api/industries.php?action=get&id=${id}`);
+        const response = await fetch(`../api/workshops.php?action=get&id=${id}`);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -743,17 +835,18 @@ async function viewIndustry(id) {
                             <div class="modal-header bg-info text-white">
                                 <h5 class="modal-title">
                                     <i class="fas fa-info-circle me-2"></i>
-                                    Thông tin ngành
+                                    Thông tin xưởng
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <table class="table table-borderless">
-                                    <tr><td><strong>Tên ngành:</strong></td><td>${escapeHtml(data.name)}</td></tr>
-                                    <tr><td><strong>Mã ngành:</strong></td><td><span class="badge bg-primary">${escapeHtml(data.code)}</span></td></tr>
+                                    <tr><td><strong>Tên xưởng:</strong></td><td>${escapeHtml(data.name)}</td></tr>
+                                    <tr><td><strong>Mã xưởng:</strong></td><td><span class="badge bg-info">${escapeHtml(data.code)}</span></td></tr>
+                                    <tr><td><strong>Ngành:</strong></td><td><span class="industry-badge">${escapeHtml(data.industry_name)} (${escapeHtml(data.industry_code)})</span></td></tr>
                                     <tr><td><strong>Mô tả:</strong></td><td>${data.description || '<em class="text-muted">Chưa có</em>'}</td></tr>
                                     <tr><td><strong>Trạng thái:</strong></td><td><span class="badge ${data.status === 'active' ? 'bg-success' : 'bg-secondary'}">${data.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}</span></td></tr>
-                                    <tr><td><strong>Số xưởng:</strong></td><td>${data.workshop_count || 0}</td></tr>
+                                    <tr><td><strong>Số line sản xuất:</strong></td><td>${data.lines_count || 0}</td></tr>
                                     <tr><td><strong>Số thiết bị:</strong></td><td>${data.equipment_count || 0}</td></tr>
                                     <tr><td><strong>Ngày tạo:</strong></td><td>${formatDateTime(data.created_at)}</td></tr>
                                     <tr><td><strong>Cập nhật:</strong></td><td>${formatDateTime(data.updated_at)}</td></tr>
@@ -793,8 +886,8 @@ async function viewIndustry(id) {
     }
 }
 
-// Delete industry
-function deleteIndustry(id, name) {
+// Delete workshop
+function deleteWorkshop(id, name) {
     document.getElementById('deleteItemId').value = id;
     document.getElementById('deleteItemName').textContent = name;
     
@@ -813,7 +906,7 @@ async function confirmDelete() {
         formData.append('action', 'delete');
         formData.append('id', id);
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/workshops.php', {
             method: 'POST',
             body: formData
         });
@@ -843,7 +936,7 @@ async function toggleStatus(id) {
         formData.append('action', 'toggle_status');
         formData.append('id', id);
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/workshops.php', {
             method: 'POST',
             body: formData
         });
@@ -863,10 +956,10 @@ async function toggleStatus(id) {
     }
 }
 
-// Save industry
-async function saveIndustry() {
-    const form = document.getElementById('industryForm');
-    const id = document.getElementById('industryId').value;
+// Save workshop
+async function saveWorkshop() {
+    const form = document.getElementById('workshopForm');
+    const id = document.getElementById('workshopId').value;
     
     // Validate form
     if (!validateForm()) {
@@ -879,7 +972,7 @@ async function saveIndustry() {
         const formData = new FormData(form);
         formData.append('action', id ? 'update' : 'create');
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/workshops.php', {
             method: 'POST',
             body: formData
         });
@@ -888,7 +981,7 @@ async function saveIndustry() {
         
         if (result.success) {
             showNotification(result.message, 'success');
-            bootstrap.Modal.getInstance(document.getElementById('industryModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('workshopModal')).hide();
             loadData();
         } else {
             showNotification(result.message || 'Lỗi khi lưu dữ liệu', 'error');
@@ -902,7 +995,7 @@ async function saveIndustry() {
 
 // Validate form
 function validateForm() {
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('workshopForm');
     const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
     let isValid = true;
     
@@ -916,10 +1009,10 @@ function validateForm() {
     });
     
     // Validate code format
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('workshopCode');
     const codePattern = /^[A-Z0-9_]+$/;
     if (codeInput.value && !codePattern.test(codeInput.value)) {
-        showFieldError(codeInput, 'Mã ngành chỉ được chứa chữ hoa, số và dấu gạch dưới');
+        showFieldError(codeInput, 'Mã xưởng chỉ được chứa chữ hoa, số và dấu gạch dưới');
         isValid = false;
     }
     
@@ -928,11 +1021,13 @@ function validateForm() {
 
 // Validate code uniqueness
 async function validateCode() {
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('workshopCode');
+    const industrySelect = document.getElementById('workshopIndustry');
     const code = codeInput.value.trim();
-    const id = document.getElementById('industryId').value;
+    const industryId = industrySelect.value;
+    const id = document.getElementById('workshopId').value;
     
-    if (!code || code.length < 2) {
+    if (!code || code.length < 2 || !industryId) {
         return;
     }
     
@@ -940,14 +1035,15 @@ async function validateCode() {
         const params = new URLSearchParams({
             action: 'check_code',
             code: code,
+            industry_id: industryId,
             exclude_id: id || 0
         });
         
-        const response = await fetch(`../api/industries.php?${params}`);
+        const response = await fetch(`../api/workshops.php?${params}`);
         const result = await response.json();
         
         if (result.success && result.data.exists) {
-            showFieldError(codeInput, 'Mã ngành đã tồn tại');
+            showFieldError(codeInput, 'Mã xưởng đã tồn tại trong ngành này');
         } else {
             clearFieldError(codeInput);
         }
@@ -972,7 +1068,7 @@ function clearFieldError(input) {
 
 // Reset form
 function resetForm() {
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('workshopForm');
     form.reset();
     
     // Clear validation states
@@ -988,6 +1084,7 @@ function resetForm() {
 // Reset filters
 function resetFilters() {
     document.getElementById('searchInput').value = '';
+    document.getElementById('industryFilter').value = '';
     document.getElementById('statusFilter').value = 'all';
     document.getElementById('sortBy').value = 'name';
     document.getElementById('sortOrder').value = 'ASC';

@@ -281,6 +281,9 @@ try {
                     <a href="views/workshops.php" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-building me-2"></i>Quản lý xưởng
                     </a>
+                    <a href="views/lines.php" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-building me-2"></i>Quản lý Lines
+                    </a>
                     <a href="views/machine_types.php" class="btn btn-outline-danger btn-sm">
                         <i class="fas fa-cogs me-2"></i>Quản lý dòng máy
                     </a>

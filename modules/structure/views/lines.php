@@ -1,14 +1,14 @@
 <?php
 /**
- * Industries Management View - /modules/structure/views/industries.php
+ * Production Lines Management View - /modules/structure/views/lines.php
  */
 
-$pageTitle = 'Quản lý ngành sản xuất';
+$pageTitle = 'Quản lý line sản xuất';
 $currentModule = 'structure';
 
 $breadcrumb = [
     ['title' => 'Cấu trúc thiết bị', 'url' => '/modules/structure/'],
-    ['title' => 'Quản lý ngành']
+    ['title' => 'Quản lý line sản xuất']
 ];
 
 require_once '../../../config/config.php';
@@ -24,11 +24,20 @@ if (hasPermission('structure', 'create')) {
     $pageActions = '
     <div class="btn-group">
         <button type="button" class="btn btn-primary" onclick="showAddModal()">
-            <i class="fas fa-plus me-1"></i> Thêm ngành
+            <i class="fas fa-plus me-1"></i> Thêm line
         </button>
         <button type="button" class="btn btn-outline-success" onclick="exportData()">
             <i class="fas fa-download me-1"></i> Xuất Excel
         </button>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-arrow-left me-1"></i> Quản lý khác
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="industries.php"><i class="fas fa-industry me-2"></i>Ngành</a></li>
+                <li><a class="dropdown-item" href="workshops.php"><i class="fas fa-building me-2"></i>Xưởng</a></li>
+            </ul>
+        </div>
     </div>';
 }
 
@@ -36,7 +45,7 @@ require_once '../../../includes/header.php';
 ?>
 
 <style>
-.industries-container {
+.lines-container {
     background: #f8fafc;
 }
 
@@ -157,6 +166,30 @@ require_once '../../../includes/header.php';
     border-color: #1e3a8a;
 }
 
+.industry-badge {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    display: inline-block;
+}
+
+.workshop-badge {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    display: inline-block;
+}
+
+.hierarchy-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 @media (max-width: 768px) {
     .table-responsive {
         border-radius: 12px;
@@ -170,21 +203,44 @@ require_once '../../../includes/header.php';
     .filter-card .row > div {
         margin-bottom: 0.5rem;
     }
+    
+    .hierarchy-display {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
 }
 </style>
 
-<div class="industries-container">
+<div class="lines-container">
     <!-- Filters -->
     <div class="filter-card">
         <div class="card-body">
             <form id="filterForm" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-floating">
                         <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm...">
-                        <label for="searchInput">Tìm kiếm tên, mã ngành...</label>
+                        <label for="searchInput">Tìm kiếm tên, mã line...</label>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <div class="form-floating">
+                        <select class="form-select" id="industryFilter">
+                            <option value="">Tất cả ngành</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                        <label for="industryFilter">Ngành</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-floating">
+                        <select class="form-select" id="workshopFilter">
+                            <option value="">Tất cả xưởng</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                        <label for="workshopFilter">Xưởng</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <div class="form-floating">
                         <select class="form-select" id="statusFilter">
                             <option value="all">Tất cả trạng thái</option>
@@ -197,20 +253,13 @@ require_once '../../../includes/header.php';
                 <div class="col-md-2">
                     <div class="form-floating">
                         <select class="form-select" id="sortBy">
-                            <option value="name">Tên ngành</option>
-                            <option value="code">Mã ngành</option>
+                            <option value="name">Tên line</option>
+                            <option value="code">Mã line</option>
+                            <option value="workshop_name">Xưởng</option>
+                            <option value="industry_name">Ngành</option>
                             <option value="created_at">Ngày tạo</option>
                         </select>
                         <label for="sortBy">Sắp xếp theo</label>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="sortOrder">
-                            <option value="ASC">Tăng dần</option>
-                            <option value="DESC">Giảm dần</option>
-                        </select>
-                        <label for="sortOrder">Thứ tự</label>
                     </div>
                 </div>
                 <div class="col-md-1">
@@ -235,12 +284,14 @@ require_once '../../../includes/header.php';
                 <thead>
                     <tr>
                         <th style="width: 60px;">#</th>
-                        <th>Tên ngành</th>
-                        <th style="width: 120px;">Mã ngành</th>
+                        <th>Tên line</th>
+                        <th style="width: 100px;">Mã line</th>
+                        <th style="width: 200px;">Ngành - Xưởng</th>
                         <th>Mô tả</th>
-                        <th style="width: 100px;">Số xưởng</th>
-                        <th style="width: 120px;">Trạng thái</th>
-                        <th style="width: 140px;">Ngày tạo</th>
+                        <th style="width: 80px;">Khu vực</th>
+                        <th style="width: 80px;">Thiết bị</th>
+                        <th style="width: 100px;">Trạng thái</th>
+                        <th style="width: 120px;">Ngày tạo</th>
                         <th style="width: 120px;">Thao tác</th>
                     </tr>
                 </thead>
@@ -252,12 +303,12 @@ require_once '../../../includes/header.php';
 
         <!-- Empty State -->
         <div class="empty-state d-none" id="emptyState">
-            <i class="fas fa-industry"></i>
-            <h5>Chưa có ngành sản xuất</h5>
-            <p>Bắt đầu bằng cách thêm ngành sản xuất đầu tiên</p>
+            <i class="fas fa-stream"></i>
+            <h5>Chưa có line sản xuất</h5>
+            <p>Bắt đầu bằng cách thêm line sản xuất đầu tiên</p>
             <?php if (hasPermission('structure', 'create')): ?>
             <button type="button" class="btn btn-primary" onclick="showAddModal()">
-                <i class="fas fa-plus me-1"></i> Thêm ngành
+                <i class="fas fa-plus me-1"></i> Thêm line
             </button>
             <?php endif; ?>
         </div>
@@ -277,55 +328,75 @@ require_once '../../../includes/header.php';
 </div>
 
 <!-- Add/Edit Modal -->
-<div class="modal fade" id="industryModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog">
+<div class="modal fade" id="lineModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">
-                    <i class="fas fa-industry me-2"></i>
-                    <span id="modalTitleText">Thêm ngành mới</span>
+                    <i class="fas fa-stream me-2"></i>
+                    <span id="modalTitleText">Thêm line sản xuất mới</span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="industryForm" novalidate>
-                    <input type="hidden" id="industryId" name="id">
+                <form id="lineForm" novalidate>
+                    <input type="hidden" id="lineId" name="id">
                     
                     <div class="row g-3">
                         <div class="col-md-8">
                             <div class="form-floating">
-                                <input type="text" class="form-control" id="industryName" name="name" 
-                                       placeholder="Tên ngành" required maxlength="255">
-                                <label for="industryName">Tên ngành *</label>
+                                <input type="text" class="form-control" id="lineName" name="name" 
+                                       placeholder="Tên line sản xuất" required maxlength="255">
+                                <label for="lineName">Tên line sản xuất *</label>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-floating">
-                                <input type="text" class="form-control text-uppercase" id="industryCode" name="code" 
-                                       placeholder="Mã ngành" required maxlength="10" pattern="[A-Z0-9_]+">
-                                <label for="industryCode">Mã ngành *</label>
+                                <input type="text" class="form-control text-uppercase" id="lineCode" name="code" 
+                                       placeholder="Mã line" required maxlength="10" pattern="[A-Z0-9_]+">
+                                <label for="lineCode">Mã line *</label>
                                 <div class="invalid-feedback"></div>
                                 <div class="form-text">Chỉ chữ hoa, số và dấu _</div>
                             </div>
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <div class="form-floating">
-                                <textarea class="form-control" id="industryDescription" name="description" 
-                                          placeholder="Mô tả" style="height: 100px;" maxlength="1000"></textarea>
-                                <label for="industryDescription">Mô tả</label>
-                                <div class="form-text">
-                                    <span id="descriptionCounter">0</span>/1000 ký tự
-                                </div>
+                                <select class="form-select" id="lineIndustry" required>
+                                    <option value="">Chọn ngành...</option>
+                                    <!-- Will be populated by JavaScript -->
+                                </select>
+                                <label for="lineIndustry">Ngành sản xuất *</label>
+                                <div class="invalid-feedback"></div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-floating">
-                                <select class="form-select" id="industryStatus" name="status" required>
+                                <select class="form-select" id="lineWorkshop" name="workshop_id" required>
+                                    <option value="">Chọn xưởng...</option>
+                                    <!-- Will be populated by JavaScript -->
+                                </select>
+                                <label for="lineWorkshop">Xưởng sản xuất *</label>
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <select class="form-select" id="lineStatus" name="status" required>
                                     <option value="active">Hoạt động</option>
                                     <option value="inactive">Không hoạt động</option>
                                 </select>
-                                <label for="industryStatus">Trạng thái *</label>
+                                <label for="lineStatus">Trạng thái *</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="lineDescription" name="description" 
+                                          placeholder="Mô tả" style="height: 100px;" maxlength="1000"></textarea>
+                                <label for="lineDescription">Mô tả</label>
+                                <div class="form-text">
+                                    <span id="descriptionCounter">0</span>/1000 ký tự
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -335,7 +406,7 @@ require_once '../../../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-1"></i> Hủy
                 </button>
-                <button type="button" class="btn btn-primary" onclick="saveIndustry()">
+                <button type="button" class="btn btn-primary" onclick="saveLine()">
                     <i class="fas fa-save me-1"></i> Lưu
                 </button>
             </div>
@@ -355,8 +426,8 @@ require_once '../../../includes/header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa ngành <strong id="deleteItemName"></strong>?</p>
-                <p class="text-muted small">Hành động này không thể hoàn tác.</p>
+                <p>Bạn có chắc chắn muốn xóa line sản xuất <strong id="deleteItemName"></strong>?</p>
+                <p class="text-muted small">Hành động này sẽ xóa tất cả dữ liệu liên quan và không thể hoàn tác.</p>
                 <input type="hidden" id="deleteItemId">
             </div>
             <div class="modal-footer">
@@ -372,17 +443,23 @@ require_once '../../../includes/header.php';
 // Global variables
 let currentPage = 1;
 let currentData = [];
+let industriesData = [];
+let workshopsData = [];
 let currentFilters = {
     search: '',
     status: 'all',
+    industry_id: '',
+    workshop_id: '',
     sort_by: 'name',
     sort_order: 'ASC'
 };
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Industries page loaded, initializing...');
+    console.log('Production Lines page loaded, initializing...');
     initializeEventListeners();
+    loadIndustries();
+    loadWorkshops();
     loadData();
 });
 
@@ -407,6 +484,12 @@ function initializeEventListeners() {
     filterInputs.forEach(input => {
         input.addEventListener('change', function() {
             console.log('Filter changed:', this.id, this.value);
+            
+            // Handle industry filter change to update workshop filter
+            if (this.id === 'industryFilter') {
+                updateWorkshopFilter();
+            }
+            
             currentPage = 1;
             loadData();
         });
@@ -427,16 +510,16 @@ function initializeEventListeners() {
     }
 
     // Form validation
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('lineForm');
     if (form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            saveIndustry();
+            saveLine();
         });
     }
 
     // Code input formatting
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('lineCode');
     if (codeInput) {
         codeInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '');
@@ -444,8 +527,25 @@ function initializeEventListeners() {
         });
     }
 
+    // Industry selection change in form
+    const industrySelect = document.getElementById('lineIndustry');
+    if (industrySelect) {
+        industrySelect.addEventListener('change', function() {
+            updateFormWorkshopOptions();
+            validateCode(); // Re-validate code when industry/workshop changes
+        });
+    }
+
+    // Workshop selection change in form
+    const workshopSelect = document.getElementById('lineWorkshop');
+    if (workshopSelect) {
+        workshopSelect.addEventListener('change', function() {
+            validateCode(); // Re-validate code when workshop changes
+        });
+    }
+
     // Description counter
-    const descInput = document.getElementById('industryDescription');
+    const descInput = document.getElementById('lineDescription');
     const counter = document.getElementById('descriptionCounter');
     if (descInput && counter) {
         descInput.addEventListener('input', function() {
@@ -454,7 +554,7 @@ function initializeEventListeners() {
     }
 
     // Modal events
-    const modal = document.getElementById('industryModal');
+    const modal = document.getElementById('lineModal');
     if (modal) {
         modal.addEventListener('hidden.bs.modal', function() {
             resetForm();
@@ -462,23 +562,134 @@ function initializeEventListeners() {
     }
 }
 
+// Load industries for dropdowns
+async function loadIndustries() {
+    try {
+        const response = await fetch('../api/lines.php?action=get_industries');
+        const result = await response.json();
+        
+        if (result.success && result.data.industries) {
+            industriesData = result.data.industries;
+            populateIndustryDropdowns();
+        }
+    } catch (error) {
+        console.error('Error loading industries:', error);
+    }
+}
+
+// Load workshops for dropdowns
+async function loadWorkshops() {
+    try {
+        const response = await fetch('../api/lines.php?action=get_workshops');
+        const result = await response.json();
+        
+        if (result.success && result.data.workshops) {
+            workshopsData = result.data.workshops;
+            populateWorkshopDropdowns();
+        }
+    } catch (error) {
+        console.error('Error loading workshops:', error);
+    }
+}
+
+// Populate industry dropdowns
+function populateIndustryDropdowns() {
+    // Filter dropdown
+    const filterSelect = document.getElementById('industryFilter');
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">Tất cả ngành</option>';
+        industriesData.forEach(industry => {
+            filterSelect.innerHTML += `<option value="${industry.id}">${industry.name} (${industry.code})</option>`;
+        });
+    }
+
+    // Form dropdown
+    const formSelect = document.getElementById('lineIndustry');
+    if (formSelect) {
+        formSelect.innerHTML = '<option value="">Chọn ngành...</option>';
+        industriesData.forEach(industry => {
+            formSelect.innerHTML += `<option value="${industry.id}">${industry.name} (${industry.code})</option>`;
+        });
+    }
+}
+
+// Populate workshop dropdowns
+function populateWorkshopDropdowns() {
+    // Filter dropdown
+    const filterSelect = document.getElementById('workshopFilter');
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">Tất cả xưởng</option>';
+        workshopsData.forEach(workshop => {
+            filterSelect.innerHTML += `<option value="${workshop.id}">${workshop.industry_name} - ${workshop.name} (${workshop.code})</option>`;
+        });
+    }
+
+    // Form dropdown - will be populated by updateFormWorkshopOptions based on selected industry
+}
+
+// Update workshop filter based on selected industry
+function updateWorkshopFilter() {
+    const industryId = document.getElementById('industryFilter').value;
+    const workshopFilter = document.getElementById('workshopFilter');
+    
+    if (workshopFilter) {
+        workshopFilter.innerHTML = '<option value="">Tất cả xưởng</option>';
+        
+        const filteredWorkshops = industryId ? 
+            workshopsData.filter(w => w.industry_id == industryId) : 
+            workshopsData;
+            
+        filteredWorkshops.forEach(workshop => {
+            workshopFilter.innerHTML += `<option value="${workshop.id}">${workshop.name} (${workshop.code})</option>`;
+        });
+        
+        // Reset workshop filter value
+        workshopFilter.value = '';
+    }
+}
+
+// Update form workshop options based on selected industry
+function updateFormWorkshopOptions() {
+    const industryId = document.getElementById('lineIndustry').value;
+    const workshopSelect = document.getElementById('lineWorkshop');
+    
+    if (workshopSelect) {
+        workshopSelect.innerHTML = '<option value="">Chọn xưởng...</option>';
+        
+        if (industryId) {
+            const filteredWorkshops = workshopsData.filter(w => w.industry_id == industryId);
+            filteredWorkshops.forEach(workshop => {
+                workshopSelect.innerHTML += `<option value="${workshop.id}">${workshop.name} (${workshop.code})</option>`;
+            });
+        }
+        
+        // Reset workshop selection
+        workshopSelect.value = '';
+        clearFieldError(workshopSelect);
+    }
+}
+
 // Load data from API
 async function loadData() {
-    console.log('Loading data...');
+    console.log('Loading production lines data...');
     try {
         showLoading(true);
         
         // Get filter values with fallback
         const searchEl = document.getElementById('searchInput');
         const statusEl = document.getElementById('statusFilter');
+        const industryEl = document.getElementById('industryFilter');
+        const workshopEl = document.getElementById('workshopFilter');
         const sortByEl = document.getElementById('sortBy');
         const sortOrderEl = document.getElementById('sortOrder');
         
         currentFilters = {
             search: searchEl ? searchEl.value.trim() : '',
             status: statusEl ? statusEl.value : 'all',
+            industry_id: industryEl ? industryEl.value : '',
+            workshop_id: workshopEl ? workshopEl.value : '',
             sort_by: sortByEl ? sortByEl.value : 'name',
-            sort_order: sortOrderEl ? sortOrderEl.value : 'ASC'
+            sort_order: 'ASC' // Fixed sort order for simplicity
         };
 
         const params = new URLSearchParams({
@@ -488,7 +699,7 @@ async function loadData() {
             ...currentFilters
         });
 
-        const apiUrl = `../api/industries.php?${params}`;
+        const apiUrl = `../api/lines.php?${params}`;
         console.log('Fetching:', apiUrl);
 
         const response = await fetch(apiUrl);
@@ -501,7 +712,7 @@ async function loadData() {
         console.log('API Response:', result);
 
         if (result.success && result.data) {
-            currentData = result.data.industries || [];
+            currentData = result.data.lines || [];
             renderTable(currentData);
             renderPagination(result.data.pagination);
             updatePaginationInfo(result.data.pagination);
@@ -554,7 +765,17 @@ function renderTable(data) {
                     <div class="fw-semibold">${escapeHtml(item.name)}</div>
                 </td>
                 <td>
-                    <span class="badge bg-primary">${escapeHtml(item.code)}</span>
+                    <span class="badge bg-success">${escapeHtml(item.code)}</span>
+                </td>
+                <td>
+                    <div class="hierarchy-display">
+                        <span class="industry-badge" title="${escapeHtml(item.industry_name)}">
+                            ${escapeHtml(item.industry_code)}
+                        </span>
+                        <span class="workshop-badge" title="${escapeHtml(item.workshop_name)}">
+                            ${escapeHtml(item.workshop_code)}
+                        </span>
+                    </div>
                 </td>
                 <td>
                     <div class="text-truncate" style="max-width: 200px;" title="${escapeHtml(item.description || '')}">
@@ -562,7 +783,10 @@ function renderTable(data) {
                     </div>
                 </td>
                 <td class="text-center">
-                    <span class="badge bg-secondary">${item.workshop_count || 0}</span>
+                    <span class="badge bg-info">${item.areas_count || 0}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-warning">${item.equipment_count || 0}</span>
                 </td>
                 <td>
                     <span class="badge ${item.status_class}" style="cursor: pointer;" 
@@ -575,18 +799,18 @@ function renderTable(data) {
                 <td>
                     <div class="btn-group btn-group-sm">
                         <button type="button" class="btn btn-outline-info btn-action" 
-                                onclick="viewIndustry(${item.id})" title="Xem chi tiết">
+                                onclick="viewLine(${item.id})" title="Xem chi tiết">
                             <i class="fas fa-eye"></i>
                         </button>
                         ${canEdit ? `
                         <button type="button" class="btn btn-outline-primary btn-action" 
-                                onclick="editIndustry(${item.id})" title="Chỉnh sửa">
+                                onclick="editLine(${item.id})" title="Chỉnh sửa">
                             <i class="fas fa-edit"></i>
                         </button>
                         ` : ''}
                         ${canDelete ? `
                         <button type="button" class="btn btn-outline-danger btn-action" 
-                                onclick="deleteIndustry(${item.id}, '${escapeHtml(item.name)}')" title="Xóa">
+                                onclick="deleteLine(${item.id}, '${escapeHtml(item.name)}')" title="Xóa">
                             <i class="fas fa-trash"></i>
                         </button>
                         ` : ''}
@@ -676,43 +900,51 @@ function changePage(page) {
 
 // Show add modal
 function showAddModal() {
-    document.getElementById('modalTitleText').textContent = 'Thêm ngành mới';
-    document.getElementById('industryId').value = '';
+    document.getElementById('modalTitleText').textContent = 'Thêm line sản xuất mới';
+    document.getElementById('lineId').value = '';
     resetForm();
     
-    const modal = new bootstrap.Modal(document.getElementById('industryModal'));
+    const modal = new bootstrap.Modal(document.getElementById('lineModal'));
     modal.show();
     
     // Focus on name input
     setTimeout(() => {
-        const nameInput = document.getElementById('industryName');
+        const nameInput = document.getElementById('lineName');
         if (nameInput) nameInput.focus();
     }, 500);
 }
 
-// Edit industry
-async function editIndustry(id) {
+// Edit line
+async function editLine(id) {
     try {
         showLoading(true);
         
-        const response = await fetch(`../api/industries.php?action=get&id=${id}`);
+        const response = await fetch(`../api/lines.php?action=get&id=${id}`);
         const result = await response.json();
         
         if (result.success && result.data) {
             const data = result.data;
             
-            document.getElementById('modalTitleText').textContent = 'Chỉnh sửa ngành';
-            document.getElementById('industryId').value = data.id;
-            document.getElementById('industryName').value = data.name;
-            document.getElementById('industryCode').value = data.code;
-            document.getElementById('industryDescription').value = data.description || '';
-            document.getElementById('industryStatus').value = data.status;
+            document.getElementById('modalTitleText').textContent = 'Chỉnh sửa line sản xuất';
+            document.getElementById('lineId').value = data.id;
+            document.getElementById('lineName').value = data.name;
+            document.getElementById('lineCode').value = data.code;
+            document.getElementById('lineIndustry').value = data.industry_id;
+            
+            // Update workshop options and set selected workshop
+            updateFormWorkshopOptions();
+            setTimeout(() => {
+                document.getElementById('lineWorkshop').value = data.workshop_id;
+            }, 100);
+            
+            document.getElementById('lineDescription').value = data.description || '';
+            document.getElementById('lineStatus').value = data.status;
             
             // Update description counter
             const counter = document.getElementById('descriptionCounter');
             if (counter) counter.textContent = (data.description || '').length;
             
-            const modal = new bootstrap.Modal(document.getElementById('industryModal'));
+            const modal = new bootstrap.Modal(document.getElementById('lineModal'));
             modal.show();
         } else {
             showNotification(result.message || 'Lỗi khi tải dữ liệu', 'error');
@@ -724,12 +956,12 @@ async function editIndustry(id) {
     }
 }
 
-// View industry details
-async function viewIndustry(id) {
+// View line details
+async function viewLine(id) {
     try {
         showLoading(true);
         
-        const response = await fetch(`../api/industries.php?action=get&id=${id}`);
+        const response = await fetch(`../api/lines.php?action=get&id=${id}`);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -743,17 +975,19 @@ async function viewIndustry(id) {
                             <div class="modal-header bg-info text-white">
                                 <h5 class="modal-title">
                                     <i class="fas fa-info-circle me-2"></i>
-                                    Thông tin ngành
+                                    Thông tin line sản xuất
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <table class="table table-borderless">
-                                    <tr><td><strong>Tên ngành:</strong></td><td>${escapeHtml(data.name)}</td></tr>
-                                    <tr><td><strong>Mã ngành:</strong></td><td><span class="badge bg-primary">${escapeHtml(data.code)}</span></td></tr>
+                                    <tr><td><strong>Tên line:</strong></td><td>${escapeHtml(data.name)}</td></tr>
+                                    <tr><td><strong>Mã line:</strong></td><td><span class="badge bg-success">${escapeHtml(data.code)}</span></td></tr>
+                                    <tr><td><strong>Ngành:</strong></td><td><span class="industry-badge">${escapeHtml(data.industry_name)} (${escapeHtml(data.industry_code)})</span></td></tr>
+                                    <tr><td><strong>Xưởng:</strong></td><td><span class="workshop-badge">${escapeHtml(data.workshop_name)} (${escapeHtml(data.workshop_code)})</span></td></tr>
                                     <tr><td><strong>Mô tả:</strong></td><td>${data.description || '<em class="text-muted">Chưa có</em>'}</td></tr>
                                     <tr><td><strong>Trạng thái:</strong></td><td><span class="badge ${data.status === 'active' ? 'bg-success' : 'bg-secondary'}">${data.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}</span></td></tr>
-                                    <tr><td><strong>Số xưởng:</strong></td><td>${data.workshop_count || 0}</td></tr>
+                                    <tr><td><strong>Số khu vực:</strong></td><td>${data.areas_count || 0}</td></tr>
                                     <tr><td><strong>Số thiết bị:</strong></td><td>${data.equipment_count || 0}</td></tr>
                                     <tr><td><strong>Ngày tạo:</strong></td><td>${formatDateTime(data.created_at)}</td></tr>
                                     <tr><td><strong>Cập nhật:</strong></td><td>${formatDateTime(data.updated_at)}</td></tr>
@@ -793,8 +1027,8 @@ async function viewIndustry(id) {
     }
 }
 
-// Delete industry
-function deleteIndustry(id, name) {
+// Delete line
+function deleteLine(id, name) {
     document.getElementById('deleteItemId').value = id;
     document.getElementById('deleteItemName').textContent = name;
     
@@ -813,7 +1047,7 @@ async function confirmDelete() {
         formData.append('action', 'delete');
         formData.append('id', id);
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/lines.php', {
             method: 'POST',
             body: formData
         });
@@ -843,7 +1077,7 @@ async function toggleStatus(id) {
         formData.append('action', 'toggle_status');
         formData.append('id', id);
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/lines.php', {
             method: 'POST',
             body: formData
         });
@@ -863,10 +1097,10 @@ async function toggleStatus(id) {
     }
 }
 
-// Save industry
-async function saveIndustry() {
-    const form = document.getElementById('industryForm');
-    const id = document.getElementById('industryId').value;
+// Save line
+async function saveLine() {
+    const form = document.getElementById('lineForm');
+    const id = document.getElementById('lineId').value;
     
     // Validate form
     if (!validateForm()) {
@@ -879,7 +1113,7 @@ async function saveIndustry() {
         const formData = new FormData(form);
         formData.append('action', id ? 'update' : 'create');
         
-        const response = await fetch('../api/industries.php', {
+        const response = await fetch('../api/lines.php', {
             method: 'POST',
             body: formData
         });
@@ -888,7 +1122,7 @@ async function saveIndustry() {
         
         if (result.success) {
             showNotification(result.message, 'success');
-            bootstrap.Modal.getInstance(document.getElementById('industryModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('lineModal')).hide();
             loadData();
         } else {
             showNotification(result.message || 'Lỗi khi lưu dữ liệu', 'error');
@@ -902,7 +1136,7 @@ async function saveIndustry() {
 
 // Validate form
 function validateForm() {
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('lineForm');
     const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
     let isValid = true;
     
@@ -916,10 +1150,18 @@ function validateForm() {
     });
     
     // Validate code format
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('lineCode');
     const codePattern = /^[A-Z0-9_]+$/;
     if (codeInput.value && !codePattern.test(codeInput.value)) {
-        showFieldError(codeInput, 'Mã ngành chỉ được chứa chữ hoa, số và dấu gạch dưới');
+        showFieldError(codeInput, 'Mã line chỉ được chứa chữ hoa, số và dấu gạch dưới');
+        isValid = false;
+    }
+    
+    // Validate workshop selection
+    const industrySelect = document.getElementById('lineIndustry');
+    const workshopSelect = document.getElementById('lineWorkshop');
+    if (industrySelect.value && !workshopSelect.value) {
+        showFieldError(workshopSelect, 'Vui lòng chọn xưởng');
         isValid = false;
     }
     
@@ -928,11 +1170,13 @@ function validateForm() {
 
 // Validate code uniqueness
 async function validateCode() {
-    const codeInput = document.getElementById('industryCode');
+    const codeInput = document.getElementById('lineCode');
+    const workshopSelect = document.getElementById('lineWorkshop');
     const code = codeInput.value.trim();
-    const id = document.getElementById('industryId').value;
+    const workshopId = workshopSelect.value;
+    const id = document.getElementById('lineId').value;
     
-    if (!code || code.length < 2) {
+    if (!code || code.length < 2 || !workshopId) {
         return;
     }
     
@@ -940,14 +1184,15 @@ async function validateCode() {
         const params = new URLSearchParams({
             action: 'check_code',
             code: code,
+            workshop_id: workshopId,
             exclude_id: id || 0
         });
         
-        const response = await fetch(`../api/industries.php?${params}`);
+        const response = await fetch(`../api/lines.php?${params}`);
         const result = await response.json();
         
         if (result.success && result.data.exists) {
-            showFieldError(codeInput, 'Mã ngành đã tồn tại');
+            showFieldError(codeInput, 'Mã line đã tồn tại trong xưởng này');
         } else {
             clearFieldError(codeInput);
         }
@@ -972,7 +1217,7 @@ function clearFieldError(input) {
 
 // Reset form
 function resetForm() {
-    const form = document.getElementById('industryForm');
+    const form = document.getElementById('lineForm');
     form.reset();
     
     // Clear validation states
@@ -983,14 +1228,21 @@ function resetForm() {
     
     // Reset description counter
     document.getElementById('descriptionCounter').textContent = '0';
+    
+    // Reset workshop options
+    document.getElementById('lineWorkshop').innerHTML = '<option value="">Chọn xưởng...</option>';
 }
 
 // Reset filters
 function resetFilters() {
     document.getElementById('searchInput').value = '';
+    document.getElementById('industryFilter').value = '';
+    document.getElementById('workshopFilter').value = '';
     document.getElementById('statusFilter').value = 'all';
     document.getElementById('sortBy').value = 'name';
-    document.getElementById('sortOrder').value = 'ASC';
+    
+    // Reset workshop filter options
+    updateWorkshopFilter();
     
     currentPage = 1;
     loadData();
@@ -1083,6 +1335,84 @@ document.addEventListener('keydown', function(e) {
             bootstrap.Modal.getInstance(modal)?.hide();
         });
     }
+});
+
+// Auto-save filters to localStorage
+function saveFiltersToStorage() {
+    const filters = {
+        search: document.getElementById('searchInput').value,
+        industry_id: document.getElementById('industryFilter').value,
+        workshop_id: document.getElementById('workshopFilter').value,
+        status: document.getElementById('statusFilter').value,
+        sort_by: document.getElementById('sortBy').value
+    };
+    localStorage.setItem('cmms_lines_filters', JSON.stringify(filters));
+}
+
+function loadFiltersFromStorage() {
+    const saved = localStorage.getItem('cmms_lines_filters');
+    if (saved) {
+        try {
+            const filters = JSON.parse(saved);
+            document.getElementById('searchInput').value = filters.search || '';
+            document.getElementById('industryFilter').value = filters.industry_id || '';
+            document.getElementById('workshopFilter').value = filters.workshop_id || '';
+            document.getElementById('statusFilter').value = filters.status || 'all';
+            document.getElementById('sortBy').value = filters.sort_by || 'name';
+            
+            // Update workshop filter based on saved industry
+            if (filters.industry_id) {
+                setTimeout(() => {
+                    updateWorkshopFilter();
+                    document.getElementById('workshopFilter').value = filters.workshop_id || '';
+                }, 100);
+            }
+        } catch (e) {
+            console.error('Error loading filters:', e);
+        }
+    }
+}
+
+// Load saved filters on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        loadFiltersFromStorage();
+    }, 500);
+    
+    // Save filters when they change
+    const filterInputs = document.querySelectorAll('#filterForm input, #filterForm select');
+    filterInputs.forEach(input => {
+        input.addEventListener('change', saveFiltersToStorage);
+    });
+});
+
+// Add tooltips and enhanced UX
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Show keyboard shortcuts hint
+    setTimeout(() => {
+        const hint = document.createElement('div');
+        hint.className = 'position-fixed bg-dark text-white p-2 rounded';
+        hint.style.cssText = 'bottom: 20px; left: 20px; font-size: 0.75rem; z-index: 1000; opacity: 0.8;';
+        hint.innerHTML = '💡 Phím tắt: Ctrl+N (thêm mới), Ctrl+R (làm mới), Ctrl+F (tìm kiếm)';
+        document.body.appendChild(hint);
+        
+        setTimeout(() => {
+            if (hint.parentElement) {
+                hint.style.opacity = '0';
+                setTimeout(() => {
+                    if (hint.parentElement) {
+                        hint.parentElement.removeChild(hint);
+                    }
+                }, 300);
+            }
+        }, 8000);
+    }, 2000);
 });
 </script>
 
