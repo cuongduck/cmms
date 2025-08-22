@@ -1,6 +1,7 @@
 <?php
 /**
  * Machine Types Management View - /modules/structure/views/machine_types.php
+ * Simplified version without structure dependencies
  */
 
 $pageTitle = 'Quản lý dòng máy';
@@ -168,69 +169,6 @@ require_once '../../../includes/header.php';
     border-color: #1e3a8a;
 }
 
-.hierarchy-badges {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.industry-badge {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.3rem;
-    font-weight: 500;
-}
-
-.workshop-badge {
-    background: linear-gradient(135deg, #059669, #10b981);
-    color: white;
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.3rem;
-    font-weight: 500;
-}
-
-.line-badge {
-    background: linear-gradient(135deg, #dc2626, #ef4444);
-    color: white;
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.3rem;
-    font-weight: 500;
-}
-
-.area-badge {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.3rem;
-    font-weight: 500;
-}
-
-.hierarchy-display {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.breadcrumb-path {
-    font-size: 0.7rem;
-    color: #6b7280;
-    display: flex;
-    align-items: center;
-    gap: 0.2rem;
-    flex-wrap: wrap;
-}
-
-.breadcrumb-path .separator {
-    color: #9ca3af;
-    font-size: 0.6rem;
-}
-
 .machine-type-code {
     background: linear-gradient(135deg, #7c3aed, #a855f7);
     color: white;
@@ -239,6 +177,15 @@ require_once '../../../includes/header.php';
     padding: 0.4rem 0.8rem;
     border-radius: 0.4rem;
     display: inline-block;
+}
+
+.universal-badge {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: white;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.3rem;
+    font-weight: 500;
 }
 
 @media (max-width: 768px) {
@@ -254,28 +201,6 @@ require_once '../../../includes/header.php';
     .filter-card .row > div {
         margin-bottom: 0.5rem;
     }
-    
-    .hierarchy-badges {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.25rem;
-    }
-    
-    .hierarchy-display {
-        gap: 0.2rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .breadcrumb-path {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.1rem;
-    }
-    
-    .breadcrumb-path .separator {
-        display: none;
-    }
 }
 </style>
 
@@ -284,49 +209,13 @@ require_once '../../../includes/header.php';
     <div class="filter-card">
         <div class="card-body">
             <form id="filterForm" class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <div class="form-floating">
                         <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm...">
                         <label for="searchInput">Tìm kiếm tên, mã dòng máy...</label>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="industryFilter">
-                            <option value="">Tất cả ngành</option>
-                            <!-- Will be populated by JavaScript -->
-                        </select>
-                        <label for="industryFilter">Ngành</label>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="workshopFilter">
-                            <option value="">Tất cả xưởng</option>
-                            <!-- Will be populated by JavaScript -->
-                        </select>
-                        <label for="workshopFilter">Xưởng</label>
-                    </div>
-                </div>
-                <div class="col-md-1">
-                    <div class="form-floating">
-                        <select class="form-select" id="lineFilter">
-                            <option value="">Line</option>
-                            <!-- Will be populated by JavaScript -->
-                        </select>
-                        <label for="lineFilter">Line</label>
-                    </div>
-                </div>
-                <div class="col-md-1">
-                    <div class="form-floating">
-                        <select class="form-select" id="areaFilter">
-                            <option value="">Khu vực</option>
-                            <!-- Will be populated by JavaScript -->
-                        </select>
-                        <label for="areaFilter">KV</label>
-                    </div>
-                </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <div class="form-floating">
                         <select class="form-select" id="statusFilter">
                             <option value="all">Tất cả trạng thái</option>
@@ -334,6 +223,19 @@ require_once '../../../includes/header.php';
                             <option value="inactive">Không hoạt động</option>
                         </select>
                         <label for="statusFilter">Trạng thái</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-floating">
+                        <select class="form-select" id="sortFilter">
+                            <option value="name_asc">Tên A-Z</option>
+                            <option value="name_desc">Tên Z-A</option>
+                            <option value="code_asc">Mã A-Z</option>
+                            <option value="code_desc">Mã Z-A</option>
+                            <option value="created_desc">Mới nhất</option>
+                            <option value="created_asc">Cũ nhất</option>
+                        </select>
+                        <label for="sortFilter">Sắp xếp</label>
                     </div>
                 </div>
                 <div class="col-md-1">
@@ -359,9 +261,9 @@ require_once '../../../includes/header.php';
                     <tr>
                         <th style="width: 60px;">#</th>
                         <th>Tên dòng máy</th>
-                        <th style="width: 120px;">Mã dòng máy</th>
-                        <th style="width: 280px;">Cấu trúc</th>
-                        <th>Mô tả</th>
+                        <th style="width: 150px;">Mã dòng máy</th>
+                        <th style="width: 250px;">Mô tả</th>
+                        <th style="width: 200px;">Thông số kỹ thuật</th>
                         <th style="width: 80px;">Cụm TB</th>
                         <th style="width: 80px;">Thiết bị</th>
                         <th style="width: 100px;">Trạng thái</th>
@@ -403,7 +305,7 @@ require_once '../../../includes/header.php';
 
 <!-- Add/Edit Modal -->
 <div class="modal fade" id="machineTypeModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">
@@ -431,49 +333,7 @@ require_once '../../../includes/header.php';
                                        placeholder="Mã dòng máy" required maxlength="20" pattern="[A-Z0-9_]+">
                                 <label for="machineTypeCode">Mã dòng máy *</label>
                                 <div class="invalid-feedback"></div>
-                                <div class="form-text">Chỉ chữ hoa, số và dấu _</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-floating">
-                                <select class="form-select" id="machineTypeIndustry" required>
-                                    <option value="">Chọn ngành...</option>
-                                    <!-- Will be populated by JavaScript -->
-                                </select>
-                                <label for="machineTypeIndustry">Ngành sản xuất *</label>
-                                <div class="invalid-feedback"></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-floating">
-                                <select class="form-select" id="machineTypeWorkshop" name="workshop_id" required>
-                                    <option value="">Chọn xưởng...</option>
-                                    <!-- Will be populated by JavaScript -->
-                                </select>
-                                <label for="machineTypeWorkshop">Xưởng sản xuất *</label>
-                                <div class="invalid-feedback"></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-floating">
-                                <select class="form-select" id="machineTypeLine" name="line_id">
-                                    <option value="">Chọn line...</option>
-                                    <!-- Will be populated by JavaScript -->
-                                </select>
-                                <label for="machineTypeLine">Line sản xuất</label>
-                                <div class="invalid-feedback"></div>
-                                <div class="form-text">Tùy chọn - áp dụng cho ngành Mì/Phở</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-floating">
-                                <select class="form-select" id="machineTypeArea" name="area_id">
-                                    <option value="">Chọn khu vực...</option>
-                                    <!-- Will be populated by JavaScript -->
-                                </select>
-                                <label for="machineTypeArea">Khu vực</label>
-                                <div class="invalid-feedback"></div>
-                                <div class="form-text">Tùy chọn - áp dụng cho ngành Mì/Phở</div>
+                                <div class="form-text">Chỉ chữ hoa, số và dấu _ (VD: MIXER_001)</div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -485,23 +345,32 @@ require_once '../../../includes/header.php';
                                 <label for="machineTypeStatus">Trạng thái *</label>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-info mb-0 py-2">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <small>Dòng máy có thể sử dụng chung cho nhiều ngành/xưởng</small>
+                            </div>
+                        </div>
                         <div class="col-12">
                             <div class="form-floating">
                                 <textarea class="form-control" id="machineTypeDescription" name="description" 
-                                          placeholder="Mô tả" style="height: 100px;" maxlength="1000"></textarea>
+                                          placeholder="Mô tả" style="height: 80px;" maxlength="1000"></textarea>
                                 <label for="machineTypeDescription">Mô tả</label>
                                 <div class="form-text">
                                     <span id="descriptionCounter">0</span>/1000 ký tự
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Industry-specific note -->
-                    <div class="alert alert-info mt-3" id="industryNote" style="display: none;">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Lưu ý:</strong> 
-                        <span id="industryNoteText"></span>
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="machineTypeSpecifications" name="specifications" 
+                                          placeholder="Thông số kỹ thuật" style="height: 100px;" maxlength="2000"></textarea>
+                                <label for="machineTypeSpecifications">Thông số kỹ thuật</label>
+                                <div class="form-text">
+                                    <span id="specificationsCounter">0</span>/2000 ký tự
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -547,41 +416,46 @@ require_once '../../../includes/header.php';
 // Global variables
 let currentPage = 1;
 let currentData = [];
-let industriesData = [];
-let workshopsData = [];
-let linesData = [];
-let areasData = [];
 let currentFilters = {
     search: '',
     status: 'all',
-    industry_id: '',
-    workshop_id: '',
-    line_id: '',
-    area_id: '',
     sort_by: 'name',
     sort_order: 'ASC'
 };
 
+// Define permissions from PHP
+const canEdit = <?php echo json_encode(hasPermission('structure', 'edit')); ?>;
+const canDelete = <?php echo json_encode(hasPermission('structure', 'delete')); ?>;
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Machine Types page loaded, initializing...');
-    initializeEventListeners();
-    loadIndustries();
-    loadWorkshops();
-    loadLines();
-    loadAreas();
-    loadData();
+    
+    // Wait for Bootstrap to be available
+    if (typeof bootstrap === 'undefined') {
+        console.log('Bootstrap not yet loaded, waiting...');
+        const checkBootstrap = setInterval(() => {
+            if (typeof bootstrap !== 'undefined') {
+                clearInterval(checkBootstrap);
+                initializePage();
+            }
+        }, 100);
+    } else {
+        initializePage();
+    }
 });
+
+function initializePage() {
+    console.log('Initializing page with Bootstrap ready...');
+    initializeEventListeners();
+    loadData();
+}
 
 // Show/hide loading overlay
 function showLoading(show) {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) {
-        if (show) {
-            overlay.style.display = 'flex';
-        } else {
-            overlay.style.display = 'none';
-        }
+        overlay.style.display = show ? 'flex' : 'none';
     }
 }
 
@@ -594,19 +468,6 @@ function initializeEventListeners() {
     filterInputs.forEach(input => {
         input.addEventListener('change', function() {
             console.log('Filter changed:', this.id, this.value);
-            
-            // Handle cascading filters
-            if (this.id === 'industryFilter') {
-                updateWorkshopFilter();
-                updateLineFilter();
-                updateAreaFilter();
-            } else if (this.id === 'workshopFilter') {
-                updateLineFilter();
-                updateAreaFilter();
-            } else if (this.id === 'lineFilter') {
-                updateAreaFilter();
-            }
-            
             currentPage = 1;
             loadData();
         });
@@ -640,54 +501,12 @@ function initializeEventListeners() {
     if (codeInput) {
         codeInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '');
-            validateCode();
         });
     }
 
-    // Form cascading dropdowns
-    const industrySelect = document.getElementById('machineTypeIndustry');
-    if (industrySelect) {
-        industrySelect.addEventListener('change', function() {
-            updateFormWorkshopOptions();
-            updateFormLineOptions();
-            updateFormAreaOptions();
-            updateIndustryNote();
-            validateCode();
-        });
-    }
-
-    const workshopSelect = document.getElementById('machineTypeWorkshop');
-    if (workshopSelect) {
-        workshopSelect.addEventListener('change', function() {
-            updateFormLineOptions();
-            updateFormAreaOptions();
-            validateCode();
-        });
-    }
-
-    const lineSelect = document.getElementById('machineTypeLine');
-    if (lineSelect) {
-        lineSelect.addEventListener('change', function() {
-            updateFormAreaOptions();
-            validateCode();
-        });
-    }
-
-    const areaSelect = document.getElementById('machineTypeArea');
-    if (areaSelect) {
-        areaSelect.addEventListener('change', function() {
-            validateCode();
-        });
-    }
-
-    // Description counter
-    const descInput = document.getElementById('machineTypeDescription');
-    const counter = document.getElementById('descriptionCounter');
-    if (descInput && counter) {
-        descInput.addEventListener('input', function() {
-            counter.textContent = this.value.length;
-        });
-    }
+    // Character counters
+    setupCharacterCounter('machineTypeDescription', 'descriptionCounter');
+    setupCharacterCounter('machineTypeSpecifications', 'specificationsCounter');
 
     // Modal events
     const modal = document.getElementById('machineTypeModal');
@@ -698,262 +517,15 @@ function initializeEventListeners() {
     }
 }
 
-// Load industries for dropdowns
-async function loadIndustries() {
-    try {
-        const response = await fetch('../api/machine_types.php?action=get_industries');
-        const result = await response.json();
-        
-        if (result.success && result.data.industries) {
-            industriesData = result.data.industries;
-            populateIndustryDropdowns();
-        }
-    } catch (error) {
-        console.error('Error loading industries:', error);
-    }
-}
-
-// Load workshops for dropdowns
-async function loadWorkshops() {
-    try {
-        const response = await fetch('../api/machine_types.php?action=get_workshops');
-        const result = await response.json();
-        
-        if (result.success && result.data.workshops) {
-            workshopsData = result.data.workshops;
-            populateWorkshopDropdowns();
-        }
-    } catch (error) {
-        console.error('Error loading workshops:', error);
-    }
-}
-
-// Load lines for dropdowns
-async function loadLines() {
-    try {
-        const response = await fetch('../api/machine_types.php?action=get_lines');
-        const result = await response.json();
-        
-        if (result.success && result.data.lines) {
-            linesData = result.data.lines;
-            populateLineDropdowns();
-        }
-    } catch (error) {
-        console.error('Error loading lines:', error);
-    }
-}
-
-// Load areas for dropdowns
-async function loadAreas() {
-    try {
-        const response = await fetch('../api/machine_types.php?action=get_areas');
-        const result = await response.json();
-        
-        if (result.success && result.data.areas) {
-            areasData = result.data.areas;
-            populateAreaDropdowns();
-        }
-    } catch (error) {
-        console.error('Error loading areas:', error);
-    }
-}
-
-// Populate industry dropdowns
-function populateIndustryDropdowns() {
-    // Filter dropdown
-    const filterSelect = document.getElementById('industryFilter');
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">Tất cả ngành</option>';
-        industriesData.forEach(industry => {
-            filterSelect.innerHTML += `<option value="${industry.id}">${industry.name} (${industry.code})</option>`;
+// Setup character counter for textarea
+function setupCharacterCounter(textareaId, counterId) {
+    const textarea = document.getElementById(textareaId);
+    const counter = document.getElementById(counterId);
+    
+    if (textarea && counter) {
+        textarea.addEventListener('input', function() {
+            counter.textContent = this.value.length;
         });
-    }
-
-    // Form dropdown
-    const formSelect = document.getElementById('machineTypeIndustry');
-    if (formSelect) {
-        formSelect.innerHTML = '<option value="">Chọn ngành...</option>';
-        industriesData.forEach(industry => {
-            formSelect.innerHTML += `<option value="${industry.id}" data-code="${industry.code}">${industry.name} (${industry.code})</option>`;
-        });
-    }
-}
-
-// Populate workshop dropdowns
-function populateWorkshopDropdowns() {
-    // Filter dropdown
-    const filterSelect = document.getElementById('workshopFilter');
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">Tất cả xưởng</option>';
-        workshopsData.forEach(workshop => {
-            filterSelect.innerHTML += `<option value="${workshop.id}">${workshop.industry_name} - ${workshop.name} (${workshop.code})</option>`;
-        });
-    }
-}
-
-// Populate line dropdowns
-function populateLineDropdowns() {
-    // Filter dropdown
-    const filterSelect = document.getElementById('lineFilter');
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">Line</option>';
-        linesData.forEach(line => {
-            filterSelect.innerHTML += `<option value="${line.id}">${line.name} (${line.code})</option>`;
-        });
-    }
-}
-
-// Populate area dropdowns
-function populateAreaDropdowns() {
-    // Filter dropdown
-    const filterSelect = document.getElementById('areaFilter');
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">Khu vực</option>';
-        areasData.forEach(area => {
-            filterSelect.innerHTML += `<option value="${area.id}">${area.name} (${area.code})</option>`;
-        });
-    }
-}
-
-// Update workshop filter based on selected industry
-function updateWorkshopFilter() {
-    const industryId = document.getElementById('industryFilter').value;
-    const workshopFilter = document.getElementById('workshopFilter');
-    
-    if (workshopFilter) {
-        workshopFilter.innerHTML = '<option value="">Tất cả xưởng</option>';
-        
-        const filteredWorkshops = industryId ? 
-            workshopsData.filter(w => w.industry_id == industryId) : 
-            workshopsData;
-            
-        filteredWorkshops.forEach(workshop => {
-            workshopFilter.innerHTML += `<option value="${workshop.id}">${workshop.name} (${workshop.code})</option>`;
-        });
-        
-        workshopFilter.value = '';
-    }
-}
-
-// Update line filter based on selected workshop
-function updateLineFilter() {
-    const workshopId = document.getElementById('workshopFilter').value;
-    const lineFilter = document.getElementById('lineFilter');
-    
-    if (lineFilter) {
-        lineFilter.innerHTML = '<option value="">Line</option>';
-        
-        const filteredLines = workshopId ? 
-            linesData.filter(l => l.workshop_id == workshopId) : 
-            linesData;
-            
-        filteredLines.forEach(line => {
-            lineFilter.innerHTML += `<option value="${line.id}">${line.name} (${line.code})</option>`;
-        });
-        
-        lineFilter.value = '';
-    }
-}
-
-// Update area filter based on selected line
-function updateAreaFilter() {
-    const lineId = document.getElementById('lineFilter').value;
-    const areaFilter = document.getElementById('areaFilter');
-    
-    if (areaFilter) {
-        areaFilter.innerHTML = '<option value="">Khu vực</option>';
-        
-        const filteredAreas = lineId ? 
-            areasData.filter(a => a.line_id == lineId) : 
-            areasData;
-            
-        filteredAreas.forEach(area => {
-            areaFilter.innerHTML += `<option value="${area.id}">${area.name} (${area.code})</option>`;
-        });
-        
-        areaFilter.value = '';
-    }
-}
-
-// Update form workshop options
-function updateFormWorkshopOptions() {
-    const industryId = document.getElementById('machineTypeIndustry').value;
-    const workshopSelect = document.getElementById('machineTypeWorkshop');
-    
-    if (workshopSelect) {
-        workshopSelect.innerHTML = '<option value="">Chọn xưởng...</option>';
-        
-        if (industryId) {
-            const filteredWorkshops = workshopsData.filter(w => w.industry_id == industryId);
-            filteredWorkshops.forEach(workshop => {
-                workshopSelect.innerHTML += `<option value="${workshop.id}">${workshop.name} (${workshop.code})</option>`;
-            });
-        }
-        
-        workshopSelect.value = '';
-        clearFieldError(workshopSelect);
-    }
-}
-
-// Update form line options
-function updateFormLineOptions() {
-    const workshopId = document.getElementById('machineTypeWorkshop').value;
-    const lineSelect = document.getElementById('machineTypeLine');
-    
-    if (lineSelect) {
-        lineSelect.innerHTML = '<option value="">Chọn line...</option>';
-        
-        if (workshopId) {
-            const filteredLines = linesData.filter(l => l.workshop_id == workshopId);
-            filteredLines.forEach(line => {
-                lineSelect.innerHTML += `<option value="${line.id}">${line.name} (${line.code})</option>`;
-            });
-        }
-        
-        lineSelect.value = '';
-        clearFieldError(lineSelect);
-    }
-}
-
-// Update form area options
-function updateFormAreaOptions() {
-    const lineId = document.getElementById('machineTypeLine').value;
-    const areaSelect = document.getElementById('machineTypeArea');
-    
-    if (areaSelect) {
-        areaSelect.innerHTML = '<option value="">Chọn khu vực...</option>';
-        
-        if (lineId) {
-            const filteredAreas = areasData.filter(a => a.line_id == lineId);
-            filteredAreas.forEach(area => {
-                areaSelect.innerHTML += `<option value="${area.id}">${area.name} (${area.code})</option>`;
-            });
-        }
-        
-        areaSelect.value = '';
-        clearFieldError(areaSelect);
-    }
-}
-
-// Update industry note
-function updateIndustryNote() {
-    const industrySelect = document.getElementById('machineTypeIndustry');
-    const noteDiv = document.getElementById('industryNote');
-    const noteText = document.getElementById('industryNoteText');
-    
-    if (!industrySelect || !noteDiv || !noteText) return;
-    
-    const selectedOption = industrySelect.options[industrySelect.selectedIndex];
-    const industryCode = selectedOption ? selectedOption.dataset.code : '';
-    
-    if (industryCode === 'NEM') {
-        noteText.textContent = 'Đối với ngành Nêm rau, Line và Khu vực có thể để trống.';
-        noteDiv.style.display = 'block';
-    } else if (industryCode === 'MI' || industryCode === 'PHO') {
-        noteText.textContent = 'Đối với ngành Mì/Phở, khuyến khích nhập đầy đủ Line và Khu vực để quản lý tốt hơn.';
-        noteDiv.style.display = 'block';
-    } else {
-        noteDiv.style.display = 'none';
     }
 }
 
@@ -966,20 +538,22 @@ async function loadData() {
         // Get filter values
         const searchEl = document.getElementById('searchInput');
         const statusEl = document.getElementById('statusFilter');
-        const industryEl = document.getElementById('industryFilter');
-        const workshopEl = document.getElementById('workshopFilter');
-        const lineEl = document.getElementById('lineFilter');
-        const areaEl = document.getElementById('areaFilter');
+        const sortEl = document.getElementById('sortFilter');
+        
+        // Parse sort filter
+        let sortBy = 'name';
+        let sortOrder = 'ASC';
+        if (sortEl && sortEl.value) {
+            const [field, order] = sortEl.value.split('_');
+            sortBy = field === 'created' ? 'created_at' : field;
+            sortOrder = order.toUpperCase();
+        }
         
         currentFilters = {
             search: searchEl ? searchEl.value.trim() : '',
             status: statusEl ? statusEl.value : 'all',
-            industry_id: industryEl ? industryEl.value : '',
-            workshop_id: workshopEl ? workshopEl.value : '',
-            line_id: lineEl ? lineEl.value : '',
-            area_id: areaEl ? areaEl.value : '',
-            sort_by: 'name',
-            sort_order: 'ASC'
+            sort_by: sortBy,
+            sort_order: sortOrder
         };
 
         const params = new URLSearchParams({
@@ -1044,63 +618,25 @@ function renderTable(data) {
     const startIndex = (currentPage - 1) * 20;
     console.log('Rendering', data.length, 'items starting from index', startIndex);
     
-    const canEdit = <?php echo json_encode(hasPermission('structure', 'edit')); ?>;
-    const canDelete = <?php echo json_encode(hasPermission('structure', 'delete')); ?>;
-    
     const rows = data.map((item, index) => {
-        // Build hierarchy path
-        let hierarchyPath = `${item.industry_name} → ${item.workshop_name}`;
-        if (item.line_name && item.area_name) {
-            hierarchyPath += ` → ${item.line_name} → ${item.area_name}`;
-        } else if (item.line_name) {
-            hierarchyPath += ` → ${item.line_name}`;
-        }
-        
-        // Build hierarchy badges
-        let hierarchyBadges = `
-            <span class="industry-badge" title="${escapeHtml(item.industry_name)}">
-                ${escapeHtml(item.industry_code)}
-            </span>
-            <span class="workshop-badge" title="${escapeHtml(item.workshop_name)}">
-                ${escapeHtml(item.workshop_code)}
-            </span>`;
-        
-        if (item.line_name) {
-            hierarchyBadges += `
-                <span class="line-badge" title="${escapeHtml(item.line_name)}">
-                    ${escapeHtml(item.line_code)}
-                </span>`;
-        }
-        
-        if (item.area_name) {
-            hierarchyBadges += `
-                <span class="area-badge" title="${escapeHtml(item.area_name)}">
-                    ${escapeHtml(item.area_code)}
-                </span>`;
-        }
-        
         return `
             <tr>
                 <td class="text-muted">${startIndex + index + 1}</td>
                 <td>
                     <div class="fw-semibold">${escapeHtml(item.name)}</div>
+                    <span class="universal-badge">Dùng chung</span>
                 </td>
                 <td>
                     <span class="machine-type-code">${escapeHtml(item.code)}</span>
                 </td>
                 <td>
-                    <div class="hierarchy-display">
-                        <div class="hierarchy-badges">
-                            ${hierarchyBadges}
-                        </div>
-                        <div class="breadcrumb-path">
-                            ${escapeHtml(hierarchyPath)}
-                        </div>
+                    <div class="text-truncate" style="max-width: 200px;" title="${escapeHtml(item.description || '')}">
+                        ${item.description || '<em class="text-muted">Chưa có mô tả</em>'}
                     </div>
                 </td>
                 <td>
-                    <div class="text-truncate" style="max-width: 200px;" title="${escapeHtml(item.description || '')}">
-                        ${item.description || '<em class="text-muted">Chưa có mô tả</em>'}
+                    <div class="text-truncate" style="max-width: 180px;" title="${escapeHtml(item.specifications || '')}">
+                        ${item.specifications || '<em class="text-muted">Chưa có</em>'}
                     </div>
                 </td>
                 <td class="text-center">
@@ -1145,7 +681,7 @@ function renderTable(data) {
     console.log('Table rendered successfully with', rows.length, 'rows');
 }
 
-// Render pagination (reuse from previous modules)
+// Render pagination
 function renderPagination(pagination) {
     const container = document.getElementById('pagination');
     if (!container || !pagination) return;
@@ -1246,35 +782,13 @@ async function editMachineType(id) {
             document.getElementById('machineTypeId').value = data.id;
             document.getElementById('machineTypeName').value = data.name;
             document.getElementById('machineTypeCode').value = data.code;
-            document.getElementById('machineTypeIndustry').value = data.industry_id;
-            
-            // Update cascading dropdowns
-            updateFormWorkshopOptions();
-            setTimeout(() => {
-                document.getElementById('machineTypeWorkshop').value = data.workshop_id;
-                
-                updateFormLineOptions();
-                setTimeout(() => {
-                    if (data.line_id) {
-                        document.getElementById('machineTypeLine').value = data.line_id;
-                        
-                        updateFormAreaOptions();
-                        setTimeout(() => {
-                            if (data.area_id) {
-                                document.getElementById('machineTypeArea').value = data.area_id;
-                            }
-                        }, 100);
-                    }
-                }, 100);
-            }, 100);
-            
             document.getElementById('machineTypeDescription').value = data.description || '';
+            document.getElementById('machineTypeSpecifications').value = data.specifications || '';
             document.getElementById('machineTypeStatus').value = data.status;
             
-            // Update industry note and description counter
-            updateIndustryNote();
-            const counter = document.getElementById('descriptionCounter');
-            if (counter) counter.textContent = (data.description || '').length;
+            // Update counters
+            updateCounter('descriptionCounter', data.description || '');
+            updateCounter('specificationsCounter', data.specifications || '');
             
             const modal = new bootstrap.Modal(document.getElementById('machineTypeModal'));
             modal.show();
@@ -1299,19 +813,6 @@ async function viewMachineType(id) {
         if (result.success && result.data) {
             const data = result.data;
             
-            // Build hierarchy display
-            let hierarchyDisplay = `
-                <span class="industry-badge">${escapeHtml(data.industry_name)} (${escapeHtml(data.industry_code)})</span>
-                <span class="workshop-badge">${escapeHtml(data.workshop_name)} (${escapeHtml(data.workshop_code)})</span>`;
-            
-            if (data.line_name) {
-                hierarchyDisplay += ` <span class="line-badge">${escapeHtml(data.line_name)} (${escapeHtml(data.line_code)})</span>`;
-            }
-            
-            if (data.area_name) {
-                hierarchyDisplay += ` <span class="area-badge">${escapeHtml(data.area_name)} (${escapeHtml(data.area_code)})</span>`;
-            }
-            
             const modalContent = `
                 <div class="modal fade" id="viewModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
@@ -1329,27 +830,29 @@ async function viewMachineType(id) {
                                         <table class="table table-borderless">
                                             <tr><td><strong>Tên dòng máy:</strong></td><td>${escapeHtml(data.name)}</td></tr>
                                             <tr><td><strong>Mã dòng máy:</strong></td><td><span class="machine-type-code">${escapeHtml(data.code)}</span></td></tr>
-                                            <tr><td><strong>Mô tả:</strong></td><td>${data.description || '<em class="text-muted">Chưa có</em>'}</td></tr>
                                             <tr><td><strong>Trạng thái:</strong></td><td><span class="badge ${data.status === 'active' ? 'bg-success' : 'bg-secondary'}">${data.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}</span></td></tr>
+                                            <tr><td><strong>Phạm vi sử dụng:</strong></td><td><span class="universal-badge">Dùng chung cho nhiều ngành/xưởng</span></td></tr>
                                         </table>
                                     </div>
                                     <div class="col-md-6">
                                         <table class="table table-borderless">
-                                            <tr><td><strong>Cấu trúc:</strong></td><td>${hierarchyDisplay}</td></tr>
                                             <tr><td><strong>Số cụm thiết bị:</strong></td><td><span class="badge bg-info">${data.equipment_groups_count || 0}</span></td></tr>
                                             <tr><td><strong>Số thiết bị:</strong></td><td><span class="badge bg-secondary">${data.equipment_count || 0}</span></td></tr>
-                                        </table>
-                                    </div>
-                                </div>
-                                <hr>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <table class="table table-borderless">
                                             <tr><td><strong>Ngày tạo:</strong></td><td>${formatDateTime(data.created_at)}</td></tr>
                                             <tr><td><strong>Cập nhật:</strong></td><td>${formatDateTime(data.updated_at)}</td></tr>
                                         </table>
                                     </div>
                                 </div>
+                                ${data.description ? `
+                                <hr>
+                                <h6><strong>Mô tả:</strong></h6>
+                                <p class="text-muted">${escapeHtml(data.description)}</p>
+                                ` : ''}
+                                ${data.specifications ? `
+                                <hr>
+                                <h6><strong>Thông số kỹ thuật:</strong></h6>
+                                <p class="text-muted">${escapeHtml(data.specifications)}</p>
+                                ` : ''}
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
@@ -1391,7 +894,7 @@ function deleteMachineType(id, name) {
     modal.show();
 }
 
-// Tiếp tục từ phần confirmDelete() - đã sửa lỗi bootstrap Modal
+// Confirm delete
 async function confirmDelete() {
     const id = document.getElementById('deleteItemId').value;
     
@@ -1425,7 +928,7 @@ async function confirmDelete() {
     }
 }
 
-// Save machine type (create/update) - đã sửa lỗi form data
+// Save machine type (create/update)
 async function saveMachineType() {
     if (!validateForm()) {
         return;
@@ -1434,25 +937,19 @@ async function saveMachineType() {
     try {
         showLoading(true);
         
-        const form = document.getElementById('machineTypeForm');
         const formData = new FormData();
         
         const id = document.getElementById('machineTypeId').value;
         formData.append('action', id ? 'update' : 'create');
         
-        // Thêm ID nếu đang update
         if (id) {
             formData.append('id', id);
         }
         
-        // Get values manually to ensure they're included correctly
         formData.append('name', document.getElementById('machineTypeName').value.trim());
         formData.append('code', document.getElementById('machineTypeCode').value.trim().toUpperCase());
-        formData.append('industry_id', document.getElementById('machineTypeIndustry').value);
-        formData.append('workshop_id', document.getElementById('machineTypeWorkshop').value);
-        formData.append('line_id', document.getElementById('machineTypeLine').value || '');
-        formData.append('area_id', document.getElementById('machineTypeArea').value || '');
         formData.append('description', document.getElementById('machineTypeDescription').value.trim());
+        formData.append('specifications', document.getElementById('machineTypeSpecifications').value.trim());
         formData.append('status', document.getElementById('machineTypeStatus').value);
         
         const response = await fetch('../api/machine_types.php', {
@@ -1468,11 +965,7 @@ async function saveMachineType() {
             if (modal) modal.hide();
             loadData(); // Reload data
         } else {
-            if (result.errors) {
-                showFormErrors(result.errors);
-            } else {
-                showNotification(result.message || 'Lỗi khi lưu dòng máy', 'error');
-            }
+            showNotification(result.message || 'Lỗi khi lưu dòng máy', 'error');
         }
     } catch (error) {
         console.error('Save error:', error);
@@ -1514,102 +1007,54 @@ async function toggleStatus(id) {
 
 // Form validation
 function validateForm() {
-    clearAllErrors();
     let isValid = true;
     
+    // Clear previous errors
+    clearAllErrors();
+    
     // Required fields
-    const requiredFields = [
-        { id: 'machineTypeName', message: 'Vui lòng nhập tên dòng máy' },
-        { id: 'machineTypeCode', message: 'Vui lòng nhập mã dòng máy' },
-        { id: 'machineTypeIndustry', message: 'Vui lòng chọn ngành' },
-        { id: 'machineTypeWorkshop', message: 'Vui lòng chọn xưởng' }
-    ];
+    const name = document.getElementById('machineTypeName').value.trim();
+    const code = document.getElementById('machineTypeCode').value.trim();
     
-    requiredFields.forEach(field => {
-        const element = document.getElementById(field.id);
-        if (!element || !element.value.trim()) {
-            showFieldError(element, field.message);
-            isValid = false;
-        }
-    });
-    
-    // Code validation
-    const codeElement = document.getElementById('machineTypeCode');
-    if (codeElement && codeElement.value) {
-        const code = codeElement.value.trim().toUpperCase();
-        if (!/^[A-Z0-9_]+$/.test(code)) {
-            showFieldError(codeElement, 'Mã chỉ được chứa chữ hoa, số và dấu gạch dưới');
-            isValid = false;
-        } else if (code.length < 2 || code.length > 20) {
-            showFieldError(codeElement, 'Mã phải từ 2-20 ký tự');
-            isValid = false;
-        }
+    if (!name) {
+        showFieldError('machineTypeName', 'Vui lòng nhập tên dòng máy');
+        isValid = false;
+    } else if (name.length < 2 || name.length > 255) {
+        showFieldError('machineTypeName', 'Tên phải từ 2-255 ký tự');
+        isValid = false;
     }
     
-    // Name validation
-    const nameElement = document.getElementById('machineTypeName');
-    if (nameElement && nameElement.value) {
-        const name = nameElement.value.trim();
-        if (name.length < 2 || name.length > 255) {
-            showFieldError(nameElement, 'Tên phải từ 2-255 ký tự');
-            isValid = false;
-        }
+    if (!code) {
+        showFieldError('machineTypeCode', 'Vui lòng nhập mã dòng máy');
+        isValid = false;
+    } else if (!/^[A-Z0-9_]+$/.test(code)) {
+        showFieldError('machineTypeCode', 'Mã chỉ được chứa chữ hoa, số và dấu gạch dưới');
+        isValid = false;
+    } else if (code.length < 2 || code.length > 20) {
+        showFieldError('machineTypeCode', 'Mã phải từ 2-20 ký tự');
+        isValid = false;
     }
     
-    // Description validation
-    const descElement = document.getElementById('machineTypeDescription');
-    if (descElement && descElement.value && descElement.value.length > 1000) {
-        showFieldError(descElement, 'Mô tả không được vượt quá 1000 ký tự');
+    // Optional field validation
+    const description = document.getElementById('machineTypeDescription').value;
+    const specifications = document.getElementById('machineTypeSpecifications').value;
+    
+    if (description && description.length > 1000) {
+        showFieldError('machineTypeDescription', 'Mô tả không được vượt quá 1000 ký tự');
+        isValid = false;
+    }
+    
+    if (specifications && specifications.length > 2000) {
+        showFieldError('machineTypeSpecifications', 'Thông số kỹ thuật không được vượt quá 2000 ký tự');
         isValid = false;
     }
     
     return isValid;
 }
 
-// Validate code in real-time
-function validateCode() {
-    const codeElement = document.getElementById('machineTypeCode');
-    const industryElement = document.getElementById('machineTypeIndustry');
-    const workshopElement = document.getElementById('machineTypeWorkshop');
-    
-    if (!codeElement || !industryElement || !workshopElement) return;
-    
-    const code = codeElement.value.trim().toUpperCase();
-    const industryId = industryElement.value;
-    const workshopId = workshopElement.value;
-    
-    // Clear previous errors
-    clearFieldError(codeElement);
-    
-    if (!code) return;
-    
-    // Basic format validation
-    if (!/^[A-Z0-9_]+$/.test(code)) {
-        showFieldError(codeElement, 'Mã chỉ được chứa chữ hoa, số và dấu gạch dưới');
-        return;
-    }
-    
-    // Generate suggested code based on hierarchy
-    if (industryId && workshopId) {
-        const industry = industriesData.find(i => i.id == industryId);
-        const workshop = workshopsData.find(w => w.id == workshopId);
-        
-        if (industry && workshop) {
-            const suggestedPrefix = `${industry.code}_${workshop.code}_`;
-            
-            if (!code.startsWith(suggestedPrefix)) {
-                const helpText = codeElement.parentElement.querySelector('.form-text');
-                if (helpText) {
-                    helpText.innerHTML = `Đề xuất: ${suggestedPrefix}XXX (ví dụ: ${suggestedPrefix}MIXER)`;
-                    helpText.style.color = '#0d6efd';
-                }
-            }
-        }
-    }
-}
-
 // Show field error
-function showFieldError(element, message) {
+function showFieldError(fieldId, message) {
+    const element = document.getElementById(fieldId);
     if (!element) return;
     
     element.classList.add('is-invalid');
@@ -1621,17 +1066,6 @@ function showFieldError(element, message) {
         element.parentElement.appendChild(feedback);
     }
     feedback.textContent = message;
-}
-
-// Clear field error
-function clearFieldError(element) {
-    if (!element) return;
-    
-    element.classList.remove('is-invalid');
-    const feedback = element.parentElement.querySelector('.invalid-feedback');
-    if (feedback) {
-        feedback.textContent = '';
-    }
 }
 
 // Clear all form errors
@@ -1650,41 +1084,6 @@ function clearAllErrors() {
     });
 }
 
-// Show form errors from API response
-function showFormErrors(errors) {
-    Object.keys(errors).forEach(field => {
-        let element;
-        
-        switch (field) {
-            case 'name':
-                element = document.getElementById('machineTypeName');
-                break;
-            case 'code':
-                element = document.getElementById('machineTypeCode');
-                break;
-            case 'industry_id':
-                element = document.getElementById('machineTypeIndustry');
-                break;
-            case 'workshop_id':
-                element = document.getElementById('machineTypeWorkshop');
-                break;
-            case 'line_id':
-                element = document.getElementById('machineTypeLine');
-                break;
-            case 'area_id':
-                element = document.getElementById('machineTypeArea');
-                break;
-            case 'description':
-                element = document.getElementById('machineTypeDescription');
-                break;
-        }
-        
-        if (element) {
-            showFieldError(element, errors[field]);
-        }
-    });
-}
-
 // Reset form
 function resetForm() {
     const form = document.getElementById('machineTypeForm');
@@ -1692,20 +1091,17 @@ function resetForm() {
         form.reset();
         clearAllErrors();
         
-        // Reset description counter
-        const counter = document.getElementById('descriptionCounter');
-        if (counter) counter.textContent = '0';
-        
-        // Hide industry note
-        const noteDiv = document.getElementById('industryNote');
-        if (noteDiv) noteDiv.style.display = 'none';
-        
-        // Reset help text
-        const helpText = document.getElementById('machineTypeCode')?.parentElement.querySelector('.form-text');
-        if (helpText) {
-            helpText.innerHTML = 'Chỉ chữ hoa, số và dấu _';
-            helpText.style.color = '';
-        }
+        // Reset counters
+        updateCounter('descriptionCounter', '');
+        updateCounter('specificationsCounter', '');
+    }
+}
+
+// Update character counter
+function updateCounter(counterId, text) {
+    const counter = document.getElementById(counterId);
+    if (counter) {
+        counter.textContent = text.length;
     }
 }
 
@@ -1713,15 +1109,7 @@ function resetForm() {
 function resetFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('statusFilter').value = 'all';
-    document.getElementById('industryFilter').value = '';
-    document.getElementById('workshopFilter').value = '';
-    document.getElementById('lineFilter').value = '';
-    document.getElementById('areaFilter').value = '';
-    
-    // Reset workshop options to show all
-    populateWorkshopDropdowns();
-    populateLineDropdowns();
-    populateAreaDropdowns();
+    document.getElementById('sortFilter').value = 'name_asc';
     
     currentPage = 1;
     loadData();
@@ -1732,29 +1120,14 @@ async function exportData() {
     try {
         showLoading(true);
         
-        // Get current filters
         const params = new URLSearchParams({
             action: 'export',
             ...currentFilters
         });
         
-        const response = await fetch(`../api/machine_types.php?${params}`);
+        window.location.href = `../api/machine_types.php?${params}`;
         
-        if (!response.ok) {
-            throw new Error('Lỗi khi xuất dữ liệu');
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `machine_types_${new Date().toISOString().split('T')[0]}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        showNotification('Xuất dữ liệu thành công', 'success');
+        showNotification('Đang tải file xuất...', 'info');
     } catch (error) {
         console.error('Export error:', error);
         showNotification('Lỗi khi xuất dữ liệu: ' + error.message, 'error');
@@ -1788,12 +1161,12 @@ function formatDateTime(dateString) {
     }
 }
 
-// Show notification function - đã sửa lại để tương thích với file areas.php
+// Show notification function
 function showNotification(message, type = 'info') {
     // Create notification element
     const notification = document.createElement('div');
-    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
     notification.style.cssText = `
+        position: fixed;
         top: 20px;
         right: 20px;
         z-index: 1060;
@@ -1811,7 +1184,7 @@ function showNotification(message, type = 'info') {
     
     // Map type to Bootstrap alert class
     const alertType = type === 'error' ? 'danger' : type;
-    notification.className = `alert alert-${alertType} alert-dismissible fade show position-fixed`;
+    notification.className = `alert alert-${alertType} alert-dismissible fade show`;
     
     notification.innerHTML = `
         <i class="${icons[type] || icons.info} me-2"></i>
@@ -1833,8 +1206,6 @@ function showNotification(message, type = 'info') {
         }
     }, 5000);
 }
+</script>
 
-// Global permission check (from PHP) - đã sửa cú pháp PHP
-const canEdit = <?= json_encode(hasPermission('structure', 'edit')); ?>;
-const canDelete = <?= json_encode(hasPermission('structure', 'delete')); ?>;
 <?php require_once '../../../includes/footer.php'; ?>

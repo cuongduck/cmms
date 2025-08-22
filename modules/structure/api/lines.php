@@ -181,13 +181,6 @@ function getLinesList() {
         $line['status_text'] = getStatusText($line['status']);
         $line['status_class'] = getStatusClass($line['status']);
         
-        // Get areas count
-        $areasCount = $db->fetch(
-            "SELECT COUNT(*) as count FROM areas WHERE line_id = ?", 
-            [$line['id']]
-        )['count'];
-        $line['areas_count'] = $areasCount;
-        
         // Get equipment count
         $equipmentCount = $db->fetch(
             "SELECT COUNT(*) as count FROM equipment WHERE line_id = ?", 
@@ -245,11 +238,6 @@ function getLine() {
     }
     
     // Get related data
-    $line['areas_count'] = $db->fetch(
-        "SELECT COUNT(*) as count FROM areas WHERE line_id = ?", 
-        [$id]
-    )['count'];
-    
     $line['equipment_count'] = $db->fetch(
         "SELECT COUNT(*) as count FROM equipment WHERE line_id = ?", 
         [$id]
@@ -561,16 +549,6 @@ function deleteLine() {
                               WHERE pl.id = ?", [$id]);
     if (!$currentData) {
         throw new Exception('Không tìm thấy line sản xuất');
-    }
-    
-    // Check if line has areas
-    $areasCount = $db->fetch(
-        "SELECT COUNT(*) as count FROM areas WHERE line_id = ?", 
-        [$id]
-    )['count'];
-    
-    if ($areasCount > 0) {
-        throw new Exception('Không thể xóa line sản xuất này vì đang có ' . $areasCount . ' khu vực thuộc line này');
     }
     
     // Check if line has equipment

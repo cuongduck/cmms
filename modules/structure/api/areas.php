@@ -1,7 +1,7 @@
 <?php
 /**
  * Areas API - /modules/structure/api/areas.php
- * CRUD operations for Areas module
+ * CRUD operations for Areas module - Simplified version (Industry + Workshop only)
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -55,8 +55,8 @@ function handleGet() {
         case 'get_workshops':
             getWorkshops();
             break;
-        case 'get_lines':
-            getLines();
+        case 'export':
+            exportAreas();
             break;
         default:
             throw new Exception('Invalid action');
@@ -102,12 +102,11 @@ function getAreasList() {
     $status = $_GET['status'] ?? 'all';
     $industryId = (int)($_GET['industry_id'] ?? 0);
     $workshopId = (int)($_GET['workshop_id'] ?? 0);
-    $lineId = (int)($_GET['line_id'] ?? 0);
     $sortBy = $_GET['sort_by'] ?? 'name';
     $sortOrder = strtoupper($_GET['sort_order'] ?? 'ASC');
     
     // Validate sort parameters
-    $allowedSortFields = ['name', 'code', 'created_at', 'status', 'industry_name', 'workshop_name', 'line_name'];
+    $allowedSortFields = ['name', 'code', 'created_at', 'status', 'industry_name', 'workshop_name'];
     if (!in_array($sortBy, $allowedSortFields)) {
         $sortBy = 'name';
     }
@@ -120,9 +119,9 @@ function getAreasList() {
     $params = [];
     
     if (!empty($search)) {
-        $whereConditions[] = "(a.name LIKE ? OR a.code LIKE ? OR a.description LIKE ? OR pl.name LIKE ? OR w.name LIKE ? OR i.name LIKE ?)";
+        $whereConditions[] = "(a.name LIKE ? OR a.code LIKE ? OR a.description LIKE ? OR w.name LIKE ? OR i.name LIKE ?)";
         $searchTerm = '%' . $search . '%';
-        $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm]);
     }
     
     if ($status !== 'all') {
@@ -131,18 +130,13 @@ function getAreasList() {
     }
     
     if ($industryId > 0) {
-        $whereConditions[] = "w.industry_id = ?";
+        $whereConditions[] = "a.industry_id = ?";
         $params[] = $industryId;
     }
     
     if ($workshopId > 0) {
-        $whereConditions[] = "pl.workshop_id = ?";
+        $whereConditions[] = "a.workshop_id = ?";
         $params[] = $workshopId;
-    }
-    
-    if ($lineId > 0) {
-        $whereConditions[] = "a.line_id = ?";
-        $params[] = $lineId;
     }
     
     $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
@@ -150,9 +144,8 @@ function getAreasList() {
     // Get total count
     $countSql = "SELECT COUNT(*) as total 
                 FROM areas a 
-                JOIN production_lines pl ON a.line_id = pl.id 
-                JOIN workshops w ON pl.workshop_id = w.id 
-                JOIN industries i ON w.industry_id = i.id 
+                JOIN workshops w ON a.workshop_id = w.id 
+                JOIN industries i ON a.industry_id = i.id 
                 $whereClause";
     $totalResult = $db->fetch($countSql, $params);
     $total = $totalResult['total'];
@@ -167,21 +160,17 @@ function getAreasList() {
         $orderBy = 'i.name';
     } elseif ($sortBy === 'workshop_name') {
         $orderBy = 'w.name';
-    } elseif ($sortBy === 'line_name') {
-        $orderBy = 'pl.name';
     } else {
         $orderBy = 'a.' . $sortBy;
     }
     
     // Get data
     $sql = "SELECT a.id, a.name, a.code, a.description, a.status, a.created_at, a.updated_at,
-                   a.line_id, pl.name as line_name, pl.code as line_code,
-                   pl.workshop_id, w.name as workshop_name, w.code as workshop_code,
-                   w.industry_id, i.name as industry_name, i.code as industry_code
+                   a.workshop_id, w.name as workshop_name, w.code as workshop_code,
+                   a.industry_id, i.name as industry_name, i.code as industry_code
             FROM areas a 
-            JOIN production_lines pl ON a.line_id = pl.id 
-            JOIN workshops w ON pl.workshop_id = w.id 
-            JOIN industries i ON w.industry_id = i.id 
+            JOIN workshops w ON a.workshop_id = w.id 
+            JOIN industries i ON a.industry_id = i.id 
             $whereClause 
             ORDER BY $orderBy $sortOrder 
             LIMIT $limit OFFSET $offset";
@@ -195,19 +184,19 @@ function getAreasList() {
         $area['status_text'] = getStatusText($area['status']);
         $area['status_class'] = getStatusClass($area['status']);
         
-        // Get machine types count
-        $machineTypesCount = $db->fetch(
-            "SELECT COUNT(*) as count FROM machine_types WHERE area_id = ?", 
-            [$area['id']]
-        )['count'];
-        $area['machine_types_count'] = $machineTypesCount;
-        
-        // Get equipment count
+        // Get equipment count directly from equipment table
         $equipmentCount = $db->fetch(
             "SELECT COUNT(*) as count FROM equipment WHERE area_id = ?", 
             [$area['id']]
         )['count'];
         $area['equipment_count'] = $equipmentCount;
+        
+        // Get lines count in this area (if any lines reference this area)
+        $linesCount = $db->fetch(
+            "SELECT COUNT(*) as count FROM production_lines WHERE workshop_id = ?", 
+            [$area['workshop_id']]
+        )['count'];
+        $area['lines_count'] = $linesCount;
     }
     
     $pagination = [
@@ -227,7 +216,6 @@ function getAreasList() {
             'status' => $status,
             'industry_id' => $industryId,
             'workshop_id' => $workshopId,
-            'line_id' => $lineId,
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder
         ]
@@ -247,13 +235,11 @@ function getArea() {
         throw new Exception('ID không hợp lệ');
     }
     
-    $sql = "SELECT a.*, pl.name as line_name, pl.code as line_code,
-                   pl.workshop_id, w.name as workshop_name, w.code as workshop_code,
-                   w.industry_id, i.name as industry_name, i.code as industry_code
+    $sql = "SELECT a.*, w.name as workshop_name, w.code as workshop_code,
+                   i.name as industry_name, i.code as industry_code
             FROM areas a 
-            JOIN production_lines pl ON a.line_id = pl.id 
-            JOIN workshops w ON pl.workshop_id = w.id 
-            JOIN industries i ON w.industry_id = i.id 
+            JOIN workshops w ON a.workshop_id = w.id 
+            JOIN industries i ON a.industry_id = i.id 
             WHERE a.id = ?";
     $area = $db->fetch($sql, [$id]);
     
@@ -262,14 +248,14 @@ function getArea() {
     }
     
     // Get related data
-    $area['machine_types_count'] = $db->fetch(
-        "SELECT COUNT(*) as count FROM machine_types WHERE area_id = ?", 
-        [$id]
-    )['count'];
-    
     $area['equipment_count'] = $db->fetch(
         "SELECT COUNT(*) as count FROM equipment WHERE area_id = ?", 
         [$id]
+    )['count'];
+    
+    $area['lines_count'] = $db->fetch(
+        "SELECT COUNT(*) as count FROM production_lines WHERE workshop_id = ?", 
+        [$area['workshop_id']]
     )['count'];
     
     successResponse($area);
@@ -284,19 +270,19 @@ function checkCode() {
     requirePermission('structure', 'view');
     
     $code = trim($_GET['code'] ?? '');
-    $lineId = (int)($_GET['line_id'] ?? 0);
+    $workshopId = (int)($_GET['workshop_id'] ?? 0);
     $excludeId = (int)($_GET['exclude_id'] ?? 0);
     
     if (empty($code)) {
         throw new Exception('Mã code không được trống');
     }
     
-    if (!$lineId) {
-        throw new Exception('Line ID không hợp lệ');
+    if (!$workshopId) {
+        throw new Exception('Workshop ID không hợp lệ');
     }
     
-    $sql = "SELECT id FROM areas WHERE code = ? AND line_id = ?";
-    $params = [$code, $lineId];
+    $sql = "SELECT id FROM areas WHERE code = ? AND workshop_id = ?";
+    $params = [$code, $workshopId];
     
     if ($excludeId) {
         $sql .= " AND id != ?";
@@ -351,37 +337,6 @@ function getWorkshops() {
 }
 
 /**
- * Get production lines for dropdown
- */
-function getLines() {
-    global $db;
-    
-    requirePermission('structure', 'view');
-    
-    $workshopId = (int)($_GET['workshop_id'] ?? 0);
-    
-    $sql = "SELECT pl.id, pl.name, pl.code, pl.workshop_id, 
-                   w.name as workshop_name, w.code as workshop_code,
-                   w.industry_id, i.name as industry_name, i.code as industry_code
-            FROM production_lines pl 
-            JOIN workshops w ON pl.workshop_id = w.id 
-            JOIN industries i ON w.industry_id = i.id 
-            WHERE pl.status = 'active'";
-    $params = [];
-    
-    if ($workshopId > 0) {
-        $sql .= " AND pl.workshop_id = ?";
-        $params[] = $workshopId;
-    }
-    
-    $sql .= " ORDER BY i.name, w.name, pl.name";
-    
-    $lines = $db->fetchAll($sql, $params);
-    
-    successResponse(['lines' => $lines]);
-}
-
-/**
  * Create new area
  */
 function createArea() {
@@ -392,7 +347,8 @@ function createArea() {
     // Get and validate input
     $name = trim($_POST['name'] ?? '');
     $code = trim(strtoupper($_POST['code'] ?? ''));
-    $lineId = (int)($_POST['line_id'] ?? 0);
+    $industryId = (int)($_POST['industry_id'] ?? 0);
+    $workshopId = (int)($_POST['workshop_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'active';
     
@@ -407,23 +363,27 @@ function createArea() {
     
     if (empty($code)) {
         $errors[] = 'Mã khu vực không được trống';
-    } elseif (strlen($code) > 10) {
-        $errors[] = 'Mã khu vực không được quá 10 ký tự';
+    } elseif (strlen($code) > 20) {
+        $errors[] = 'Mã khu vực không được quá 20 ký tự';
     } elseif (!preg_match('/^[A-Z0-9_]+$/', $code)) {
         $errors[] = 'Mã khu vực chỉ được chứa chữ hoa, số và dấu gạch dưới';
     }
     
-    if (!$lineId) {
-        $errors[] = 'Vui lòng chọn line sản xuất';
+    if (!$industryId) {
+        $errors[] = 'Vui lòng chọn ngành';
+    }
+    
+    if (!$workshopId) {
+        $errors[] = 'Vui lòng chọn xưởng';
     } else {
-        // Check if line exists and is active with full hierarchy
-        $line = $db->fetch("SELECT pl.*, w.name as workshop_name, i.name as industry_name 
-                           FROM production_lines pl 
-                           JOIN workshops w ON pl.workshop_id = w.id 
-                           JOIN industries i ON w.industry_id = i.id 
-                           WHERE pl.id = ? AND pl.status = 'active'", [$lineId]);
-        if (!$line) {
-            $errors[] = 'Line sản xuất không hợp lệ hoặc không hoạt động';
+        // Check if workshop exists and belongs to the selected industry
+        $workshop = $db->fetch("SELECT w.*, i.name as industry_name 
+                               FROM workshops w 
+                               JOIN industries i ON w.industry_id = i.id 
+                               WHERE w.id = ? AND w.status = 'active' AND w.industry_id = ?", 
+                               [$workshopId, $industryId]);
+        if (!$workshop) {
+            $errors[] = 'Xưởng không hợp lệ hoặc không thuộc ngành đã chọn';
         }
     }
     
@@ -435,11 +395,11 @@ function createArea() {
         $errors[] = 'Mô tả không được quá 1000 ký tự';
     }
     
-    // Check code uniqueness within line
+    // Check code uniqueness within workshop
     if (empty($errors)) {
-        $sql = "SELECT id FROM areas WHERE code = ? AND line_id = ?";
-        if ($db->fetch($sql, [$code, $lineId])) {
-            $errors[] = 'Mã khu vực đã tồn tại trong line này';
+        $sql = "SELECT id FROM areas WHERE code = ? AND workshop_id = ?";
+        if ($db->fetch($sql, [$code, $workshopId])) {
+            $errors[] = 'Mã khu vực đã tồn tại trong xưởng này';
         }
     }
     
@@ -450,13 +410,14 @@ function createArea() {
     try {
         $db->beginTransaction();
         
-        $sql = "INSERT INTO areas (name, code, line_id, description, status, created_by, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        $sql = "INSERT INTO areas (name, code, industry_id, workshop_id, description, status, created_by, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $params = [
             $name,
             $code,
-            $lineId,
+            $industryId,
+            $workshopId,
             $description,
             $status,
             getCurrentUser()['id']
@@ -466,13 +427,14 @@ function createArea() {
         $areaId = $db->lastInsertId();
         
         // Log activity
-        logActivity('create', 'areas', "Tạo khu vực: $name ($code) - Line: {$line['name']} - Xưởng: {$line['workshop_name']} - Ngành: {$line['industry_name']}", getCurrentUser()['id']);
+        logActivity('create', 'areas', "Tạo khu vực: $name ($code) - Xưởng: {$workshop['name']} - Ngành: {$workshop['industry_name']}", getCurrentUser()['id']);
         
         // Create audit trail
         createAuditTrail('areas', $areaId, 'create', null, [
             'name' => $name,
             'code' => $code,
-            'line_id' => $lineId,
+            'industry_id' => $industryId,
+            'workshop_id' => $workshopId,
             'description' => $description,
             'status' => $status
         ]);
@@ -486,6 +448,7 @@ function createArea() {
         throw new Exception('Lỗi khi tạo khu vực: ' . $e->getMessage());
     }
 }
+
 /**
  * Update area
  */
@@ -508,11 +471,12 @@ function updateArea() {
     // Get and validate input
     $name = trim($_POST['name'] ?? '');
     $code = trim(strtoupper($_POST['code'] ?? ''));
-    $lineId = (int)($_POST['line_id'] ?? 0);
+    $industryId = (int)($_POST['industry_id'] ?? 0);
+    $workshopId = (int)($_POST['workshop_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'active';
     
-    // Validation
+    // Validation (same as create)
     $errors = [];
     
     if (empty($name)) {
@@ -523,23 +487,27 @@ function updateArea() {
     
     if (empty($code)) {
         $errors[] = 'Mã khu vực không được trống';
-    } elseif (strlen($code) > 10) {
-        $errors[] = 'Mã khu vực không được quá 10 ký tự';
+    } elseif (strlen($code) > 20) {
+        $errors[] = 'Mã khu vực không được quá 20 ký tự';
     } elseif (!preg_match('/^[A-Z0-9_]+$/', $code)) {
         $errors[] = 'Mã khu vực chỉ được chứa chữ hoa, số và dấu gạch dưới';
     }
     
-    if (!$lineId) {
-        $errors[] = 'Vui lòng chọn line sản xuất';
+    if (!$industryId) {
+        $errors[] = 'Vui lòng chọn ngành';
+    }
+    
+    if (!$workshopId) {
+        $errors[] = 'Vui lòng chọn xưởng';
     } else {
-        // Check if line exists and is active with full hierarchy
-        $line = $db->fetch("SELECT pl.*, w.name as workshop_name, i.name as industry_name 
-                           FROM production_lines pl 
-                           JOIN workshops w ON pl.workshop_id = w.id 
-                           JOIN industries i ON w.industry_id = i.id 
-                           WHERE pl.id = ? AND pl.status = 'active'", [$lineId]);
-        if (!$line) {
-            $errors[] = 'Line sản xuất không hợp lệ hoặc không hoạt động';
+        // Check if workshop exists and belongs to the selected industry
+        $workshop = $db->fetch("SELECT w.*, i.name as industry_name 
+                               FROM workshops w 
+                               JOIN industries i ON w.industry_id = i.id 
+                               WHERE w.id = ? AND w.status = 'active' AND w.industry_id = ?", 
+                               [$workshopId, $industryId]);
+        if (!$workshop) {
+            $errors[] = 'Xưởng không hợp lệ hoặc không thuộc ngành đã chọn';
         }
     }
     
@@ -551,11 +519,11 @@ function updateArea() {
         $errors[] = 'Mô tả không được quá 1000 ký tự';
     }
     
-    // Check code uniqueness within line (exclude current record)
+    // Check code uniqueness within workshop (exclude current record)
     if (empty($errors)) {
-        $sql = "SELECT id FROM areas WHERE code = ? AND line_id = ? AND id != ?";
-        if ($db->fetch($sql, [$code, $lineId, $id])) {
-            $errors[] = 'Mã khu vực đã tồn tại trong line này';
+        $sql = "SELECT id FROM areas WHERE code = ? AND workshop_id = ? AND id != ?";
+        if ($db->fetch($sql, [$code, $workshopId, $id])) {
+            $errors[] = 'Mã khu vực đã tồn tại trong xưởng này';
         }
     }
     
@@ -567,20 +535,21 @@ function updateArea() {
         $db->beginTransaction();
         
         $sql = "UPDATE areas 
-                SET name = ?, code = ?, line_id = ?, description = ?, status = ?, updated_at = NOW() 
+                SET name = ?, code = ?, industry_id = ?, workshop_id = ?, description = ?, status = ?, updated_at = NOW() 
                 WHERE id = ?";
         
-        $params = [$name, $code, $lineId, $description, $status, $id];
+        $params = [$name, $code, $industryId, $workshopId, $description, $status, $id];
         $db->execute($sql, $params);
         
         // Log activity
-        logActivity('update', 'areas', "Cập nhật khu vực: $name ($code) - Line: {$line['name']} - Xưởng: {$line['workshop_name']} - Ngành: {$line['industry_name']}", getCurrentUser()['id']);
+        logActivity('update', 'areas', "Cập nhật khu vực: $name ($code) - Xưởng: {$workshop['name']} - Ngành: {$workshop['industry_name']}", getCurrentUser()['id']);
         
         // Create audit trail
         createAuditTrail('areas', $id, 'update', $currentData, [
             'name' => $name,
             'code' => $code,
-            'line_id' => $lineId,
+            'industry_id' => $industryId,
+            'workshop_id' => $workshopId,
             'description' => $description,
             'status' => $status
         ]);
@@ -609,26 +578,14 @@ function deleteArea() {
     }
     
     // Get current data with full hierarchy info
-    $currentData = $db->fetch("SELECT a.*, pl.name as line_name, pl.code as line_code,
-                                      w.name as workshop_name, w.code as workshop_code,
+    $currentData = $db->fetch("SELECT a.*, w.name as workshop_name, w.code as workshop_code,
                                       i.name as industry_name, i.code as industry_code
                               FROM areas a 
-                              JOIN production_lines pl ON a.line_id = pl.id 
-                              JOIN workshops w ON pl.workshop_id = w.id 
-                              JOIN industries i ON w.industry_id = i.id 
+                              JOIN workshops w ON a.workshop_id = w.id 
+                              JOIN industries i ON a.industry_id = i.id 
                               WHERE a.id = ?", [$id]);
     if (!$currentData) {
         throw new Exception('Không tìm thấy khu vực');
-    }
-    
-    // Check if area has machine types
-    $machineTypesCount = $db->fetch(
-        "SELECT COUNT(*) as count FROM machine_types WHERE area_id = ?", 
-        [$id]
-    )['count'];
-    
-    if ($machineTypesCount > 0) {
-        throw new Exception('Không thể xóa khu vực này vì đang có ' . $machineTypesCount . ' dòng máy thuộc khu vực này');
     }
     
     // Check if area has equipment
@@ -641,16 +598,14 @@ function deleteArea() {
         throw new Exception('Không thể xóa khu vực này vì đang có ' . $equipmentCount . ' thiết bị thuộc khu vực này');
     }
     
-    // Check if area has equipment groups
-    $equipmentGroupsCount = $db->fetch(
-        "SELECT COUNT(*) as count FROM equipment_groups eg 
-         JOIN machine_types mt ON eg.machine_type_id = mt.id 
-         WHERE mt.area_id = ?", 
+    // Check if any production lines reference this area
+    $linesCount = $db->fetch(
+        "SELECT COUNT(*) as count FROM production_lines WHERE area_id = ?", 
         [$id]
     )['count'];
     
-    if ($equipmentGroupsCount > 0) {
-        throw new Exception('Không thể xóa khu vực này vì đang có ' . $equipmentGroupsCount . ' cụm thiết bị thuộc khu vực này');
+    if ($linesCount > 0) {
+        throw new Exception('Không thể xóa khu vực này vì đang có ' . $linesCount . ' line sản xuất thuộc khu vực này');
     }
     
     try {
@@ -661,7 +616,7 @@ function deleteArea() {
         $db->execute($sql, [$id]);
         
         // Log activity
-        logActivity('delete', 'areas', "Xóa khu vực: {$currentData['name']} ({$currentData['code']}) - Line: {$currentData['line_name']} - Xưởng: {$currentData['workshop_name']} - Ngành: {$currentData['industry_name']}", getCurrentUser()['id']);
+        logActivity('delete', 'areas', "Xóa khu vực: {$currentData['name']} ({$currentData['code']}) - Xưởng: {$currentData['workshop_name']} - Ngành: {$currentData['industry_name']}", getCurrentUser()['id']);
         
         // Create audit trail
         createAuditTrail('areas', $id, 'delete', $currentData, null);
@@ -690,11 +645,10 @@ function toggleStatus() {
     }
     
     // Get current data with hierarchy info
-    $currentData = $db->fetch("SELECT a.*, pl.name as line_name, w.name as workshop_name, i.name as industry_name 
+    $currentData = $db->fetch("SELECT a.*, w.name as workshop_name, i.name as industry_name 
                               FROM areas a 
-                              JOIN production_lines pl ON a.line_id = pl.id 
-                              JOIN workshops w ON pl.workshop_id = w.id 
-                              JOIN industries i ON w.industry_id = i.id 
+                              JOIN workshops w ON a.workshop_id = w.id 
+                              JOIN industries i ON a.industry_id = i.id 
                               WHERE a.id = ?", [$id]);
     if (!$currentData) {
         throw new Exception('Không tìm thấy khu vực');
@@ -720,5 +674,62 @@ function toggleStatus() {
         $db->rollback();
         throw new Exception('Lỗi khi thay đổi trạng thái: ' . $e->getMessage());
     }
+}
+
+/**
+ * Export areas to Excel
+ */
+function exportAreas() {
+    global $db;
+    
+    requirePermission('structure', 'export');
+    
+    // Get all areas with hierarchy info
+    $sql = "SELECT a.name, a.code, a.description, a.status, a.created_at, a.updated_at,
+                   i.name as industry_name, i.code as industry_code,
+                   w.name as workshop_name, w.code as workshop_code
+            FROM areas a 
+            JOIN workshops w ON a.workshop_id = w.id 
+            JOIN industries i ON a.industry_id = i.id 
+            ORDER BY i.name, w.name, a.name";
+    $data = $db->fetchAll($sql);
+    
+    // Format data for export
+    $exportData = [];
+    foreach ($data as $row) {
+        $exportData[] = [
+            'Tên khu vực' => $row['name'],
+            'Mã khu vực' => $row['code'],
+            'Ngành' => $row['industry_name'] . ' (' . $row['industry_code'] . ')',
+            'Xưởng' => $row['workshop_name'] . ' (' . $row['workshop_code'] . ')',
+            'Mô tả' => $row['description'],
+            'Trạng thái' => $row['status'] === 'active' ? 'Hoạt động' : 'Không hoạt động',
+            'Ngày tạo' => formatDateTime($row['created_at']),
+            'Cập nhật' => formatDateTime($row['updated_at'])
+        ];
+    }
+    
+    $headers = array_keys($exportData[0] ?? []);
+    
+    // Export to Excel (simple CSV format)
+    header('Content-Type: application/vnd.ms-excel');
+    header('Content-Disposition: attachment; filename="areas_' . date('Y-m-d_H-i-s') . '.csv"');
+    header('Cache-Control: max-age=0');
+    
+    $output = fopen('php://output', 'w');
+    
+    // Add BOM for UTF-8
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+    
+    // Headers
+    fputcsv($output, $headers);
+    
+    // Data
+    foreach ($exportData as $row) {
+        fputcsv($output, $row);
+    }
+    
+    fclose($output);
+    exit;
 }
 ?>
