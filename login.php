@@ -288,7 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Company Info -->
                         <div class="company-info">
-                            <h5>MASAN CONSUMER CORPORATION</h5>
+                            <h5>BẢO TRÌ CF</h5>
                             <p>Hệ thống quản lý bảo trì thiết bị</p>
                             <small class="text-muted">Version <?php echo APP_VERSION; ?></small>
                         </div>
