@@ -30,11 +30,11 @@
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     
     <!-- Custom JS -->
-    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/main.js?v=<?php echo time(); ?>"></script>
     
     <!-- Module specific JS -->
     <?php if (!empty($moduleJS)): ?>
-        <script src="/assets/js/<?php echo $moduleJS; ?>.js"></script>
+        <script src="/assets/js/<?php echo $moduleJS; ?>.js?v=<?php echo time(); ?>"></script>
     <?php endif; ?>
     
     <!-- Custom page scripts -->
