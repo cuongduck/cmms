@@ -66,8 +66,8 @@
     
     <script>
     // Global JavaScript functions
-    window.CMMS = {
-        baseUrl: '<?php echo APP_URL; ?>',
+window.CMMS = window.CMMS || {
+    baseUrl: '<?php echo APP_URL; ?>',
         
         // Show toast notification
         showToast: function(message, type = 'info') {

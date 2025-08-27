@@ -4,6 +4,9 @@
  */
 
 // Extend CMMS object with additional utilities
+if (!window.CMMS) {
+    window.CMMS = {};
+}
 Object.assign(window.CMMS, {
     
     // Data table utilities

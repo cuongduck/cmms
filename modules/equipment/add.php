@@ -547,9 +547,15 @@ require_once '../../includes/header.php';
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="workshopId" name="workshop_id" required onchange="updateLines()">
-                                        <option value="">Chọn xưởng</option>
-                                        <?php echo buildSelectOptions($workshops, 'id', 'name', $formData['workshop_id'] ?? null); ?>
-                                    </select>
+    <option value="">Chọn xưởng</option>
+    <?php foreach ($workshops as $workshop): ?>
+        <option value="<?php echo $workshop['id']; ?>" 
+                data-industry="<?php echo $workshop['industry_id']; ?>"
+                <?php echo ($formData['workshop_id'] ?? null) == $workshop['id'] ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($workshop['name']); ?>
+        </option>
+    <?php endforeach; ?>
+</select>
                                     <label for="workshopId">Xưởng sản xuất *</label>
                                     <div class="invalid-feedback"></div>
                                 </div>
@@ -559,10 +565,16 @@ require_once '../../includes/header.php';
 <div class="row g-3 mt-1">
     <div class="col-md-6">
         <div class="form-floating">
-            <select class="form-select" id="lineId" name="line_id">
-                <option value="">Chọn line sản xuất</option>
-                <?php echo buildSelectOptions($lines, 'id', 'name', $formData['line_id'] ?? null, ['workshop_id' => 'data-workshop']); ?>
-            </select>
+           <select class="form-select" id="lineId" name="line_id">
+    <option value="">Chọn line sản xuất</option>
+    <?php foreach ($lines as $line): ?>
+        <option value="<?php echo $line['id']; ?>" 
+                data-workshop="<?php echo $line['workshop_id']; ?>"
+                <?php echo ($formData['line_id'] ?? null) == $line['id'] ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($line['name']); ?>
+        </option>
+    <?php endforeach; ?>
+</select>
             <label for="lineId">Line sản xuất</label>
             <div class="invalid-feedback"></div>
         </div>
@@ -570,9 +582,15 @@ require_once '../../includes/header.php';
     <div class="col-md-6">
         <div class="form-floating">
             <select class="form-select" id="areaId" name="area_id">
-                <option value="">Chọn khu vực</option>
-                <?php echo buildSelectOptions($areas, 'id', 'name', $formData['area_id'] ?? null, ['workshop_id' => 'data-workshop']); ?>  <!-- SỬA: data-workshop thay vì data-line -->
-            </select>
+    <option value="">Chọn khu vực</option>
+    <?php foreach ($areas as $area): ?>
+        <option value="<?php echo $area['id']; ?>" 
+                data-workshop="<?php echo $area['workshop_id']; ?>"
+                <?php echo ($formData['area_id'] ?? null) == $area['id'] ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($area['name']); ?>
+        </option>
+    <?php endforeach; ?>
+</select>
             <label for="areaId">Khu vực</label>
             <div class="invalid-feedback"></div>
         </div>
@@ -592,9 +610,15 @@ require_once '../../includes/header.php';
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="equipmentGroupId" name="equipment_group_id">
-                                        <option value="">Chọn cụm thiết bị</option>
-                                        <?php echo buildSelectOptions($equipmentGroups, 'id', 'name', $formData['equipment_group_id'] ?? null); ?>
-                                    </select>
+    <option value="">Chọn cụm thiết bị</option>
+    <?php foreach ($equipmentGroups as $group): ?>
+        <option value="<?php echo $group['id']; ?>" 
+                data-machine-type="<?php echo $group['machine_type_id']; ?>"
+                <?php echo ($formData['equipment_group_id'] ?? null) == $group['id'] ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($group['name']); ?>
+        </option>
+    <?php endforeach; ?>
+</select>
                                     <label for="equipmentGroupId">Cụm thiết bị</label>
                                     <div class="invalid-feedback"></div>
                                 </div>

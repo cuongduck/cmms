@@ -4,6 +4,9 @@
  */
 
 // Extend CMMS object with Equipment utilities
+if (!window.CMMS) {
+    window.CMMS = {};
+}
 Object.assign(window.CMMS, {
     
     equipment: {
@@ -514,3 +517,5 @@ Object.assign(window.CMMS, {
                 selectedCountEl.textContent = count;
             }
         },
+       } ,
+      }) ;

@@ -70,6 +70,7 @@ const EquipmentAddForm = {
                 name: option.text,
                 industryId: option.getAttribute('data-industry')
             })).filter(item => item.id);
+            console.log('Loaded workshops:', this.state.dependentData.workshops); // Thêm log để kiểm tra
         }
         
         const lineSelect = document.getElementById('lineId');
@@ -154,34 +155,32 @@ const EquipmentAddForm = {
     },
     
     // Update workshops based on selected industry
-    updateWorkshops: function() {
-        const industrySelect = document.getElementById('industryId');
-        const workshopSelect = document.getElementById('workshopId');
-        
-        if (!industrySelect || !workshopSelect) return;
-        
-        const selectedIndustryId = industrySelect.value;
-        
-        // Clear dependent selects
-        this.clearSelect(workshopSelect, 'Chọn xưởng');
-        this.clearSelect(document.getElementById('lineId'), 'Chọn line sản xuất');
-        this.clearSelect(document.getElementById('areaId'), 'Chọn khu vực');
-        
-        // Filter and populate workshops
-        const availableWorkshops = this.state.dependentData.workshops.filter(workshop => 
-            !selectedIndustryId || workshop.industryId === selectedIndustryId
-        );
-        
-        this.populateSelect(workshopSelect, availableWorkshops);
-        
-        console.log('Updated workshops for industry:', selectedIndustryId);
-        
-        // Cascade: If a workshop is pre-selected or default, update lines and areas
-        if (workshopSelect.value) {
-            this.updateLines();
-            this.updateAreas();
-        }
-    },
+updateWorkshops: function() {
+    const industrySelect = document.getElementById('industryId');
+    const workshopSelect = document.getElementById('workshopId');
+    
+    if (!industrySelect || !workshopSelect) {
+        console.log('Không tìm thấy industry hoặc workshop select');
+        return;
+    }
+    
+    const selectedIndustryId = industrySelect.value;
+    console.log('Selected industry ID:', selectedIndustryId);
+    
+    // Clear dependent selects
+    this.clearSelect(workshopSelect, 'Chọn xưởng');
+    this.clearSelect(document.getElementById('lineId'), 'Chọn line sản xuất');
+    this.clearSelect(document.getElementById('areaId'), 'Chọn khu vực');
+    
+    // Filter and populate workshops
+    const availableWorkshops = this.state.dependentData.workshops.filter(workshop => 
+        !selectedIndustryId || workshop.industryId === selectedIndustryId
+    );
+    
+    this.populateSelect(workshopSelect, availableWorkshops);
+    
+    console.log('Updated workshops for industry:', selectedIndustryId, 'Found workshops:', availableWorkshops);
+},
     
     // Update lines based on selected workshop
     updateLines: function() {
@@ -830,32 +829,3 @@ setTimeout(function() {
 window.EquipmentAddForm = EquipmentAddForm;
 
 console.log('Equipment Add Form JavaScript loaded successfully');
-
-/* 
- * Usage:
- * 1. Include this file: <script src="/assets/js/equipment-add.js"></script>
- * 2. Ensure Bootstrap and dependencies are loaded first
- * 3. Form auto-initializes on DOM ready
- * 
- * Global Functions:
- * - saveEquipment()
- * - saveDraft()
- * - previewEquipment()
- * - resetForm()
- * - updateWorkshops()
- * - updateLines()
- * - updateAreas()
- * - updateEquipmentGroups()
- * - handleFileSelect(input, type)
- * - clearFilePreview(type)
- * 
- * Configuration:
- * Set window.equipmentConfig before DOM ready to override defaults
- * 
- * Example:
- * window.equipmentConfig = {
- *     maxFileSize: 10 * 1024 * 1024, // 10MB
- *     autoSaveInterval: 60000 // 1 minute
- * };
- */
-```
