@@ -374,11 +374,20 @@ function getStatusText($status) {
 /**
  * Tạo select options
  */
-function buildSelectOptions($items, $valueField = 'id', $textField = 'name', $selectedValue = null) {
+/**
+ * Tạo select options với data attributes tùy chọn
+ */
+function buildSelectOptions($items, $valueField = 'id', $textField = 'name', $selectedValue = null, $dataFields = []) {
     $options = '';
     foreach ($items as $item) {
         $selected = ($item[$valueField] == $selectedValue) ? 'selected' : '';
-        $options .= "<option value='{$item[$valueField]}' {$selected}>{$item[$textField]}</option>";
+        $dataAttrs = '';
+        foreach ($dataFields as $field => $attrName) {
+            if (isset($item[$field])) {
+                $dataAttrs .= " {$attrName}='" . htmlspecialchars($item[$field]) . "'";
+            }
+        }
+        $options .= "<option value='" . htmlspecialchars($item[$valueField]) . "' {$selected}{$dataAttrs}>" . htmlspecialchars($item[$textField]) . "</option>";
     }
     return $options;
 }

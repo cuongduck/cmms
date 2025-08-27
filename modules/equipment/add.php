@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     );
                     
                     if ($manualUpload['success']) {
-                        $manualPath = $manualUpload['path'];
+                        $manualPath = $imageUpload['path'];
                     } else {
                         $errors[] = $manualUpload['message'];
                     }
@@ -121,7 +121,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (empty($errors)) {
                     // Auto-generate code if empty
                     if (empty($formData['code'])) {
-                        $formData['code'] = generateEquipmentCode($formData);
+                        // Fetch codes
+                        $industry = $db->fetch("SELECT code FROM industries WHERE id = ?", [$formData['industry_id']]);
+                        $workshop = $db->fetch("SELECT code FROM workshops WHERE id = ?", [$formData['workshop_id']]);
+                        $lineCode = '';
+                        if ($formData['line_id']) {
+                            $line = $db->fetch("SELECT code FROM production_lines WHERE id = ?", [$formData['line_id']]);
+                            $lineCode = $line['code'] ?? '';
+                        }
+                        $areaCode = '';
+                        if ($formData['area_id']) {
+                            $area = $db->fetch("SELECT code FROM areas WHERE id = ?", [$formData['area_id']]);
+                            $areaCode = $area['code'] ?? '';
+                        }
+                        $formData['code'] = generateEquipmentCode($industry['code'] ?? '', $workshop['code'] ?? '', $lineCode, $areaCode);
                     }
                     
                     // Insert equipment
@@ -513,8 +526,7 @@ require_once '../../includes/header.php';
                     </div>
                 </div>
 
-<!-- PART 2 END -->
-<!-- Location & Structure Section -->
+                <!-- Location & Structure Section -->
                 <div class="form-section">
                     <div class="form-section-header">
                         <i class="fas fa-map-marked-alt"></i>
@@ -524,14 +536,9 @@ require_once '../../includes/header.php';
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <select class="form-select" id="industryId" name="industry_id" required>
-                                        <option value="">-- Chọn ngành --</option>
-                                        <?php foreach ($industries as $industry): ?>
-                                            <option value="<?php echo $industry['id']; ?>" 
-                                                    <?php echo ($formData['industry_id'] ?? '') == $industry['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($industry['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                    <select class="form-select" id="industryId" name="industry_id" required onchange="updateWorkshops()">
+                                        <option value="">Chọn ngành</option>
+                                        <?php echo buildSelectOptions($industries, 'id', 'name', $formData['industry_id'] ?? null); ?>
                                     </select>
                                     <label for="industryId">Ngành sản xuất *</label>
                                     <div class="invalid-feedback"></div>
@@ -539,15 +546,9 @@ require_once '../../includes/header.php';
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <select class="form-select" id="workshopId" name="workshop_id" required>
-                                        <option value="">-- Chọn xưởng --</option>
-                                        <?php foreach ($workshops as $workshop): ?>
-                                            <option value="<?php echo $workshop['id']; ?>" 
-                                                    data-industry="<?php echo $workshop['industry_id']; ?>"
-                                                    <?php echo ($formData['workshop_id'] ?? '') == $workshop['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($workshop['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                    <select class="form-select" id="workshopId" name="workshop_id" required onchange="updateLines()">
+                                        <option value="">Chọn xưởng</option>
+                                        <?php echo buildSelectOptions($workshops, 'id', 'name', $formData['workshop_id'] ?? null); ?>
                                     </select>
                                     <label for="workshopId">Xưởng sản xuất *</label>
                                     <div class="invalid-feedback"></div>
@@ -555,49 +556,34 @@ require_once '../../includes/header.php';
                             </div>
                         </div>
 
+<div class="row g-3 mt-1">
+    <div class="col-md-6">
+        <div class="form-floating">
+            <select class="form-select" id="lineId" name="line_id">
+                <option value="">Chọn line sản xuất</option>
+                <?php echo buildSelectOptions($lines, 'id', 'name', $formData['line_id'] ?? null, ['workshop_id' => 'data-workshop']); ?>
+            </select>
+            <label for="lineId">Line sản xuất</label>
+            <div class="invalid-feedback"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-floating">
+            <select class="form-select" id="areaId" name="area_id">
+                <option value="">Chọn khu vực</option>
+                <?php echo buildSelectOptions($areas, 'id', 'name', $formData['area_id'] ?? null, ['workshop_id' => 'data-workshop']); ?>  <!-- SỬA: data-workshop thay vì data-line -->
+            </select>
+            <label for="areaId">Khu vực</label>
+            <div class="invalid-feedback"></div>
+        </div>
+    </div>
+</div>
                         <div class="row g-3 mt-1">
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <select class="form-select" id="lineId" name="line_id">
-                                        <option value="">-- Chọn line (tùy chọn) --</option>
-                                        <?php foreach ($lines as $line): ?>
-                                            <option value="<?php echo $line['id']; ?>" 
-                                                    data-workshop="<?php echo $line['workshop_id']; ?>"
-                                                    <?php echo ($formData['line_id'] ?? '') == $line['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($line['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <label for="lineId">Line sản xuất</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-  <select class="form-select" id="areaId" name="area_id">
-    <option value="">-- Chọn khu vực (tùy chọn) --</option>
-    <?php foreach ($areas as $area): ?>
-        <option value="<?php echo $area['id']; ?>"
-                <?php echo ($formData['area_id'] ?? '') == $area['id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($area['name']); ?>
-        </option>
-    <?php endforeach; ?>
-</select>
-                                    <label for="areaId">Khu vực</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-3 mt-1">
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <select class="form-select" id="machineTypeId" name="machine_type_id" required>
-                                        <option value="">-- Chọn dòng máy --</option>
-                                        <?php foreach ($machineTypes as $machineType): ?>
-                                            <option value="<?php echo $machineType['id']; ?>"
-                                                    <?php echo ($formData['machine_type_id'] ?? '') == $machineType['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($machineType['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                    <select class="form-select" id="machineTypeId" name="machine_type_id" required onchange="updateEquipmentGroups()">
+                                        <option value="">Chọn dòng máy</option>
+                                        <?php echo buildSelectOptions($machineTypes, 'id', 'name', $formData['machine_type_id'] ?? null); ?>
                                     </select>
                                     <label for="machineTypeId">Dòng máy *</label>
                                     <div class="invalid-feedback"></div>
@@ -606,53 +592,41 @@ require_once '../../includes/header.php';
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="equipmentGroupId" name="equipment_group_id">
-                                        <option value="">-- Chọn cụm thiết bị (tùy chọn) --</option>
-                                        <?php foreach ($equipmentGroups as $group): ?>
-                                            <option value="<?php echo $group['id']; ?>" 
-                                                    data-machine-type="<?php echo $group['machine_type_id']; ?>"
-                                                    <?php echo ($formData['equipment_group_id'] ?? '') == $group['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($group['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                        <option value="">Chọn cụm thiết bị</option>
+                                        <?php echo buildSelectOptions($equipmentGroups, 'id', 'name', $formData['equipment_group_id'] ?? null); ?>
                                     </select>
                                     <label for="equipmentGroupId">Cụm thiết bị</label>
+                                    <div class="invalid-feedback"></div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mt-3">
                             <div class="form-floating">
-                                <input type="text" class="form-control" id="locationDetails" name="location_details" 
-                                       placeholder="Vị trí chi tiết" maxlength="200"
-                                       value="<?php echo htmlspecialchars($formData['location_details'] ?? ''); ?>">
-                                <label for="locationDetails">Vị trí chi tiết</label>
-                                <div class="form-text">VD: Tầng 2, góc trái, gần cửa sổ...</div>
+                                <textarea class="form-control" id="locationDetails" name="location_details" 
+                                          placeholder="Chi tiết vị trí" style="height: 100px;" maxlength="500"><?php echo htmlspecialchars($formData['location_details'] ?? ''); ?></textarea>
+                                <label for="locationDetails">Chi tiết vị trí</label>
+                                <div class="character-counter">
+                                    <span id="locationDetailsCounter">0</span>/500 ký tự
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Management & Status Section -->
+                <!-- Management & Maintenance Section -->
                 <div class="form-section">
                     <div class="form-section-header">
-                        <i class="fas fa-users"></i>
-                        Quản lý & Trạng thái
+                        <i class="fas fa-cogs"></i>
+                        Quản lý & Bảo trì
                     </div>
                     <div class="form-section-body">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="ownerUserId" name="owner_user_id">
-                                        <option value="">-- Chọn người quản lý chính --</option>
-                                        <?php foreach ($users as $user): ?>
-                                            <option value="<?php echo $user['id']; ?>"
-                                                    <?php echo ($formData['owner_user_id'] ?? '') == $user['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($user['full_name']); ?>
-                                                <?php if ($user['email']): ?>
-                                                    (<?php echo htmlspecialchars($user['email']); ?>)
-                                                <?php endif; ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                        <option value="">Chọn người quản lý</option>
+                                        <?php echo buildSelectOptions($users, 'id', 'full_name', $formData['owner_user_id'] ?? null); ?>
                                     </select>
                                     <label for="ownerUserId">Người quản lý chính</label>
                                 </div>
@@ -660,16 +634,8 @@ require_once '../../includes/header.php';
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="backupOwnerUserId" name="backup_owner_user_id">
-                                        <option value="">-- Chọn người quản lý phụ --</option>
-                                        <?php foreach ($users as $user): ?>
-                                            <option value="<?php echo $user['id']; ?>"
-                                                    <?php echo ($formData['backup_owner_user_id'] ?? '') == $user['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($user['full_name']); ?>
-                                                <?php if ($user['email']): ?>
-                                                    (<?php echo htmlspecialchars($user['email']); ?>)
-                                                <?php endif; ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                        <option value="">Chọn người quản lý phụ</option>
+                                        <?php echo buildSelectOptions($users, 'id', 'full_name', $formData['backup_owner_user_id'] ?? null); ?>
                                     </select>
                                     <label for="backupOwnerUserId">Người quản lý phụ</label>
                                 </div>
@@ -677,57 +643,18 @@ require_once '../../includes/header.php';
                         </div>
 
                         <div class="row g-3 mt-1">
-                            <div class="col-md-4">
-                                <div class="form-floating">
-                                    <select class="form-select" id="criticality" name="criticality" required>
-                                        <option value="Low" <?php echo ($formData['criticality'] ?? 'Medium') === 'Low' ? 'selected' : ''; ?>>Thấp</option>
-                                        <option value="Medium" <?php echo ($formData['criticality'] ?? 'Medium') === 'Medium' ? 'selected' : ''; ?>>Trung bình</option>
-                                        <option value="High" <?php echo ($formData['criticality'] ?? 'Medium') === 'High' ? 'selected' : ''; ?>>Cao</option>
-                                        <option value="Critical" <?php echo ($formData['criticality'] ?? 'Medium') === 'Critical' ? 'selected' : ''; ?>>Nghiêm trọng</option>
-                                    </select>
-                                    <label for="criticality">Mức độ quan trọng *</label>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="form-floating">
-                                    <select class="form-select" id="status" name="status" required>
-                                        <option value="active" <?php echo ($formData['status'] ?? 'active') === 'active' ? 'selected' : ''; ?>>Hoạt động</option>
-                                        <option value="inactive" <?php echo ($formData['status'] ?? 'active') === 'inactive' ? 'selected' : ''; ?>>Ngưng hoạt động</option>
-                                        <option value="maintenance" <?php echo ($formData['status'] ?? 'active') === 'maintenance' ? 'selected' : ''; ?>>Bảo trì</option>
-                                        <option value="broken" <?php echo ($formData['status'] ?? 'active') === 'broken' ? 'selected' : ''; ?>>Hỏng</option>
-                                    </select>
-                                    <label for="status">Trạng thái *</label>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="alert alert-info mb-0 py-2">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <small>Thiết bị mới thường ở trạng thái "Hoạt động"</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-<!-- PART 3 END -->
-<!-- Technical Details Section -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <i class="fas fa-cog"></i>
-                        Thông số kỹ thuật & Bảo trì
-                    </div>
-                    <div class="form-section-body">
-                        <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <input type="date" class="form-control" id="installationDate" name="installation_date"
+                                    <input type="date" class="form-control" id="installationDate" name="installation_date" 
+                                           placeholder="Ngày lắp đặt"
                                            value="<?php echo htmlspecialchars($formData['installation_date'] ?? ''); ?>">
                                     <label for="installationDate">Ngày lắp đặt</label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <input type="date" class="form-control" id="warrantyExpiry" name="warranty_expiry"
+                                    <input type="date" class="form-control" id="warrantyExpiry" name="warranty_expiry" 
+                                           placeholder="Ngày hết bảo hành"
                                            value="<?php echo htmlspecialchars($formData['warranty_expiry'] ?? ''); ?>">
                                     <label for="warrantyExpiry">Ngày hết bảo hành</label>
                                 </div>
@@ -738,10 +665,9 @@ require_once '../../includes/header.php';
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <input type="number" class="form-control" id="maintenanceFrequencyDays" name="maintenance_frequency_days" 
-                                           placeholder="Chu kỳ bảo trì" min="1" max="365"
+                                           placeholder="Chu kỳ bảo trì (ngày)" min="1" max="365"
                                            value="<?php echo htmlspecialchars($formData['maintenance_frequency_days'] ?? ''); ?>">
                                     <label for="maintenanceFrequencyDays">Chu kỳ bảo trì (ngày)</label>
-                                    <div class="form-text">VD: 30 ngày, 90 ngày...</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -755,6 +681,31 @@ require_once '../../includes/header.php';
                                         <option value="custom" <?php echo ($formData['maintenance_frequency_type'] ?? 'monthly') === 'custom' ? 'selected' : ''; ?>>Tùy chỉnh</option>
                                     </select>
                                     <label for="maintenanceFrequencyType">Loại chu kỳ bảo trì</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="criticality" name="criticality">
+                                        <option value="Low" <?php echo ($formData['criticality'] ?? 'Medium') === 'Low' ? 'selected' : ''; ?>>Thấp</option>
+                                        <option value="Medium" <?php echo ($formData['criticality'] ?? 'Medium') === 'Medium' ? 'selected' : ''; ?>>Trung bình</option>
+                                        <option value="High" <?php echo ($formData['criticality'] ?? 'Medium') === 'High' ? 'selected' : ''; ?>>Cao</option>
+                                        <option value="Critical" <?php echo ($formData['criticality'] ?? 'Medium') === 'Critical' ? 'selected' : ''; ?>>Nghiêm trọng</option>
+                                    </select>
+                                    <label for="criticality">Mức độ quan trọng</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="active" <?php echo ($formData['status'] ?? 'active') === 'active' ? 'selected' : ''; ?>>Hoạt động</option>
+                                        <option value="inactive" <?php echo ($formData['status'] ?? 'active') === 'inactive' ? 'selected' : ''; ?>>Không hoạt động</option>
+                                        <option value="maintenance" <?php echo ($formData['status'] ?? 'active') === 'maintenance' ? 'selected' : ''; ?>>Bảo trì</option>
+                                        <option value="broken" <?php echo ($formData['status'] ?? 'active') === 'broken' ? 'selected' : ''; ?>>Hỏng</option>
+                                    </select>
+                                    <label for="status">Trạng thái</label>
                                 </div>
                             </div>
                         </div>
@@ -1097,9 +1048,6 @@ function validateEquipmentForm($data) {
     return $errors;
 }
 
-
-
-// Add these functions to config/functions.php if missing
 if (!function_exists('logActivity')) {
     function logActivity($action, $module, $description, $userId) {
         global $db;
@@ -1147,11 +1095,79 @@ if (!function_exists('formatFileSize')) {
 }
 
 if (!function_exists('resizeImage')) {
-
+    function resizeImage($source, $destination, $maxWidth = 800, $maxHeight = 600, $quality = 85) {
+        $imageInfo = getimagesize($source);
+        if (!$imageInfo) return false;
+        
+        $width = $imageInfo[0];
+        $height = $imageInfo[1];
+        $type = $imageInfo[2];
+        
+        // Calculate new dimensions
+        $ratio = min($maxWidth / $width, $maxHeight / $height);
+        if ($ratio < 1) {
+            $newWidth = (int)($width * $ratio);
+            $newHeight = (int)($height * $ratio);
+        } else {
+            $newWidth = $width;
+            $newHeight = $height;
+        }
+        
+        // Create image resource
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $sourceImage = imagecreatefromjpeg($source);
+                break;
+            case IMAGETYPE_PNG:
+                $sourceImage = imagecreatefrompng($source);
+                break;
+            case IMAGETYPE_GIF:
+                $sourceImage = imagecreatefromgif($source);
+                break;
+            default:
+                return false;
+        }
+        
+        if (!$sourceImage) return false;
+        
+        // Create new image
+        $newImage = imagecreatetruecolor($newWidth, $newHeight);
+        
+        // Preserve transparency for PNG and GIF
+        if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
+            imagealphablending($newImage, false);
+            imagesavealpha($newImage, true);
+            $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
+            imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $transparent);
+        }
+        
+        // Resize image
+        imagecopyresampled($newImage, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+        
+        // Save image
+        $result = false;
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $result = imagejpeg($newImage, $destination, $quality);
+                break;
+            case IMAGETYPE_PNG:
+                $result = imagepng($newImage, $destination, 9);
+                break;
+            case IMAGETYPE_GIF:
+                $result = imagegif($newImage, $destination);
+                break;
+        }
+        
+        // Clean up
+        imagedestroy($sourceImage);
+        imagedestroy($newImage);
+        
+        return $result;
+    }
 }
 
 require_once '../../includes/footer.php';
 ?>
 
 <!-- PART 5 END -->
-<!-- FILE COMPLETE - Combine all 5 parts to create the full add.php file -->
+<!-- FILE COMPLETE -->
