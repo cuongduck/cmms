@@ -1,321 +1,137 @@
 </main>
-        </div>
-    </div>
-    
-    <!-- Footer -->
-    <footer class="bg-light border-top mt-5 py-3">
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-md-6">
-                    <small class="text-muted">
-                        © <?php echo date('Y'); ?> <?php echo APP_NAME; ?>. 
-                        Phát triển bởi IT Department.
-                    </small>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <small class="text-muted">
-                        Version <?php echo APP_VERSION; ?> | 
-                        <a href="#" class="text-decoration-none">Hỗ trợ</a> | 
-                        <a href="#" class="text-decoration-none">Hướng dẫn</a>
-                    </small>
-                </div>
+</div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-light border-top mt-5 py-3">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-6">
+                <small class="text-muted">
+                    © <?php echo date('Y'); ?> <?php echo APP_NAME; ?>. 
+                    Phát triển bởi IT Department.
+                </small>
             </div>
-        </div>
-    </footer>
-    
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    
-    <!-- Custom JS -->
-    <script src="/assets/js/main.js?v=<?php echo time(); ?>"></script>
-    
-    <!-- Module specific JS -->
-    <?php if (!empty($moduleJS)): ?>
-        <script src="/assets/js/<?php echo $moduleJS; ?>.js?v=<?php echo time(); ?>"></script>
-    <?php endif; ?>
-    
-    <!-- Custom page scripts -->
-    <?php if (!empty($pageScripts)): ?>
-        <?php echo $pageScripts; ?>
-    <?php endif; ?>
-    
-    <!-- Toast container -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
-        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="fas fa-info-circle text-primary me-2"></i>
-                <strong class="me-auto">Thông báo</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body"></div>
-        </div>
-    </div>
-    
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
-         style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
-        <div class="d-flex justify-content-center align-items-center h-100">
-            <div class="spinner-border text-light" role="status">
-                <span class="visually-hidden">Đang tải...</span>
+            <div class="col-md-6 text-md-end">
+                <small class="text-muted">
+                    Version <?php echo APP_VERSION; ?> | 
+                    <a href="#" class="text-decoration-none">Hỗ trợ</a> | 
+                    <a href="#" class="text-decoration-none">Hướng dẫn</a>
+                </small>
             </div>
         </div>
     </div>
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
+<!-- Custom JS -->
+<script src="/assets/js/main.js?v=<?php echo time(); ?>"></script>
+
+<!-- Module specific JS -->
+<?php if (!empty($moduleJS)): ?>
+    <script src="/assets/js/<?php echo $moduleJS; ?>.js?v=<?php echo time(); ?>"></script>
+<?php endif; ?>
+
+<!-- Custom page scripts -->
+<?php if (!empty($pageScripts)): ?>
+    <?php echo $pageScripts; ?>
+<?php endif; ?>
+
+<!-- Toast container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-info-circle text-primary me-2"></i>
+            <strong class="me-auto">Thông báo</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body"></div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
+     style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
+    <div class="d-flex justify-content-center align-items-center h-100">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Đang tải...</span>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-hide alerts after 5 seconds
+document.addEventListener('DOMContentLoaded', function() {
+    const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 5000);
+    });
     
-    <script>
-    // Global JavaScript functions
-window.CMMS = window.CMMS || {
-    baseUrl: '<?php echo APP_URL; ?>',
-        
-        // Show toast notification
-        showToast: function(message, type = 'info') {
-            const toast = document.getElementById('liveToast');
-            const toastBody = toast.querySelector('.toast-body');
-            const toastHeader = toast.querySelector('.toast-header');
-            const icon = toastHeader.querySelector('i');
-            
-            // Update content
-            toastBody.textContent = message;
-            
-            // Update icon and color based on type
-            icon.className = 'me-2';
-            switch(type) {
-                case 'success':
-                    icon.classList.add('fas', 'fa-check-circle', 'text-success');
-                    break;
-                case 'error':
-                    icon.classList.add('fas', 'fa-exclamation-circle', 'text-danger');
-                    break;
-                case 'warning':
-                    icon.classList.add('fas', 'fa-exclamation-triangle', 'text-warning');
-                    break;
-                default:
-                    icon.classList.add('fas', 'fa-info-circle', 'text-primary');
-            }
-            
-            // Show toast
-            const bsToast = new bootstrap.Toast(toast);
-            bsToast.show();
-        },
-        
-        // Show loading overlay
-        showLoading: function() {
-            document.getElementById('loadingOverlay').classList.remove('d-none');
-        },
-        
-        // Hide loading overlay
-        hideLoading: function() {
-            document.getElementById('loadingOverlay').classList.add('d-none');
-        },
-        
-        // Confirm dialog
-        confirm: function(message, callback) {
-            if (confirm(message)) {
-                callback();
-            }
-        },
-        
-        // AJAX helper
-        ajax: function(options) {
-            const defaults = {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            };
-            
-            options = Object.assign(defaults, options);
-            
-            this.showLoading();
-            
-            fetch(options.url, options)
-                .then(response => response.json())
-                .then(data => {
-                    this.hideLoading();
-                    if (options.success) {
-                        options.success(data);
-                    }
-                })
-                .catch(error => {
-                    this.hideLoading();
-                    console.error('Ajax error:', error);
-                    this.showToast('Có lỗi xảy ra, vui lòng thử lại', 'error');
-                    if (options.error) {
-                        options.error(error);
-                    }
-                });
-        },
-        
-        // Format number
-        formatNumber: function(number, decimals = 0) {
-            return new Intl.NumberFormat('vi-VN', {
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals
-            }).format(number);
-        },
-        
-        // Format currency
-        formatCurrency: function(amount) {
-            return new Intl.NumberFormat('vi-VN', {
-                style: 'currency',
-                currency: 'VND'
-            }).format(amount);
-        },
-        
-        // Format date
-        formatDate: function(dateString, format = 'dd/MM/yyyy') {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('vi-VN');
-        },
-        
-        // Format datetime
-        formatDateTime: function(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleString('vi-VN');
-        },
-        
-        // Validate form
-        validateForm: function(formElement) {
-            const form = typeof formElement === 'string' ? 
-                document.getElementById(formElement) : formElement;
-            
-            return form.checkValidity();
-        },
-        
-        // Submit form via AJAX
-        submitForm: function(formElement, options = {}) {
-            const form = typeof formElement === 'string' ? 
-                document.getElementById(formElement) : formElement;
-            
-            if (!this.validateForm(form)) {
-                form.classList.add('was-validated');
-                return false;
-            }
-            
-            const formData = new FormData(form);
-            
-            this.ajax({
-                url: form.action || window.location.href,
-                method: form.method || 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                success: function(data) {
-                    if (data.success) {
-                        CMMS.showToast(data.message, 'success');
-                        if (options.onSuccess) {
-                            options.onSuccess(data);
-                        } else if (options.redirect) {
-                            setTimeout(() => {
-                                window.location.href = options.redirect;
-                            }, 1500);
-                        }
-                    } else {
-                        CMMS.showToast(data.message, 'error');
-                        if (options.onError) {
-                            options.onError(data);
-                        }
-                    }
-                },
-                error: options.onError
-            });
-            
-            return false;
-        },
-        
-        // Delete confirmation
-        deleteItem: function(url, message = 'Bạn có chắc chắn muốn xóa?') {
-            this.confirm(message, function() {
-                CMMS.ajax({
-                    url: url,
-                    method: 'POST',
-                    body: 'action=delete',
-                    success: function(data) {
-                        if (data.success) {
-                            CMMS.showToast(data.message, 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            CMMS.showToast(data.message, 'error');
-                        }
-                    }
-                });
-            });
-        }
-    };
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
     
-    // Auto-hide alerts after 5 seconds
-    document.addEventListener('DOMContentLoaded', function() {
-        const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
-        alerts.forEach(alert => {
-            setTimeout(() => {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            }, 5000);
-        });
-        
-        // Initialize tooltips
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-        
-        // Initialize popovers
-        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-        popoverTriggerList.map(function (popoverTriggerEl) {
-            return new bootstrap.Popover(popoverTriggerEl);
-        });
-        
-        // Form validation
-        const forms = document.querySelectorAll('.needs-validation');
-        forms.forEach(form => {
-            form.addEventListener('submit', function(event) {
-                if (!form.checkValidity()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                form.classList.add('was-validated');
-            });
-        });
-        
-        // Auto-save form data to localStorage (for draft)
-        const autoSaveForms = document.querySelectorAll('[data-auto-save]');
-        autoSaveForms.forEach(form => {
-            const formKey = 'cmms_draft_' + form.id;
-            
-            // Load saved data
-            const savedData = localStorage.getItem(formKey);
-            if (savedData) {
-                const data = JSON.parse(savedData);
-                Object.keys(data).forEach(key => {
-                    const field = form.querySelector(`[name="${key}"]`);
-                    if (field) {
-                        field.value = data[key];
-                    }
-                });
+    // Initialize popovers
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl);
+    });
+    
+    // Form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
             }
-            
-            // Save on input
-            form.addEventListener('input', function() {
-                const formData = new FormData(form);
-                const data = {};
-                for (let [key, value] of formData.entries()) {
-                    data[key] = value;
-                }
-                localStorage.setItem(formKey, JSON.stringify(data));
-            });
-            
-            // Clear on submit
-            form.addEventListener('submit', function() {
-                localStorage.removeItem(formKey);
-            });
+            form.classList.add('was-validated');
         });
     });
-    </script>
+    
+    // Auto-save form data to localStorage (for draft)
+    const autoSaveForms = document.querySelectorAll('[data-auto-save]');
+    autoSaveForms.forEach(form => {
+        const formKey = 'cmms_draft_' + form.id;
+        
+        // Load saved data
+        const savedData = localStorage.getItem(formKey);
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            Object.keys(data).forEach(key => {
+                const field = form.querySelector(`[name="${key}"]`);
+                if (field) {
+                    field.value = data[key];
+                }
+            });
+        }
+        
+        // Save on input
+        form.addEventListener('input', function() {
+            const formData = new FormData(form);
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            localStorage.setItem(formKey, JSON.stringify(data));
+        });
+        
+        // Clear on submit
+        form.addEventListener('submit', function() {
+            localStorage.removeItem(formKey);
+        });
+    });
+});
+</script>
 </body>
 </html>

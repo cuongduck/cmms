@@ -8,6 +8,190 @@ if (!window.CMMS) {
     window.CMMS = {};
 }
 Object.assign(window.CMMS, {
+    baseUrl: '<?php echo APP_URL; ?>',
+    
+    // Show toast notification
+    showToast: function(message, type = 'info') {
+        const toast = document.getElementById('liveToast');
+        const toastBody = toast.querySelector('.toast-body');
+        const toastHeader = toast.querySelector('.toast-header');
+        const icon = toastHeader.querySelector('i');
+        
+        // Update content
+        toastBody.textContent = message;
+        
+        // Update icon and color based on type
+        icon.className = 'me-2';
+        switch(type) {
+            case 'success':
+                icon.classList.add('fas', 'fa-check-circle', 'text-success');
+                break;
+            case 'error':
+                icon.classList.add('fas', 'fa-exclamation-circle', 'text-danger');
+                break;
+            case 'warning':
+                icon.classList.add('fas', 'fa-exclamation-triangle', 'text-warning');
+                break;
+            default:
+                icon.classList.add('fas', 'fa-info-circle', 'text-primary');
+        }
+        
+        // Show toast
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    },
+    
+    // Show loading overlay
+    showLoading: function() {
+        document.getElementById('loadingOverlay').classList.remove('d-none');
+    },
+    
+    // Hide loading overlay
+    hideLoading: function() {
+        document.getElementById('loadingOverlay').classList.add('d-none');
+    },
+    
+    // Confirm dialog
+    confirm: function(message, callback) {
+        if (confirm(message)) {
+            callback();
+        }
+    },
+    
+    // AJAX helper
+ajax: function(options) {
+    const defaults = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    };
+    
+    options = Object.assign(defaults, options);
+    
+    this.showLoading();
+    
+    fetch(options.url, options)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            this.hideLoading();
+            if (options.success) {
+                options.success(data);
+            }
+        })
+        .catch(error => {
+            this.hideLoading();
+            console.error('Ajax error:', error, 'URL:', options.url); // Thêm URL vào log
+            this.showToast(`Có lỗi xảy ra: ${error.message}`, 'error');
+            if (options.error) {
+                options.error(error);
+            }
+        });
+},    
+    // Format number
+    formatNumber: function(number, decimals = 0) {
+        return new Intl.NumberFormat('vi-VN', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(number);
+    },
+    
+    // Format currency
+    formatCurrency: function(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    },
+    
+    // Format date
+    formatDate: function(dateString, format = 'dd/MM/yyyy') {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN');
+    },
+    
+    // Format datetime
+    formatDateTime: function(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString('vi-VN');
+    },
+    
+    // Validate form
+    validateForm: function(formElement) {
+        const form = typeof formElement === 'string' ? 
+            document.getElementById(formElement) : formElement;
+        
+        return form.checkValidity();
+    },
+    
+    // Submit form via AJAX
+    submitForm: function(formElement, options = {}) {
+        const form = typeof formElement === 'string' ? 
+            document.getElementById(formElement) : formElement;
+        
+        if (!this.validateForm(form)) {
+            form.classList.add('was-validated');
+            return false;
+        }
+        
+        const formData = new FormData(form);
+        
+        this.ajax({
+            url: form.action || window.location.href,
+            method: form.method || 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                if (data.success) {
+                    CMMS.showToast(data.message, 'success');
+                    if (options.onSuccess) {
+                        options.onSuccess(data);
+                    } else if (options.redirect) {
+                        setTimeout(() => {
+                            window.location.href = options.redirect;
+                        }, 1500);
+                    }
+                } else {
+                    CMMS.showToast(data.message, 'error');
+                    if (options.onError) {
+                        options.onError(data);
+                    }
+                }
+            },
+            error: options.onError
+        });
+        
+        return false;
+    },
+    
+    // Delete confirmation
+    deleteItem: function(url, message = 'Bạn có chắc chắn muốn xóa?') {
+        this.confirm(message, function() {
+            CMMS.ajax({
+                url: url,
+                method: 'POST',
+                body: 'action=delete',
+                success: function(data) {
+                    if (data.success) {
+                        CMMS.showToast(data.message, 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        CMMS.showToast(data.message, 'error');
+                    }
+                }
+            });
+        });
+    },
     
     // Data table utilities
     dataTable: {
@@ -97,7 +281,7 @@ Object.assign(window.CMMS, {
                     return isAsc ? aNum - bNum : bNum - aNum;
                 }
                 
-                return isAsc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                return isAsc ? aText.localeCompare(bText) : bText.localeCompare(bText);
             });
             
             rows.forEach(row => tbody.appendChild(row));
