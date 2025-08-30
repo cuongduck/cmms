@@ -2,13 +2,12 @@
 /**
  * Edit Equipment - modules/equipment/edit.php
  * Form to edit existing equipment in the system
- * PART 1: PHP Logic & Data Processing
  */
 
 $pageTitle = 'Chỉnh sửa thiết bị';
 $currentModule = 'equipment';
 $moduleCSS = 'equipment';
-$moduleJS = 'equipment';
+$moduleJS = 'equipment-edit'; // Sử dụng file JS riêng
 
 require_once '../../config/config.php';
 require_once '../../config/database.php';
@@ -35,14 +34,14 @@ $formData = [];
 // Lấy thông tin thiết bị hiện tại
 try {
     $sql = "SELECT e.*, 
-                   i.name as industry_name,
-                   w.name as workshop_name,
-                   pl.name as line_name,
-                   a.name as area_name,
-                   mt.name as machine_type_name,
+                   i.name as industry_name, i.code as industry_code,
+                   w.name as workshop_name, w.code as workshop_code,
+                   pl.name as line_name, pl.code as line_code,
+                   a.name as area_name, a.code as area_code,
+                   mt.name as machine_type_name, mt.code as machine_type_code,
                    eg.name as equipment_group_name,
-                   u1.full_name as owner_name,
-                   u2.full_name as backup_owner_name
+                   u1.full_name as owner_name, u1.email as owner_email,
+                   u2.full_name as backup_owner_name, u2.email as backup_owner_email
             FROM equipment e
             LEFT JOIN industries i ON e.industry_id = i.id
             LEFT JOIN workshops w ON e.workshop_id = w.id
@@ -67,8 +66,48 @@ try {
 } catch (Exception $e) {
     $errors[] = "Lỗi khi lấy thông tin thiết bị: " . $e->getMessage();
 }
-?>
-<?php
+
+// Helper function for validation
+function validateEquipmentUpdate($data, $equipmentId) {
+    global $db;
+    $errors = [];
+    
+    // Required fields validation
+    if (empty($data['name'])) {
+        $errors[] = 'Tên thiết bị không được trống';
+    } elseif (strlen($data['name']) < 2 || strlen($data['name']) > 200) {
+        $errors[] = 'Tên thiết bị phải từ 2-200 ký tự';
+    }
+    
+    if (empty($data['industry_id'])) {
+        $errors[] = 'Vui lòng chọn ngành sản xuất';
+    }
+    
+    if (empty($data['workshop_id'])) {
+        $errors[] = 'Vui lòng chọn xưởng sản xuất';
+    }
+    
+    if (empty($data['machine_type_id'])) {
+        $errors[] = 'Vui lòng chọn dòng máy';
+    }
+    
+    // Code validation (if provided)
+    if (!empty($data['code'])) {
+        if (!preg_match('/^[A-Z0-9_-]+$/', $data['code'])) {
+            $errors[] = 'Mã thiết bị chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới';
+        } elseif (strlen($data['code']) > 30) {
+            $errors[] = 'Mã thiết bị không được quá 30 ký tự';
+        } else {
+            // Check uniqueness (exclude current equipment)
+            $sql = "SELECT id FROM equipment WHERE code = ? AND id != ?";
+            if ($db->fetch($sql, [$data['code'], $equipmentId])) {
+                $errors[] = 'Mã thiết bị đã tồn tại';
+            }
+        }
+    }
+    
+    return $errors;
+}
 // Xử lý form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
@@ -115,20 +154,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $imagePath = $equipment['image_path'];
                 $manualPath = $equipment['manual_path'];
                 
+                // Handle image removal
+                if (isset($_POST['remove_current_image']) && $_POST['remove_current_image'] === '1') {
+                    if ($imagePath && file_exists($imagePath)) {
+                        unlink($imagePath);
+                    }
+                    $imagePath = null;
+                }
+                
+                // Handle manual removal
+                if (isset($_POST['remove_current_manual']) && $_POST['remove_current_manual'] === '1') {
+                    if ($manualPath && file_exists($manualPath)) {
+                        unlink($manualPath);
+                    }
+                    $manualPath = null;
+                }
+                
+                // Handle new image upload
                 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                     $imageUpload = uploadFile(
                         $_FILES['image'],
                         ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                        'uploads/equipment/images/',
+                        getConfig('upload.paths.equipment_images'),
                         5 * 1024 * 1024 // 5MB
                     );
                     
                     if ($imageUpload['success']) {
-                        // Delete old image
+                        // Delete old image if exists
                         if ($imagePath && file_exists($imagePath)) {
                             unlink($imagePath);
                         }
                         $imagePath = $imageUpload['path'];
+                        
                         // Resize image if needed
                         resizeImage($imagePath, $imagePath, 800, 600);
                     } else {
@@ -136,16 +193,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
                 
+                // Handle new manual upload
                 if (isset($_FILES['manual']) && $_FILES['manual']['error'] === UPLOAD_ERR_OK) {
                     $manualUpload = uploadFile(
                         $_FILES['manual'],
                         ['pdf', 'doc', 'docx'],
-                        'uploads/equipment/manuals/',
+                        getConfig('upload.paths.manuals'),
                         10 * 1024 * 1024 // 10MB
                     );
                     
                     if ($manualUpload['success']) {
-                        // Delete old manual
+                        // Delete old manual if exists
                         if ($manualPath && file_exists($manualPath)) {
                             unlink($manualPath);
                         }
@@ -154,9 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $errors[] = $manualUpload['message'];
                     }
                 }
-                
                 if (empty($errors)) {
-                    // Update equipment
+                    // Update equipment in database
                     $sql = "UPDATE equipment SET 
                            code = ?, name = ?, industry_id = ?, workshop_id = ?, line_id = ?, area_id = ?,
                            machine_type_id = ?, equipment_group_id = ?, owner_user_id = ?, backup_owner_user_id = ?,
@@ -188,14 +245,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     
                     $db->commit();
                     
-                    $success = 'Cập nhật thiết bị thành công!';
-                    
-                    // Update form data for display
-                    $formData = array_merge($formData, $updateData);
-                    
                     if ($action === 'save') {
+                        $success = 'Cập nhật thiết bị thành công!';
+                        // Redirect to view page after 2 seconds
                         header('Refresh: 2; url=view.php?id=' . $equipment_id);
+                    } else {
+                        $success = 'Lưu nháp thành công!';
                     }
+                    
+                    // Update form data for display with new values
+                    $formData = array_merge($formData, $updateData);
+                    $formData['image_path'] = $imagePath;
+                    $formData['manual_path'] = $manualPath;
                 }
                 
             } catch (Exception $e) {
@@ -205,8 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 }
-?>
-<?php
+
 // Lấy danh sách cho dropdown
 $industries = $db->fetchAll("SELECT id, name, code FROM industries WHERE status = 'active' ORDER BY name");
 $workshops = $db->fetchAll("SELECT id, name, code, industry_id FROM workshops WHERE status = 'active' ORDER BY name");
@@ -216,6 +276,7 @@ $machineTypes = $db->fetchAll("SELECT id, name, code FROM machine_types WHERE st
 $equipmentGroups = $db->fetchAll("SELECT id, name, machine_type_id FROM equipment_groups WHERE status = 'active' ORDER BY name");
 $users = $db->fetchAll("SELECT id, full_name, email FROM users WHERE status = 'active' ORDER BY full_name");
 
+// Breadcrumb and page actions
 $breadcrumb = [
     ['title' => 'Quản lý thiết bị', 'url' => '/modules/equipment/'],
     ['title' => 'Chỉnh sửa thiết bị']
@@ -238,119 +299,7 @@ $pageActions = '
 </div>';
 
 require_once '../../includes/header.php';
-
-// Helper functions for validation
-function validateEquipmentUpdate($data, $equipmentId) {
-    global $db;
-    $errors = [];
-    
-    // Required fields validation
-    if (empty($data['name'])) {
-        $errors[] = 'Tên thiết bị không được trống';
-    } elseif (strlen($data['name']) < 2 || strlen($data['name']) > 200) {
-        $errors[] = 'Tên thiết bị phải từ 2-200 ký tự';
-    }
-    
-    if (empty($data['industry_id'])) {
-        $errors[] = 'Vui lòng chọn ngành sản xuất';
-    } else {
-        $sql = "SELECT id FROM industries WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['industry_id']])) {
-            $errors[] = 'Ngành sản xuất không hợp lệ';
-        }
-    }
-    
-    if (empty($data['workshop_id'])) {
-        $errors[] = 'Vui lòng chọn xưởng sản xuất';
-    } else {
-        $sql = "SELECT id FROM workshops WHERE id = ? AND industry_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['workshop_id'], $data['industry_id']])) {
-            $errors[] = 'Xưởng sản xuất không hợp lệ';
-        }
-    }
-    
-    if (empty($data['machine_type_id'])) {
-        $errors[] = 'Vui lòng chọn dòng máy';
-    } else {
-        $sql = "SELECT id FROM machine_types WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['machine_type_id']])) {
-            $errors[] = 'Dòng máy không hợp lệ';
-        }
-    }
-    
-    // Code validation (if provided)
-    if (!empty($data['code'])) {
-        if (!preg_match('/^[A-Z0-9_-]+$/', $data['code'])) {
-            $errors[] = 'Mã thiết bị chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới';
-        } elseif (strlen($data['code']) > 30) {
-            $errors[] = 'Mã thiết bị không được quá 30 ký tự';
-        } else {
-            // Check uniqueness (exclude current equipment)
-            $sql = "SELECT id FROM equipment WHERE code = ? AND id != ?";
-            if ($db->fetch($sql, [$data['code'], $equipmentId])) {
-                $errors[] = 'Mã thiết bị đã tồn tại';
-            }
-        }
-    }
-    
-    // Optional field validations
-    if ($data['manufacture_year'] && ($data['manufacture_year'] < 1900 || $data['manufacture_year'] > date('Y') + 1)) {
-        $errors[] = 'Năm sản xuất không hợp lệ';
-    }
-    
-    if ($data['maintenance_frequency_days'] && ($data['maintenance_frequency_days'] < 1 || $data['maintenance_frequency_days'] > 365)) {
-        $errors[] = 'Chu kỳ bảo trì phải từ 1 đến 365 ngày';
-    }
-    
-    if (!in_array($data['criticality'], ['Low', 'Medium', 'High', 'Critical'])) {
-        $errors[] = 'Mức độ quan trọng không hợp lệ';
-    }
-    
-    if (!in_array($data['status'], ['active', 'inactive', 'maintenance', 'broken'])) {
-        $errors[] = 'Trạng thái không hợp lệ';
-    }
-    
-    // Validate optional references
-    if (!empty($data['line_id'])) {
-        $sql = "SELECT id FROM production_lines WHERE id = ? AND workshop_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['line_id'], $data['workshop_id']])) {
-            $errors[] = 'Line sản xuất không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['area_id'])) {
-        $sql = "SELECT id FROM areas WHERE id = ? AND workshop_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['area_id'], $data['workshop_id']])) {
-            $errors[] = 'Khu vực không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['equipment_group_id'])) {
-        $sql = "SELECT id FROM equipment_groups WHERE id = ? AND machine_type_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['equipment_group_id'], $data['machine_type_id']])) {
-            $errors[] = 'Cụm thiết bị không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['owner_user_id'])) {
-        $sql = "SELECT id FROM users WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['owner_user_id']])) {
-            $errors[] = 'Người quản lý chính không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['backup_owner_user_id'])) {
-        $sql = "SELECT id FROM users WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['backup_owner_user_id']])) {
-            $errors[] = 'Người quản lý phụ không hợp lệ';
-        }
-    }
-    
-    return $errors;
-}
 ?>
-?>
-
 <!-- Custom Styles -->
 <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/equipment.css">
 <style>
@@ -578,7 +527,7 @@ function validateEquipmentUpdate($data, $equipmentId) {
                         </div>
                     </div>
                 </div>
-<!-- Location & Structure Section -->
+                <!-- Location & Structure Section -->
                 <div class="form-section">
                     <div class="form-section-header">
                         <i class="fas fa-map-marked-alt"></i>
@@ -773,7 +722,7 @@ function validateEquipmentUpdate($data, $equipmentId) {
                         </div>
                     </div>
                 </div>
-            <!-- Technical Details Section -->
+                <!-- Technical Details Section -->
                 <div class="form-section">
                     <div class="form-section-header">
                         <i class="fas fa-cog"></i>
@@ -894,11 +843,6 @@ function validateEquipmentUpdate($data, $equipmentId) {
                                         Chấp nhận: JPG, PNG, GIF, WEBP (tối đa 5MB)
                                     </small>
                                     <div id="imagePreview" class="file-preview d-none"></div>
-                                    <div id="imageProgress" class="progress-container">
-                                        <div class="progress">
-                                            <div class="progress-bar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             
@@ -945,11 +889,6 @@ function validateEquipmentUpdate($data, $equipmentId) {
                                         Chấp nhận: PDF, DOC, DOCX (tối đa 10MB)
                                     </small>
                                     <div id="manualPreview" class="file-preview d-none"></div>
-                                    <div id="manualProgress" class="progress-container">
-                                        <div class="progress">
-                                            <div class="progress-bar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1030,9 +969,9 @@ function validateEquipmentUpdate($data, $equipmentId) {
                         <a href="view.php?id=<?php echo $equipment_id; ?>" class="btn btn-outline-primary">
                             <i class="fas fa-external-link-alt me-2"></i>Xem chi tiết
                         </a>
-                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
-                            <i class="fas fa-undo me-2"></i>Reset form
-                        </button>
+                        <a href="index.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Quay lại danh sách
+                        </a>
                     </div>
                 </div>
 
@@ -1047,6 +986,9 @@ function validateEquipmentUpdate($data, $equipmentId) {
                         <li><strong>Cập nhật:</strong> <?php echo formatDateTime($formData['updated_at'] ?? $formData['created_at']); ?></li>
                         <?php if (!empty($formData['installation_date'])): ?>
                         <li><strong>Lắp đặt:</strong> <?php echo formatDate($formData['installation_date']); ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($formData['warranty_expiry'])): ?>
+                        <li><strong>Bảo hành đến:</strong> <?php echo formatDate($formData['warranty_expiry']); ?></li>
                         <?php endif; ?>
                     </ul>
                 </div>
@@ -1085,240 +1027,15 @@ function validateEquipmentUpdate($data, $equipmentId) {
 // Set configuration for JavaScript
 window.equipmentConfig = {
     equipmentId: <?php echo $equipment_id; ?>,
-    maxFileSize: <?php echo 5 * 1024 * 1024; ?>, // 5MB for images
-    allowedImageTypes: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    allowedDocTypes: ['pdf', 'doc', 'docx'],
-    autoSaveInterval: 30000, // 30 seconds
+    maxFileSize: <?php echo getConfig('upload.max_size'); ?>,
+    allowedImageTypes: <?php echo json_encode(getConfig('upload.allowed_types.image')); ?>,
+    allowedDocTypes: <?php echo json_encode(getConfig('upload.allowed_types.document')); ?>,
+    autoSaveInterval: 30000,
     isEditMode: true
 };
 
-// Pass form data to JavaScript
-window.formData = <?php echo json_encode($formData); ?>;
-
-// Global functions for HTML callbacks
-function saveEquipment() {
-    document.getElementById('formAction').value = 'save';
-    document.getElementById('equipmentForm').submit();
-}
-
-function saveDraft() {
-    document.getElementById('formAction').value = 'draft';
-    document.getElementById('equipmentForm').submit();
-}
-
-function previewEquipment() {
-    const modal = new bootstrap.Modal(document.getElementById('fullPreviewModal'));
-    // Generate preview content here
-    modal.show();
-}
-
-function resetForm() {
-    if (confirm('Bạn có chắc chắn muốn reset form? Tất cả thay đổi chưa lưu sẽ bị mất.')) {
-        location.reload();
-    }
-}
-
-function handleFileSelect(input, type) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    console.log('File selected:', file.name, 'Type:', type);
-    
-    // Basic validation
-    const maxSize = type === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-        alert(`File quá lớn. Kích thước tối đa: ${maxSize / 1024 / 1024}MB`);
-        input.value = '';
-        return;
-    }
-    
-    // Show preview
-    const previewId = type + 'Preview';
-    const preview = document.getElementById(previewId);
-    
-    if (preview) {
-        preview.classList.remove('d-none');
-        preview.innerHTML = `
-            <div class="mt-2 p-2 bg-light rounded">
-                <i class="fas fa-file me-2"></i>
-                <strong>File mới:</strong> ${file.name}
-                <button type="button" class="btn btn-sm btn-outline-danger float-end" onclick="clearFilePreview('${type}')">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-    }
-}
-
-function clearFilePreview(type) {
-    const input = document.getElementById(type + 'File');
-    const preview = document.getElementById(type + 'Preview');
-    
-    if (input) input.value = '';
-    if (preview) {
-        preview.classList.add('d-none');
-        preview.innerHTML = '';
-    }
-}
-
-function removeCurrentImage() {
-    if (confirm('Bạn có chắc chắn muốn xóa hình ảnh hiện tại?')) {
-        // Add hidden input to mark for deletion
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'remove_current_image';
-        hiddenInput.value = '1';
-        document.getElementById('equipmentForm').appendChild(hiddenInput);
-        
-        // Hide current image display
-        const currentFile = document.querySelector('.current-file');
-        if (currentFile) {
-            currentFile.style.display = 'none';
-        }
-    }
-}
-
-function removeCurrentManual() {
-    if (confirm('Bạn có chắc chắn muốn xóa tài liệu hiện tại?')) {
-        // Add hidden input to mark for deletion
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'remove_current_manual';
-        hiddenInput.value = '1';
-        document.getElementById('equipmentForm').appendChild(hiddenInput);
-        
-        // Hide current manual display
-        const currentFile = document.querySelectorAll('.current-file')[1];
-        if (currentFile) {
-            currentFile.style.display = 'none';
-        }
-    }
-}
-
-// Initialize character counters
-document.addEventListener('DOMContentLoaded', function() {
-    const textareas = ['specifications', 'notes'];
-    
-    textareas.forEach(id => {
-        const textarea = document.getElementById(id);
-        const counter = document.getElementById(id + 'Counter');
-        
-        if (textarea && counter) {
-            textarea.addEventListener('input', function() {
-                const length = this.value.length;
-                counter.textContent = length;
-                
-                // Update counter color based on length
-                const maxLength = id === 'specifications' ? 2000 : 1000;
-                counter.className = 'character-counter';
-                
-                if (length > maxLength * 0.9) {
-                    counter.classList.add('danger');
-                } else if (length > maxLength * 0.8) {
-                    counter.classList.add('warning');
-                }
-            });
-        }
-    });
-    
-    // Initialize dependent dropdowns
-    initializeDependentDropdowns();
-});
-
-function initializeDependentDropdowns() {
-    const industrySelect = document.getElementById('industryId');
-    const workshopSelect = document.getElementById('workshopId');
-    const lineSelect = document.getElementById('lineId');
-    const areaSelect = document.getElementById('areaId');
-    const machineTypeSelect = document.getElementById('machineTypeId');
-    const equipmentGroupSelect = document.getElementById('equipmentGroupId');
-    
-    // Handle industry change
-    industrySelect.addEventListener('change', function() {
-        updateWorkshops(this.value);
-    });
-    
-    // Handle workshop change
-    workshopSelect.addEventListener('change', function() {
-        updateLines(this.value);
-        updateAreas(this.value);
-    });
-    
-    // Handle machine type change
-    machineTypeSelect.addEventListener('change', function() {
-        updateEquipmentGroups(this.value);
-    });
-}
-
-function updateWorkshops(industryId) {
-    const workshopSelect = document.getElementById('workshopId');
-    const lineSelect = document.getElementById('lineId');
-    const areaSelect = document.getElementById('areaId');
-    
-    // Clear dependent selects
-    clearSelectOptions(workshopSelect, '-- Chọn xưởng --');
-    clearSelectOptions(lineSelect, '-- Chọn line (tùy chọn) --');
-    clearSelectOptions(areaSelect, '-- Chọn khu vực (tùy chọn) --');
-    
-    if (!industryId) return;
-    
-    // Filter workshops
-    const workshopOptions = workshopSelect.querySelectorAll('option[data-industry]');
-    workshopOptions.forEach(option => {
-        option.style.display = option.dataset.industry === industryId ? '' : 'none';
-    });
-}
-
-function updateLines(workshopId) {
-    const lineSelect = document.getElementById('lineId');
-    clearSelectOptions(lineSelect, '-- Chọn line (tùy chọn) --');
-    
-    if (!workshopId) return;
-    
-    const lineOptions = lineSelect.querySelectorAll('option[data-workshop]');
-    lineOptions.forEach(option => {
-        option.style.display = option.dataset.workshop === workshopId ? '' : 'none';
-    });
-}
-
-function updateAreas(workshopId) {
-    const areaSelect = document.getElementById('areaId');
-    clearSelectOptions(areaSelect, '-- Chọn khu vực (tùy chọn) --');
-    
-    if (!workshopId) return;
-    
-    const areaOptions = areaSelect.querySelectorAll('option[data-workshop]');
-    areaOptions.forEach(option => {
-        option.style.display = option.dataset.workshop === workshopId ? '' : 'none';
-    });
-}
-
-function updateEquipmentGroups(machineTypeId) {
-    const equipmentGroupSelect = document.getElementById('equipmentGroupId');
-    clearSelectOptions(equipmentGroupSelect, '-- Chọn cụm thiết bị (tùy chọn) --');
-    
-    if (!machineTypeId) return;
-    
-    const groupOptions = equipmentGroupSelect.querySelectorAll('option[data-machine-type]');
-    groupOptions.forEach(option => {
-        option.style.display = option.dataset.machineType === machineTypeId ? '' : 'none';
-    });
-}
-
-function clearSelectOptions(selectElement, defaultText) {
-    const currentValue = selectElement.value;
-    Array.from(selectElement.options).forEach(option => {
-        if (option.value === '') {
-            option.textContent = defaultText;
-        } else {
-            option.style.display = 'none';
-        }
-    });
-    selectElement.value = '';
-}
+// Pass current form data to JavaScript
+window.currentFormData = <?php echo json_encode($formData); ?>;
 </script>
-
-<!-- Load Equipment JavaScript -->
-<script src="<?php echo APP_URL; ?>/assets/js/equipment-add.js"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -114,28 +114,28 @@ if (hasPermission('equipment', 'delete')) {
 
 $pageActions .= '</ul></div>';
 
-// Format some data
-$equipment['created_at_formatted'] = formatDateTime($equipment['created_at']);
-$equipment['updated_at_formatted'] = formatDateTime($equipment['updated_at']);
-$equipment['installation_date_formatted'] = formatDate($equipment['installation_date']);
-$equipment['warranty_expiry_formatted'] = formatDate($equipment['warranty_expiry']);
+// Format some data - Sửa lỗi: Kiểm tra hàm tồn tại
+$equipment['created_at_formatted'] = !empty($equipment['created_at']) ? formatDateTime($equipment['created_at']) : 'N/A';
+$equipment['updated_at_formatted'] = !empty($equipment['updated_at']) ? formatDateTime($equipment['updated_at']) : 'N/A';
+$equipment['installation_date_formatted'] = !empty($equipment['installation_date']) ? formatDate($equipment['installation_date']) : '';
+$equipment['warranty_expiry_formatted'] = !empty($equipment['warranty_expiry']) ? formatDate($equipment['warranty_expiry']) : '';
 $equipment['status_text'] = getStatusText($equipment['status']);
 $equipment['status_class'] = getStatusClass($equipment['status']);
 
-// Parse technical specs if JSON
+// Parse technical specs if JSON - Sửa lỗi: Kiểm tra field tồn tại
 $technical_specs = [];
-if ($equipment['technical_specs']) {
+if (isset($equipment['technical_specs']) && !empty($equipment['technical_specs'])) {
     $parsed = json_decode($equipment['technical_specs'], true);
-    if ($parsed) {
+    if (is_array($parsed)) {
         $technical_specs = $parsed;
     }
 }
 
-// Parse settings images if JSON
+// Parse settings images if JSON - Sửa lỗi: Kiểm tra field tồn tại
 $settings_images = [];
-if ($equipment['settings_images']) {
+if (isset($equipment['settings_images']) && !empty($equipment['settings_images'])) {
     $parsed = json_decode($equipment['settings_images'], true);
-    if ($parsed) {
+    if (is_array($parsed)) {
         $settings_images = $parsed;
     }
 }
@@ -145,20 +145,26 @@ $next_maintenance = null;
 $maintenance_due = false;
 $days_until_maintenance = null;
 
-if ($equipment['maintenance_frequency_days'] && $equipment['installation_date']) {
-    $installDate = new DateTime($equipment['installation_date']);
-    $nextMaintenance = clone $installDate;
-    $nextMaintenance->add(new DateInterval('P' . $equipment['maintenance_frequency_days'] . 'D'));
-    
-    // Keep adding maintenance intervals until we get a future date
-    $today = new DateTime();
-    while ($nextMaintenance <= $today) {
+if (!empty($equipment['maintenance_frequency_days']) && !empty($equipment['installation_date'])) {
+    try {
+        $installDate = new DateTime($equipment['installation_date']);
+        $nextMaintenance = clone $installDate;
         $nextMaintenance->add(new DateInterval('P' . $equipment['maintenance_frequency_days'] . 'D'));
+        
+        // Keep adding maintenance intervals until we get a future date
+        $today = new DateTime();
+        while ($nextMaintenance <= $today) {
+            $nextMaintenance->add(new DateInterval('P' . $equipment['maintenance_frequency_days'] . 'D'));
+        }
+        
+        $next_maintenance = $nextMaintenance->format('d/m/Y');
+        $days_until_maintenance = $today->diff($nextMaintenance)->days;
+        $maintenance_due = $days_until_maintenance <= 7;
+    } catch (Exception $e) {
+        // Ignore date calculation errors
+        $next_maintenance = null;
+        $maintenance_due = false;
     }
-    
-    $next_maintenance = $nextMaintenance->format('d/m/Y');
-    $days_until_maintenance = $today->diff($nextMaintenance)->days;
-    $maintenance_due = $days_until_maintenance <= 7;
 }
 
 // Get recent maintenance history (mock data for now)
@@ -191,24 +197,42 @@ $maintenance_history = [
 
 // Build location path
 $location_parts = array_filter([
-    $equipment['industry_name'],
-    $equipment['workshop_name'],
-    $equipment['line_name'],
-    $equipment['area_name']
+    $equipment['industry_name'] ?? null,
+    $equipment['workshop_name'] ?? null,
+    $equipment['line_name'] ?? null,
+    $equipment['area_name'] ?? null
 ]);
 $location_path = implode(' → ', $location_parts);
 
+// Format image URLs - Sửa lỗi: Kiểm tra file tồn tại
+$equipment_image_url = null;
+$equipment_manual_url = null;
+
+if (!empty($equipment['image_path'])) {
+    $full_image_path = BASE_PATH . '/' . ltrim($equipment['image_path'], '/');
+    if (file_exists($full_image_path)) {
+        $equipment_image_url = APP_URL . '/' . ltrim($equipment['image_path'], '/');
+    }
+}
+
+if (!empty($equipment['manual_path'])) {
+    $full_manual_path = BASE_PATH . '/' . ltrim($equipment['manual_path'], '/');
+    if (file_exists($full_manual_path)) {
+        $equipment_manual_url = APP_URL . '/' . ltrim($equipment['manual_path'], '/');
+    }
+}
+
 require_once '../../includes/header.php';
 ?>
-
+<!-- CSS Styles - Sửa lỗi và tối ưu -->
 <style>
 .equipment-view-container {
-    background: var(--equipment-light);
+    background: var(--equipment-light, #f8fafc);
     min-height: 100vh;
 }
 
 .equipment-header {
-    background: linear-gradient(135deg, var(--equipment-primary), #3b82f6);
+    background: linear-gradient(135deg, var(--equipment-primary, #1e3a8a), #3b82f6);
     color: white;
     padding: 2rem 0;
     margin-bottom: 2rem;
@@ -255,6 +279,13 @@ require_once '../../includes/header.php';
     border: 2px solid rgba(255, 255, 255, 0.3);
     display: inline-block;
     margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.equipment-code-badge:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
 }
 
 .equipment-title {
@@ -289,12 +320,12 @@ require_once '../../includes/header.php';
 
 .info-section-header h5 {
     margin: 0;
-    color: var(--equipment-dark);
+    color: var(--equipment-dark, #374151);
     font-weight: 600;
 }
 
 .info-section-header .section-icon {
-    color: var(--equipment-primary);
+    color: var(--equipment-primary, #1e3a8a);
 }
 
 .info-section-body {
@@ -322,7 +353,7 @@ require_once '../../includes/header.php';
 }
 
 .info-value {
-    color: var(--equipment-dark);
+    color: var(--equipment-dark, #374151);
     font-weight: 500;
     font-size: 1rem;
 }
@@ -345,11 +376,28 @@ require_once '../../includes/header.php';
     width: 100%;
     height: 300px;
     object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.main-equipment-image:hover {
+    transform: scale(1.02);
+}
+
+.no-image-placeholder {
+    width: 100%;
+    height: 300px;
     background: #f3f4f6;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #9ca3af;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.no-image-placeholder i {
+    font-size: 3rem;
 }
 
 .image-thumbnails {
@@ -371,7 +419,7 @@ require_once '../../includes/header.php';
 
 .image-thumbnail:hover,
 .image-thumbnail.active {
-    border-color: var(--equipment-primary);
+    border-color: var(--equipment-primary, #1e3a8a);
     transform: scale(1.05);
 }
 
@@ -422,6 +470,7 @@ require_once '../../includes/header.php';
     background: linear-gradient(135deg, #7f1d1d, #dc2626);
     color: white;
     box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+    animation: pulse-critical 2s infinite;
 }
 
 .criticality-high {
@@ -442,6 +491,17 @@ require_once '../../includes/header.php';
     box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
+@keyframes pulse-critical {
+    0%, 100% { 
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
 .maintenance-timeline {
     position: relative;
 }
@@ -453,7 +513,7 @@ require_once '../../includes/header.php';
     top: 0;
     bottom: 0;
     width: 2px;
-    background: linear-gradient(to bottom, var(--equipment-primary), #e5e7eb);
+    background: linear-gradient(to bottom, var(--equipment-primary, #1e3a8a), #e5e7eb);
 }
 
 .timeline-item {
@@ -469,27 +529,27 @@ require_once '../../includes/header.php';
     top: 0.5rem;
     width: 1rem;
     height: 1rem;
-    background: var(--equipment-primary);
+    background: var(--equipment-primary, #1e3a8a);
     border: 3px solid white;
     border-radius: 50%;
-    box-shadow: 0 0 0 3px var(--equipment-primary);
+    box-shadow: 0 0 0 3px var(--equipment-primary, #1e3a8a);
 }
 
 .timeline-item.completed::before {
-    background: var(--equipment-success);
-    box-shadow: 0 0 0 3px var(--equipment-success);
+    background: var(--equipment-success, #10b981);
+    box-shadow: 0 0 0 3px var(--equipment-success, #10b981);
 }
 
 .timeline-item.pending::before {
-    background: var(--equipment-warning);
-    box-shadow: 0 0 0 3px var(--equipment-warning);
+    background: var(--equipment-warning, #f59e0b);
+    box-shadow: 0 0 0 3px var(--equipment-warning, #f59e0b);
 }
 
 .timeline-content {
     background: #f8fafc;
     padding: 1rem;
     border-radius: 0.5rem;
-    border-left: 3px solid var(--equipment-primary);
+    border-left: 3px solid var(--equipment-primary, #1e3a8a);
 }
 
 .timeline-date {
@@ -502,7 +562,7 @@ require_once '../../includes/header.php';
 
 .timeline-title {
     font-weight: 600;
-    color: var(--equipment-dark);
+    color: var(--equipment-dark, #374151);
     margin: 0.25rem 0;
 }
 
@@ -529,7 +589,7 @@ require_once '../../includes/header.php';
     background: #f8fafc;
     padding: 1rem;
     border-radius: 0.5rem;
-    border-left: 3px solid var(--equipment-primary);
+    border-left: 3px solid var(--equipment-primary, #1e3a8a);
 }
 
 .spec-label {
@@ -542,7 +602,7 @@ require_once '../../includes/header.php';
 }
 
 .spec-value {
-    color: var(--equipment-dark);
+    color: var(--equipment-dark, #374151);
     font-weight: 500;
 }
 
@@ -556,16 +616,54 @@ require_once '../../includes/header.php';
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    animation: fadeInUp 0.5s ease-out;
 }
 
 .maintenance-alert.due {
     background: linear-gradient(135deg, #fef2f2, #fecaca);
     border-color: #ef4444;
     color: #991b1b;
+    animation: pulse-alert 2s infinite;
 }
 
 .maintenance-alert i {
     font-size: 1.25rem;
+}
+
+@keyframes pulse-alert {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    color: var(--equipment-primary, #1e3a8a);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.file-link:hover {
+    background: var(--equipment-primary, #1e3a8a);
+    color: white;
+    transform: translateY(-1px);
+    text-decoration: none;
 }
 
 .qr-code-section {
@@ -589,25 +687,7 @@ require_once '../../includes/header.php';
     color: #9ca3af;
 }
 
-.file-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
-    color: var(--equipment-primary);
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.file-link:hover {
-    background: var(--equipment-primary);
-    color: white;
-    transform: translateY(-1px);
-}
-
+/* Responsive Design */
 @media (max-width: 768px) {
     .equipment-view-container {
         padding: 0.5rem;
@@ -636,7 +716,8 @@ require_once '../../includes/header.php';
         margin-top: 1rem;
     }
     
-    .main-equipment-image {
+    .main-equipment-image,
+    .no-image-placeholder {
         height: 200px;
     }
     
@@ -649,6 +730,7 @@ require_once '../../includes/header.php';
     }
 }
 
+/* Print Styles */
 @media print {
     .equipment-view-container {
         background: white !important;
@@ -674,30 +756,33 @@ require_once '../../includes/header.php';
 }
 </style>
 
+<!-- Equipment View HTML Structure -->
 <div class="equipment-view-container">
     <!-- Equipment Header -->
     <div class="equipment-header">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-md-8">
-                    <div class="equipment-code-badge">
+                    <div class="equipment-code-badge" title="Click để copy mã thiết bị">
                         <?php echo htmlspecialchars($equipment['code']); ?>
                     </div>
                     <h1 class="equipment-title">
                         <?php echo htmlspecialchars($equipment['name']); ?>
                     </h1>
                     <div class="equipment-subtitle">
-                        <?php echo htmlspecialchars($location_path); ?>
+                        <?php echo htmlspecialchars($location_path ?: 'Chưa xác định vị trí'); ?>
                     </div>
                 </div>
                 <div class="col-md-4 text-md-end">
                     <div class="mb-3">
-                        <div class="status-indicator status-<?php echo $equipment['status']; ?>">
+                        <div class="status-indicator status-<?php echo $equipment['status']; ?>" 
+                             title="<?php echo $equipment['status_text']; ?>">
                             <i class="fas fa-circle"></i>
                             <?php echo $equipment['status_text']; ?>
                         </div>
                     </div>
-                    <div class="criticality-badge criticality-<?php echo strtolower($equipment['criticality']); ?>">
+                    <div class="criticality-badge criticality-<?php echo strtolower($equipment['criticality']); ?>"
+                         title="Mức độ quan trọng: <?php echo $equipment['criticality']; ?>">
                         <?php echo $equipment['criticality']; ?>
                     </div>
                 </div>
@@ -718,7 +803,6 @@ require_once '../../includes/header.php';
                 </div>
             </div>
         <?php endif; ?>
-
         <div class="row">
             <!-- Main Content -->
             <div class="col-lg-8">
@@ -733,19 +817,19 @@ require_once '../../includes/header.php';
                             <div class="info-item">
                                 <div class="info-label">Nhà sản xuất</div>
                                 <div class="info-value <?php echo empty($equipment['manufacturer']) ? 'empty' : ''; ?>">
-                                    <?php echo $equipment['manufacturer'] ?: 'Chưa có thông tin'; ?>
+                                    <?php echo htmlspecialchars($equipment['manufacturer'] ?: 'Chưa có thông tin'); ?>
                                 </div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Model</div>
                                 <div class="info-value <?php echo empty($equipment['model']) ? 'empty' : ''; ?>">
-                                    <?php echo $equipment['model'] ?: 'Chưa có thông tin'; ?>
+                                    <?php echo htmlspecialchars($equipment['model'] ?: 'Chưa có thông tin'); ?>
                                 </div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Số seri</div>
                                 <div class="info-value <?php echo empty($equipment['serial_number']) ? 'empty' : ''; ?>">
-                                    <?php echo $equipment['serial_number'] ?: 'Chưa có thông tin'; ?>
+                                    <?php echo htmlspecialchars($equipment['serial_number'] ?: 'Chưa có thông tin'); ?>
                                 </div>
                             </div>
                             <div class="info-item">
@@ -767,22 +851,39 @@ require_once '../../includes/header.php';
                                 </div>
                             </div>
                             <div class="info-item">
+                                <div class="info-label">Dòng máy</div>
+                                <div class="info-value">
+                                    <?php if (!empty($equipment['machine_type_name'])): ?>
+                                        <span class="badge bg-info"><?php echo htmlspecialchars($equipment['machine_type_name']); ?></span>
+                                    <?php else: ?>
+                                        <span class="empty">Chưa phân loại</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="info-item">
                                 <div class="info-label">Cụm thiết bị</div>
                                 <div class="info-value <?php echo empty($equipment['equipment_group_name']) ? 'empty' : ''; ?>">
-                                    <?php if ($equipment['equipment_group_name']): ?>
+                                    <?php if (!empty($equipment['equipment_group_name'])): ?>
                                         <span class="badge bg-dark"><?php echo htmlspecialchars($equipment['equipment_group_name']); ?></span>
                                     <?php else: ?>
                                         Chưa phân cụm
                                     <?php endif; ?>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <?php if (!empty($equipment['location_details'])): ?>
+                        <div class="mt-3">
                             <div class="info-item">
                                 <div class="info-label">Vị trí chi tiết</div>
-                                <div class="info-value <?php echo empty($equipment['location_details']) ? 'empty' : ''; ?>">
-                                    <?php echo $equipment['location_details'] ?: 'Chưa có thông tin chi tiết'; ?>
+                                <div class="info-value">
+                                    <div class="p-3 bg-light rounded">
+                                        <?php echo nl2br(htmlspecialchars($equipment['location_details'])); ?>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -797,15 +898,15 @@ require_once '../../includes/header.php';
                             <div class="info-item">
                                 <div class="info-label">Người quản lý chính</div>
                                 <div class="info-value <?php echo empty($equipment['owner_name']) ? 'empty' : ''; ?>">
-                                    <?php if ($equipment['owner_name']): ?>
+                                    <?php if (!empty($equipment['owner_name'])): ?>
                                         <div class="d-flex align-items-center gap-2">
                                             <i class="fas fa-user-circle text-primary"></i>
                                             <div>
                                                 <div class="fw-semibold"><?php echo htmlspecialchars($equipment['owner_name']); ?></div>
-                                                <?php if ($equipment['owner_email']): ?>
+                                                <?php if (!empty($equipment['owner_email'])): ?>
                                                     <small class="text-muted"><?php echo htmlspecialchars($equipment['owner_email']); ?></small>
                                                 <?php endif; ?>
-                                                <?php if ($equipment['owner_phone']): ?>
+                                                <?php if (!empty($equipment['owner_phone'])): ?>
                                                     <small class="text-muted d-block"><?php echo htmlspecialchars($equipment['owner_phone']); ?></small>
                                                 <?php endif; ?>
                                             </div>
@@ -818,15 +919,15 @@ require_once '../../includes/header.php';
                             <div class="info-item">
                                 <div class="info-label">Người quản lý phụ</div>
                                 <div class="info-value <?php echo empty($equipment['backup_owner_name']) ? 'empty' : ''; ?>">
-                                    <?php if ($equipment['backup_owner_name']): ?>
+                                    <?php if (!empty($equipment['backup_owner_name'])): ?>
                                         <div class="d-flex align-items-center gap-2">
                                             <i class="fas fa-user text-secondary"></i>
                                             <div>
                                                 <div class="fw-semibold"><?php echo htmlspecialchars($equipment['backup_owner_name']); ?></div>
-                                                <?php if ($equipment['backup_owner_email']): ?>
+                                                <?php if (!empty($equipment['backup_owner_email'])): ?>
                                                     <small class="text-muted"><?php echo htmlspecialchars($equipment['backup_owner_email']); ?></small>
                                                 <?php endif; ?>
-                                                <?php if ($equipment['backup_owner_phone']): ?>
+                                                <?php if (!empty($equipment['backup_owner_phone'])): ?>
                                                     <small class="text-muted d-block"><?php echo htmlspecialchars($equipment['backup_owner_phone']); ?></small>
                                                 <?php endif; ?>
                                             </div>
@@ -872,9 +973,9 @@ require_once '../../includes/header.php';
                             <div class="info-item">
                                 <div class="info-label">Chu kỳ bảo trì</div>
                                 <div class="info-value <?php echo empty($equipment['maintenance_frequency_days']) ? 'empty' : ''; ?>">
-                                    <?php if ($equipment['maintenance_frequency_days']): ?>
+                                    <?php if (!empty($equipment['maintenance_frequency_days'])): ?>
                                         <?php echo $equipment['maintenance_frequency_days']; ?> ngày 
-                                        (<?php echo ucfirst($equipment['maintenance_frequency_type']); ?>)
+                                        (<?php echo ucfirst($equipment['maintenance_frequency_type'] ?? 'monthly'); ?>)
                                     <?php else: ?>
                                         Chưa thiết lập
                                     <?php endif; ?>
@@ -890,6 +991,11 @@ require_once '../../includes/header.php';
                                                 <i class="fas fa-exclamation-triangle ms-1"></i>
                                             <?php endif; ?>
                                         </span>
+                                        <?php if ($days_until_maintenance !== null): ?>
+                                            <small class="d-block text-muted">
+                                                (Còn <?php echo $days_until_maintenance; ?> ngày)
+                                            </small>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         Chưa lên lịch
                                     <?php endif; ?>
@@ -898,9 +1004,15 @@ require_once '../../includes/header.php';
                             <div class="info-item">
                                 <div class="info-label">Trạng thái hiện tại</div>
                                 <div class="info-value">
-                                    <div class="status-indicator status-<?php echo $equipment['status']; ?>">
+                                    <div class="status-indicator status-<?php echo $equipment['status']; ?>" 
+                                         title="Click để thay đổi trạng thái" 
+                                         style="cursor: pointer;" 
+                                         onclick="changeStatus()">
                                         <i class="fas fa-circle"></i>
                                         <?php echo $equipment['status_text']; ?>
+                                        <?php if (hasPermission('equipment', 'edit')): ?>
+                                            <i class="fas fa-edit ms-2 small"></i>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -917,14 +1029,14 @@ require_once '../../includes/header.php';
                 </div>
 
                 <!-- Technical Specifications -->
-                <?php if ($equipment['specifications'] || !empty($technical_specs)): ?>
+                <?php if (!empty($equipment['specifications']) || !empty($technical_specs)): ?>
                 <div class="info-section">
                     <div class="info-section-header">
                         <i class="fas fa-cog section-icon"></i>
                         <h5>Thông số kỹ thuật</h5>
                     </div>
                     <div class="info-section-body">
-                        <?php if ($equipment['specifications']): ?>
+                        <?php if (!empty($equipment['specifications'])): ?>
                             <div class="mb-3">
                                 <div class="p-3 bg-light rounded">
                                     <?php echo nl2br(htmlspecialchars($equipment['specifications'])); ?>
@@ -960,17 +1072,17 @@ require_once '../../includes/header.php';
                     <div class="info-section-body">
                         <?php if (!empty($maintenance_history)): ?>
                             <div class="maintenance-timeline">
-                                <?php foreach ($maintenance_history as $maintenance): ?>
-                                    <div class="timeline-item <?php echo $maintenance['status']; ?>">
+                                <?php foreach (array_slice($maintenance_history, 0, 5) as $maintenance): ?>
+                                    <div class="timeline-item <?php echo htmlspecialchars($maintenance['status']); ?>">
                                         <div class="timeline-content">
-                                            <div class="timeline-date"><?php echo $maintenance['date']; ?></div>
+                                            <div class="timeline-date"><?php echo htmlspecialchars($maintenance['date']); ?></div>
                                             <div class="timeline-title"><?php echo htmlspecialchars($maintenance['type']); ?></div>
                                             <div class="timeline-description">
                                                 <?php echo htmlspecialchars($maintenance['description']); ?>
                                             </div>
                                             <div class="timeline-meta">
                                                 <span><i class="fas fa-user me-1"></i><?php echo htmlspecialchars($maintenance['technician']); ?></span>
-                                                <span><i class="fas fa-clock me-1"></i><?php echo $maintenance['duration']; ?></span>
+                                                <span><i class="fas fa-clock me-1"></i><?php echo htmlspecialchars($maintenance['duration']); ?></span>
                                             </div>
                                         </div>
                                     </div>
@@ -980,13 +1092,16 @@ require_once '../../includes/header.php';
                             <div class="text-center py-4 text-muted">
                                 <i class="fas fa-tools fa-3x mb-3 opacity-25"></i>
                                 <p>Chưa có lịch sử bảo trì</p>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="createMaintenanceSchedule()">
+                                    <i class="fas fa-plus me-1"></i>Tạo lịch bảo trì đầu tiên
+                                </button>
                             </div>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <!-- Notes -->
-                <?php if ($equipment['notes']): ?>
+                <?php if (!empty($equipment['notes'])): ?>
                 <div class="info-section">
                     <div class="info-section-header">
                         <i class="fas fa-sticky-note section-icon"></i>
@@ -1000,33 +1115,37 @@ require_once '../../includes/header.php';
                 </div>
                 <?php endif; ?>
             </div>
-
             <!-- Sidebar -->
             <div class="col-lg-4">
                 <!-- Equipment Image -->
                 <div class="equipment-image-section">
-                    <?php if ($equipment['image_path'] && file_exists($equipment['image_path'])): ?>
-                        <img src="<?php echo str_replace(BASE_PATH, APP_URL, $equipment['image_path']); ?>" 
+                    <?php if ($equipment_image_url): ?>
+                        <img src="<?php echo htmlspecialchars($equipment_image_url); ?>" 
                              alt="<?php echo htmlspecialchars($equipment['name']); ?>" 
                              class="main-equipment-image"
-                             onclick="showImageModal(this.src)">
+                             onclick="showImageModal(this.src)"
+                             loading="lazy">
                         
                         <?php if (!empty($settings_images)): ?>
                         <div class="image-thumbnails">
-                            <?php foreach ($settings_images as $image): ?>
+                            <?php foreach ($settings_images as $index => $image): ?>
                                 <img src="<?php echo htmlspecialchars($image); ?>" 
-                                     alt="Settings Image" 
-                                     class="image-thumbnail"
-                                     onclick="showImageModal(this.src)">
+                                     alt="Settings Image <?php echo $index + 1; ?>" 
+                                     class="image-thumbnail <?php echo $index === 0 ? 'active' : ''; ?>"
+                                     onclick="showImageModal(this.src)"
+                                     loading="lazy">
                             <?php endforeach; ?>
                         </div>
                         <?php endif; ?>
                     <?php else: ?>
-                        <div class="main-equipment-image">
-                            <div class="text-center">
-                                <i class="fas fa-image fa-3x mb-2"></i>
-                                <div>Chưa có hình ảnh</div>
-                            </div>
+                        <div class="no-image-placeholder">
+                            <i class="fas fa-image"></i>
+                            <div>Chưa có hình ảnh</div>
+                            <?php if (hasPermission('equipment', 'edit')): ?>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="uploadFiles()">
+                                    <i class="fas fa-upload me-1"></i>Upload ảnh
+                                </button>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -1049,9 +1168,11 @@ require_once '../../includes/header.php';
                                 <i class="fas fa-calendar-plus me-2"></i>Lên lịch bảo trì
                             </button>
                             
+                            <?php if (hasPermission('equipment', 'edit')): ?>
                             <button type="button" class="btn btn-outline-info" onclick="changeStatus()">
                                 <i class="fas fa-exchange-alt me-2"></i>Thay đổi trạng thái
                             </button>
+                            <?php endif; ?>
                             
                             <button type="button" class="btn btn-outline-warning" onclick="generateQR()">
                                 <i class="fas fa-qrcode me-2"></i>Tạo mã QR
@@ -1066,21 +1187,27 @@ require_once '../../includes/header.php';
                             <button type="button" class="btn btn-outline-secondary" onclick="exportEquipment()">
                                 <i class="fas fa-download me-2"></i>Xuất PDF
                             </button>
+                            
+                            <?php if (hasPermission('equipment', 'delete')): ?>
+                            <hr>
+                            <button type="button" class="btn btn-outline-danger" onclick="deleteEquipment()">
+                                <i class="fas fa-trash me-2"></i>Xóa thiết bị
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
 
                 <!-- Files & Documents -->
-                <?php if ($equipment['manual_path'] || !empty($settings_images)): ?>
                 <div class="info-section mt-3">
                     <div class="info-section-header">
                         <i class="fas fa-file section-icon"></i>
                         <h5>Tài liệu & File</h5>
                     </div>
                     <div class="info-section-body">
-                        <?php if ($equipment['manual_path'] && file_exists($equipment['manual_path'])): ?>
+                        <?php if ($equipment_manual_url): ?>
                             <div class="mb-2">
-                                <a href="<?php echo str_replace(BASE_PATH, APP_URL, $equipment['manual_path']); ?>" 
+                                <a href="<?php echo htmlspecialchars($equipment_manual_url); ?>" 
                                    target="_blank" class="file-link">
                                     <i class="fas fa-file-pdf"></i>
                                     Hướng dẫn sử dụng
@@ -1088,14 +1215,22 @@ require_once '../../includes/header.php';
                             </div>
                         <?php endif; ?>
                         
+                        <!-- Additional files can be added here -->
+                        
                         <?php if (hasPermission('equipment', 'edit')): ?>
-                            <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="uploadFiles()">
+                            <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="uploadFiles()">
                                 <i class="fas fa-upload me-2"></i>Upload tài liệu
                             </button>
                         <?php endif; ?>
+                        
+                        <?php if (!$equipment_manual_url && !hasPermission('equipment', 'edit')): ?>
+                            <div class="text-center py-3 text-muted">
+                                <i class="fas fa-folder-open fa-2x mb-2 opacity-25"></i>
+                                <p class="mb-0">Chưa có tài liệu</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
-                <?php endif; ?>
 
                 <!-- QR Code -->
                 <div class="info-section mt-3">
@@ -1109,8 +1244,9 @@ require_once '../../includes/header.php';
                                 <div class="qr-code-placeholder">
                                     <i class="fas fa-qrcode fa-2x"></i>
                                 </div>
+                                <p class="mb-2 text-muted small">Mã QR để truy cập nhanh thông tin thiết bị</p>
                                 <button type="button" class="btn btn-sm btn-primary" onclick="generateQR()">
-                                    Tạo mã QR
+                                    <i class="fas fa-magic me-1"></i>Tạo mã QR
                                 </button>
                             </div>
                         </div>
@@ -1127,7 +1263,9 @@ require_once '../../includes/header.php';
                         <div class="row g-2 text-center">
                             <div class="col-6">
                                 <div class="p-2 bg-success bg-opacity-10 rounded">
-                                    <div class="h6 mb-1 text-success">0</div>
+                                    <div class="h6 mb-1 text-success">
+                                        <?php echo count(array_filter($maintenance_history, function($m) { return $m['status'] === 'completed'; })); ?>
+                                    </div>
                                     <small class="text-muted">Bảo trì hoàn thành</small>
                                 </div>
                             </div>
@@ -1141,11 +1279,15 @@ require_once '../../includes/header.php';
                                 <div class="p-2 bg-info bg-opacity-10 rounded">
                                     <div class="h6 mb-1 text-info">
                                         <?php 
-                                        if ($equipment['installation_date']) {
-                                            $installDate = new DateTime($equipment['installation_date']);
-                                            $today = new DateTime();
-                                            $diff = $installDate->diff($today);
-                                            echo $diff->days;
+                                        if (!empty($equipment['installation_date'])) {
+                                            try {
+                                                $installDate = new DateTime($equipment['installation_date']);
+                                                $today = new DateTime();
+                                                $diff = $installDate->diff($today);
+                                                echo $diff->days;
+                                            } catch (Exception $e) {
+                                                echo 'N/A';
+                                            }
                                         } else {
                                             echo 'N/A';
                                         }
@@ -1156,10 +1298,26 @@ require_once '../../includes/header.php';
                             </div>
                             <div class="col-6">
                                 <div class="p-2 bg-primary bg-opacity-10 rounded">
-                                    <div class="h6 mb-1 text-primary">98%</div>
+                                    <div class="h6 mb-1 text-primary">
+                                        <?php echo $equipment['status'] === 'active' ? '100%' : ($equipment['status'] === 'maintenance' ? '80%' : '0%'); ?>
+                                    </div>
                                     <small class="text-muted">Hiệu suất</small>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Related Equipment (if any) -->
+                <div class="info-section mt-3">
+                    <div class="info-section-header">
+                        <i class="fas fa-link section-icon"></i>
+                        <h5>Thiết bị liên quan</h5>
+                    </div>
+                    <div class="info-section-body">
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-sitemap fa-2x mb-2 opacity-25"></i>
+                            <p class="mb-0 small">Chức năng đang phát triển</p>
                         </div>
                     </div>
                 </div>
@@ -1169,15 +1327,15 @@ require_once '../../includes/header.php';
 </div>
 
 <!-- Image Modal -->
-<div class="modal fade" id="imageModal" tabindex="-1">
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Hình ảnh thiết bị</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="imageModalLabel">Hình ảnh thiết bị</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center">
-                <img id="modalImage" src="" alt="" class="img-fluid">
+                <img id="modalImage" src="" alt="" class="img-fluid" style="max-height: 70vh;">
             </div>
             <div class="modal-footer">
                 <a id="downloadImage" href="" download class="btn btn-primary">
@@ -1190,28 +1348,37 @@ require_once '../../includes/header.php';
 </div>
 
 <!-- Status Change Modal -->
-<div class="modal fade" id="statusModal" tabindex="-1">
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Thay đổi trạng thái thiết bị</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="statusModalLabel">Thay đổi trạng thái thiết bị</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="statusForm">
                     <div class="mb-3">
                         <label for="newStatus" class="form-label">Trạng thái mới:</label>
                         <select class="form-select" id="newStatus" name="status" required>
-                            <option value="active" <?php echo $equipment['status'] === 'active' ? 'selected' : ''; ?>>Hoạt động</option>
-                            <option value="inactive" <?php echo $equipment['status'] === 'inactive' ? 'selected' : ''; ?>>Ngưng hoạt động</option>
-                            <option value="maintenance" <?php echo $equipment['status'] === 'maintenance' ? 'selected' : ''; ?>>Bảo trì</option>
-                            <option value="broken" <?php echo $equipment['status'] === 'broken' ? 'selected' : ''; ?>>Hỏng</option>
+                            <option value="active" <?php echo $equipment['status'] === 'active' ? 'selected' : ''; ?>>
+                                <i class="fas fa-check-circle"></i> Hoạt động
+                            </option>
+                            <option value="inactive" <?php echo $equipment['status'] === 'inactive' ? 'selected' : ''; ?>>
+                                <i class="fas fa-pause-circle"></i> Ngưng hoạt động
+                            </option>
+                            <option value="maintenance" <?php echo $equipment['status'] === 'maintenance' ? 'selected' : ''; ?>>
+                                <i class="fas fa-wrench"></i> Bảo trì
+                            </option>
+                            <option value="broken" <?php echo $equipment['status'] === 'broken' ? 'selected' : ''; ?>>
+                                <i class="fas fa-times-circle"></i> Hỏng
+                            </option>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label for="statusNote" class="form-label">Ghi chú (tùy chọn):</label>
                         <textarea class="form-control" id="statusNote" name="note" rows="3" 
                                   placeholder="Lý do thay đổi trạng thái..."></textarea>
+                        <div class="form-text">Ghi chú sẽ được lưu vào lịch sử thay đổi</div>
                     </div>
                 </form>
             </div>
@@ -1225,511 +1392,148 @@ require_once '../../includes/header.php';
     </div>
 </div>
 
-<script>
-// Equipment View JavaScript
-const EquipmentView = {
-    equipmentId: <?php echo $equipmentId; ?>,
-    equipmentData: <?php echo json_encode($equipment); ?>,
-    
-    init: function() {
-        console.log('Equipment view initialized for ID:', this.equipmentId);
-        
-        // Initialize tooltips
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-        
-        // Initialize image gallery
-        this.initializeImageGallery();
-    },
-    
-    initializeImageGallery: function() {
-        const thumbnails = document.querySelectorAll('.image-thumbnail');
-        const mainImage = document.querySelector('.main-equipment-image');
-        
-        thumbnails.forEach((thumbnail, index) => {
-            thumbnail.addEventListener('click', function() {
-                // Update main image
-                if (mainImage) {
-                    mainImage.src = this.src;
-                }
-                
-                // Update active thumbnail
-                thumbnails.forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-            });
-        });
-    }
-};
-
-// Global functions
-function showImageModal(src) {
-    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
-    const modalImage = document.getElementById('modalImage');
-    const downloadLink = document.getElementById('downloadImage');
-    
-    modalImage.src = src;
-    modalImage.alt = EquipmentView.equipmentData.name;
-    downloadLink.href = src;
-    
-    modal.show();
-}
-
-function changeStatus() {
-    if (!<?php echo json_encode(hasPermission('equipment', 'edit')); ?>) {
-        CMMS.showToast('Bạn không có quyền thay đổi trạng thái thiết bị', 'error');
-        return;
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
-    modal.show();
-}
-
-async function updateStatus() {
-    const form = document.getElementById('statusForm');
-    const formData = new FormData(form);
-    
-    try {
-        CMMS.showLoading();
-        
-        formData.append('action', 'update_status');
-        formData.append('id', EquipmentView.equipmentId);
-        
-        const response = await fetch('../api/equipment.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            CMMS.showToast(result.message, 'success');
-            
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
-            modal.hide();
-            
-            // Refresh page to show updated status
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            CMMS.showToast(result.message || 'Lỗi khi cập nhật trạng thái', 'error');
-        }
-    } catch (error) {
-        console.error('Update status error:', error);
-        CMMS.showToast('Lỗi kết nối. Vui lòng thử lại.', 'error');
-    } finally {
-        CMMS.hideLoading();
-    }
-}
-
-function generateQR() {
-    const equipmentUrl = `${window.location.origin}${window.location.pathname}?id=${EquipmentView.equipmentId}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(equipmentUrl)}`;
-    
-    const qrContainer = document.getElementById('qrCodeContainer');
-    qrContainer.innerHTML = `
-        <img src="${qrCodeUrl}" alt="QR Code" style="width: 150px; height: 150px; border-radius: 0.375rem;">
-        <div class="mt-2">
-            <small class="text-muted">Quét để xem thiết bị</small>
+<!-- File Upload Modal -->
+<div class="modal fade" id="fileUploadModal" tabindex="-1" aria-labelledby="fileUploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fileUploadModalLabel">Upload tài liệu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="fileUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fileType" class="form-label">Loại file:</label>
+                        <select class="form-select" id="fileType" name="file_type" required>
+                            <option value="">Chọn loại file</option>
+                            <option value="image">Hình ảnh</option>
+                            <option value="manual">Hướng dẫn sử dụng</option>
+                            <option value="document">Tài liệu khác</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="uploadFile" class="form-label">Chọn file:</label>
+                        <input type="file" class="form-control" id="uploadFile" name="upload_file" required>
+                        <div class="form-text">
+                            Hình ảnh: JPG, PNG, GIF (tối đa 5MB)<br>
+                            Tài liệu: PDF, DOC, DOCX (tối đa 10MB)
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fileDescription" class="form-label">Mô tả (tùy chọn):</label>
+                        <input type="text" class="form-control" id="fileDescription" name="description" 
+                               placeholder="Mô tả ngắn về file...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="performFileUpload()">
+                    <i class="fas fa-upload me-2"></i>Upload
+                </button>
+            </div>
         </div>
-        <div class="mt-2">
-            <a href="${qrCodeUrl}" download="equipment-${EquipmentView.equipmentId}-qr.png" class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-download me-1"></i>Tải QR
-            </a>
-        </div>
-    `;
-    
-    CMMS.showToast('Đã tạo mã QR thành công', 'success');
-}
+    </div>
+</div>
 
-function createMaintenanceSchedule() {
-    CMMS.showToast('Chức năng lên lịch bảo trì đang được phát triển', 'info');
-    // TODO: Implement maintenance scheduling
-}
-
-function viewMaintenanceHistory() {
-    CMMS.showToast('Chức năng xem lịch sử bảo trì đang được phát triển', 'info');
-    // TODO: Implement maintenance history modal
-}
-
-function viewFullMaintenanceHistory() {
-    CMMS.showToast('Chức năng xem đầy đủ lịch sử bảo trì đang được phát triển', 'info');
-    // TODO: Implement full maintenance history page
-}
-
-function printEquipment() {
-    // Hide print-unfriendly elements
-    const elementsToHide = document.querySelectorAll('.btn, .dropdown, .maintenance-alert');
-    elementsToHide.forEach(el => el.style.display = 'none');
-    
-    // Print
-    window.print();
-    
-    // Restore hidden elements
-    setTimeout(() => {
-        elementsToHide.forEach(el => el.style.display = '');
-    }, 1000);
-}
-
-function exportEquipment() {
-    CMMS.showToast('Chức năng xuất PDF đang được phát triển', 'info');
-    // TODO: Implement PDF export
-}
-
-function uploadFiles() {
-    CMMS.showToast('Chức năng upload file đang được phát triển', 'info');
-    // TODO: Implement file upload modal
-}
-
-function deleteEquipment() {
-    if (!<?php echo json_encode(hasPermission('equipment', 'delete')); ?>) {
-        CMMS.showToast('Bạn không có quyền xóa thiết bị', 'error');
-        return;
-    }
-    
-    const message = `Bạn có chắc chắn muốn xóa thiết bị "${EquipmentView.equipmentData.name}"?\n\nHành động này sẽ xóa:\n• Tất cả thông tin thiết bị\n• Lịch sử bảo trì\n• File đính kèm\n\nVà không thể hoàn tác.`;
-    
-    if (confirm(message)) {
-        performDelete();
-    }
-}
-
-async function performDelete() {
-    try {
-        CMMS.showLoading();
-        
-        const formData = new FormData();
-        formData.append('action', 'delete');
-        formData.append('id', EquipmentView.equipmentId);
-        
-        const response = await fetch('../api/equipment.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            CMMS.showToast(result.message, 'success');
-            
-            // Redirect to equipment list after successful deletion
-            setTimeout(() => {
-                window.location.href = 'index.php';
-            }, 2000);
-        } else {
-            CMMS.showToast(result.message || 'Lỗi khi xóa thiết bị', 'error');
-        }
-    } catch (error) {
-        console.error('Delete error:', error);
-        CMMS.showToast('Lỗi kết nối. Vui lòng thử lại.', 'error');
-    } finally {
-        CMMS.hideLoading();
-    }
-}
-
-// Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', function() {
-    EquipmentView.init();
-    
-    // Add smooth scroll behavior to internal links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        });
-    });
-    
-    // Auto-hide alerts after some time
-    const alerts = document.querySelectorAll('.maintenance-alert');
-    alerts.forEach(alert => {
-        // Add close button if not exists
-        if (!alert.querySelector('.btn-close')) {
-            const closeBtn = document.createElement('button');
-            closeBtn.type = 'button';
-            closeBtn.className = 'btn-close ms-auto';
-            closeBtn.setAttribute('aria-label', 'Close');
-            closeBtn.onclick = function() {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    alert.style.display = 'none';
-                }, 300);
-            };
-            alert.appendChild(closeBtn);
-        }
-    });
-    
-    // Enhance image loading with lazy loading
-    const images = document.querySelectorAll('img[data-src]');
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                img.src = img.dataset.src;
-                img.classList.remove('lazy');
-                imageObserver.unobserve(img);
-            }
-        });
-    });
-    
-    images.forEach(img => imageObserver.observe(img));
-});
-
-// Keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-    }
-    
-    if (e.ctrlKey || e.metaKey) {
-        switch(e.key.toLowerCase()) {
-            case 'e':
-                e.preventDefault();
-                if (<?php echo json_encode(hasPermission('equipment', 'edit')); ?>) {
-                    window.location.href = `edit.php?id=${EquipmentView.equipmentId}`;
-                }
-                break;
-            case 'p':
-                e.preventDefault();
-                printEquipment();
-                break;
-            case 's':
-                e.preventDefault();
-                changeStatus();
-                break;
-            case 'm':
-                e.preventDefault();
-                createMaintenanceSchedule();
-                break;
-        }
-    }
-    
-    // ESC key to close modals
-    if (e.key === 'Escape') {
-        const openModals = document.querySelectorAll('.modal.show');
-        openModals.forEach(modal => {
-            const modalInstance = bootstrap.Modal.getInstance(modal);
-            if (modalInstance) modalInstance.hide();
-        });
-    }
-});
-
-// Add contextual help tooltips
-const helpTooltips = [
-    {
-        selector: '.criticality-badge',
-        title: 'Mức độ quan trọng của thiết bị ảnh hưởng đến ưu tiên bảo trì và thời gian phản hồi khi có sự cố'
-    },
-    {
-        selector: '.status-indicator',
-        title: 'Trạng thái hiện tại của thiết bị. Click để thay đổi nếu có quyền'
-    },
-    {
-        selector: '.maintenance-alert',
-        title: 'Cảnh báo bảo trì dựa trên chu kỳ bảo trì đã thiết lập'
-    }
-];
-
-helpTooltips.forEach(({ selector, title }) => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(element => {
-        element.setAttribute('data-bs-toggle', 'tooltip');
-        element.setAttribute('data-bs-placement', 'top');
-        element.setAttribute('title', title);
-        new bootstrap.Tooltip(element);
-    });
-});
-
-// Add click-to-copy functionality for equipment code
-document.addEventListener('DOMContentLoaded', function() {
-    const equipmentCodeBadge = document.querySelector('.equipment-code-badge');
-    if (equipmentCodeBadge) {
-        equipmentCodeBadge.style.cursor = 'pointer';
-        equipmentCodeBadge.title = 'Click để copy mã thiết bị';
-        
-        equipmentCodeBadge.addEventListener('click', function() {
-            const code = this.textContent.trim();
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(code).then(() => {
-                    CMMS.showToast(`Đã copy mã thiết bị: ${code}`, 'success');
+<!-- Maintenance Schedule Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="maintenanceModalLabel">Lên lịch bảo trì</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="maintenanceForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="maintenanceType" class="form-label">Loại bảo trì:</label>
+                                <select class="form-select" id="maintenanceType" name="type" required>
+                                    <option value="">Chọn loại bảo trì</option>
+                                    <option value="preventive">Bảo trì định kỳ</option>
+                                    <option value="corrective">Sửa chữa</option>
+                                    <option value="inspection">Kiểm tra</option>
+                                    <option value="calibration">Hiệu chuẩn</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="maintenanceDate" class="form-label">Ngày thực hiện:</label>
+                                <input type="datetime-local" class="form-control" id="maintenanceDate" 
+                                       name="scheduled_date" required>
+                            </div>
+                        </div>
+                    </div>
                     
-                    // Visual feedback
-                    this.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        this.style.transform = '';
-                    }, 150);
-                });
-            } else {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = code;
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    CMMS.showToast(`Đã copy mã thiết bị: ${code}`, 'success');
-                } catch (err) {
-                    CMMS.showToast('Không thể copy mã thiết bị', 'error');
-                }
-                document.body.removeChild(textArea);
-            }
-        });
-    }
-});
+                    <div class="mb-3">
+                        <label for="maintenanceDescription" class="form-label">Mô tả công việc:</label>
+                        <textarea class="form-control" id="maintenanceDescription" name="description" 
+                                  rows="4" required placeholder="Mô tả chi tiết công việc cần thực hiện..."></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="assignedTechnician" class="form-label">Kỹ thuật viên:</label>
+                                <select class="form-select" id="assignedTechnician" name="technician_id">
+                                    <option value="">Chưa phân công</option>
+                                    <!-- Dynamic options will be loaded -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="estimatedDuration" class="form-label">Thời gian dự kiến (giờ):</label>
+                                <input type="number" class="form-control" id="estimatedDuration" 
+                                       name="estimated_duration" min="0.5" step="0.5" placeholder="2.0">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success" onclick="createMaintenanceScheduleConfirm()">
+                    <i class="fas fa-calendar-plus me-2"></i>Tạo lịch bảo trì
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-// Performance monitoring
-let performanceMetrics = {
-    pageLoadTime: 0,
-    renderTime: 0
+<!-- Include Equipment View JavaScript -->
+<script src="<?php echo APP_URL; ?>/assets/js/equipment-view.js?v=<?php echo time(); ?>"></script>
+
+<!-- Pass PHP data to JavaScript -->
+<script>
+// Equipment data for JavaScript
+window.equipmentViewData = {
+    equipmentId: <?php echo $equipmentId; ?>,
+    equipment: <?php echo json_encode($equipment); ?>,
+    permissions: {
+        canEdit: <?php echo json_encode(hasPermission('equipment', 'edit')); ?>,
+        canDelete: <?php echo json_encode(hasPermission('equipment', 'delete')); ?>,
+        canCreate: <?php echo json_encode(hasPermission('equipment', 'create')); ?>
+    },
+    urls: {
+        baseUrl: '<?php echo APP_URL; ?>',
+        apiUrl: '<?php echo APP_URL; ?>/modules/equipment/api/equipment.php',
+        editUrl: 'edit.php?id=<?php echo $equipmentId; ?>',
+        listUrl: 'index.php'
+    }
 };
 
-window.addEventListener('load', function() {
-    performanceMetrics.pageLoadTime = performance.now();
-    console.log(`Equipment view page loaded in ${performanceMetrics.pageLoadTime.toFixed(2)}ms`);
-});
-
-// Add search functionality within the page content
-function initPageSearch() {
-    // Add search box in the header if needed
-    const headerActions = document.querySelector('.btn-toolbar');
-    if (headerActions) {
-        const searchBox = document.createElement('div');
-        searchBox.className = 'input-group input-group-sm me-2';
-        searchBox.style.width = '200px';
-        searchBox.innerHTML = `
-            <span class="input-group-text">
-                <i class="fas fa-search"></i>
-            </span>
-            <input type="text" class="form-control" placeholder="Tìm trong trang..." id="pageSearch">
-        `;
-        
-        headerActions.insertBefore(searchBox, headerActions.firstChild);
-        
-        // Add search functionality
-        const searchInput = document.getElementById('pageSearch');
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const sections = document.querySelectorAll('.info-section');
-            
-            sections.forEach(section => {
-                const text = section.textContent.toLowerCase();
-                const shouldShow = !searchTerm || text.includes(searchTerm);
-                
-                section.style.display = shouldShow ? '' : 'none';
-                
-                if (shouldShow && searchTerm) {
-                    // Highlight matching text
-                    highlightText(section, searchTerm);
-                } else {
-                    // Remove highlights
-                    removeHighlights(section);
-                }
-            });
-        });
-    }
-}
-
-function highlightText(element, searchTerm) {
-    // Simple text highlighting implementation
-    const walker = document.createTreeWalker(
-        element,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-    );
-    
-    const textNodes = [];
-    let node;
-    
-    while (node = walker.nextNode()) {
-        textNodes.push(node);
-    }
-    
-    textNodes.forEach(textNode => {
-        const text = textNode.textContent;
-        const regex = new RegExp(`(${searchTerm})`, 'gi');
-        
-        if (regex.test(text)) {
-            const highlightedText = text.replace(regex, '<mark>$1</mark>');
-            const wrapper = document.createElement('span');
-            wrapper.innerHTML = highlightedText;
-            textNode.parentNode.replaceChild(wrapper, textNode);
-        }
-    });
-}
-
-function removeHighlights(element) {
-    const highlights = element.querySelectorAll('mark');
-    highlights.forEach(highlight => {
-        highlight.replaceWith(highlight.textContent);
-    });
-}
-
-// Add equipment comparison functionality (for future use)
-function addToComparison() {
-    const comparisonList = JSON.parse(localStorage.getItem('equipmentComparison') || '[]');
-    
-    if (!comparisonList.includes(EquipmentView.equipmentId)) {
-        comparisonList.push(EquipmentView.equipmentId);
-        localStorage.setItem('equipmentComparison', JSON.stringify(comparisonList));
-        
-        CMMS.showToast(`Đã thêm "${EquipmentView.equipmentData.name}" vào danh sách so sánh`, 'success');
-        
-        // Update comparison indicator
-        updateComparisonIndicator();
+// Initialize equipment view when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof EquipmentView !== 'undefined') {
+        EquipmentView.init();
     } else {
-        CMMS.showToast('Thiết bị đã có trong danh sách so sánh', 'info');
+        console.error('EquipmentView not loaded');
     }
-}
-
-function updateComparisonIndicator() {
-    const comparisonList = JSON.parse(localStorage.getItem('equipmentComparison') || '[]');
-    
-    if (comparisonList.length > 0) {
-        // Add comparison indicator to header if not exists
-        if (!document.getElementById('comparisonIndicator')) {
-            const indicator = document.createElement('div');
-            indicator.id = 'comparisonIndicator';
-            indicator.className = 'position-fixed bottom-0 end-0 m-3 p-3 bg-primary text-white rounded shadow';
-            indicator.style.zIndex = '1050';
-            indicator.innerHTML = `
-                <div class="d-flex align-items-center gap-2">
-                    <i class="fas fa-balance-scale"></i>
-                    <span>So sánh (${comparisonList.length})</span>
-                    <button type="button" class="btn btn-sm btn-light" onclick="viewComparison()">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-            `;
-            document.body.appendChild(indicator);
-        }
-    }
-}
-
-function viewComparison() {
-    const comparisonList = JSON.parse(localStorage.getItem('equipmentComparison') || '[]');
-    if (comparisonList.length > 0) {
-        window.open(`comparison.php?ids=${comparisonList.join(',')}`, '_blank');
-    }
-}
-
-// Initialize additional features
-setTimeout(() => {
-    initPageSearch();
-    updateComparisonIndicator();
-}, 1000);
-
-console.log('Equipment view JavaScript loaded successfully');
+});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>
