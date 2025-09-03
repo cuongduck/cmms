@@ -8,8 +8,28 @@ require_once __DIR__ . '/../config/functions.php';
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-// Require login
-requireLogin();
+
+// Require login - with better error handling
+try {
+    requireLogin();
+} catch (Exception $e) {
+    // If this is an AJAX request, return JSON error
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(401);
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Authentication required'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    } else {
+        // Regular request - redirect to login
+        header('Location: /login.php');
+        exit;
+    }
+}
 
 $currentUser = getCurrentUser();
 $pageTitle = $pageTitle ?? 'CMMS';

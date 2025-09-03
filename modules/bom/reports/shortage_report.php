@@ -10,6 +10,8 @@ $currentModule = 'bom';
 $moduleCSS = 'bom';
 $moduleJS = 'bom';
 
+require_once '../config.php';
+
 // Check permission
 requirePermission('bom', 'view');
 
@@ -20,7 +22,6 @@ $breadcrumb = [
 ];
 
 require_once '../../../includes/header.php';
-require_once '../config.php';
 
 // Get filters
 $filters = [

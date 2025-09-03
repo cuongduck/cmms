@@ -1,6 +1,6 @@
 <?php
 /**
- * Parts API Handler
+ * Parts API Handler - Fixed Version
  * /modules/bom/api/parts.php
  * API endpoint cho Parts operations
  */
@@ -11,7 +11,21 @@ require_once '../../../config/config.php';
 require_once '../../../config/database.php';
 require_once '../../../config/auth.php';
 require_once '../../../config/functions.php';
-//require_once '../config.php';
+
+// Helper function for checking duplicate codes
+function checkPartCodeExists($code, $excludeId = null) {
+    global $db;
+    
+    $sql = "SELECT id FROM parts WHERE part_code = ?";
+    $params = [$code];
+    
+    if ($excludeId) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeId;
+    }
+    
+    return $db->fetch($sql, $params) !== false;
+}
 
 // Check login
 requireLogin();
@@ -213,32 +227,42 @@ function handleGetPartDetails() {
         throw new Exception('Part not found');
     }
     
-    // Get suppliers
-    $suppliers = $db->fetchAll(
-        "SELECT * FROM part_suppliers WHERE part_id = ? ORDER BY is_preferred DESC, supplier_name",
-        [$partId]
-    );
+    // Get suppliers (optional, may not exist)
+    $suppliers = [];
+    try {
+        $suppliers = $db->fetchAll(
+            "SELECT * FROM part_suppliers WHERE part_id = ? ORDER BY is_preferred DESC, supplier_name",
+            [$partId]
+        );
+    } catch (Exception $e) {
+        // Suppliers table might not exist, continue without it
+    }
     
-    // Get usage in BOMs
-    $usage = $db->fetchAll(
-        "SELECT mb.id, mb.bom_name, mb.bom_code, mt.name as machine_type_name,
-                bi.quantity, bi.unit, bi.priority
-         FROM bom_items bi
-         JOIN machine_bom mb ON bi.bom_id = mb.id
-         JOIN machine_types mt ON mb.machine_type_id = mt.id
-         WHERE bi.part_id = ?
-         ORDER BY mb.bom_name",
-        [$partId]
-    );
+    // Get usage in BOMs (optional, may not exist)
+    $usage = [];
+    try {
+        $usage = $db->fetchAll(
+            "SELECT mb.id, mb.bom_name, mb.bom_code, mt.name as machine_type_name,
+                    bi.quantity, bi.unit, bi.priority
+             FROM bom_items bi
+             JOIN machine_bom mb ON bi.bom_id = mb.id
+             JOIN machine_types mt ON mb.machine_type_id = mt.id
+             WHERE bi.part_id = ?
+             ORDER BY mb.bom_name",
+            [$partId]
+        );
+    } catch (Exception $e) {
+        // BOM tables might not exist, continue without it
+    }
     
     $part['suppliers'] = $suppliers;
     $part['usage'] = $usage;
     
-    successResponse(['part' => $part]);
+    successResponse($part); // Return part data directly
 }
 
 /**
- * Save new part
+ * Save new part (CREATE)
  */
 function handleSavePart() {
     requirePermission('bom', 'create');
@@ -270,15 +294,106 @@ function handleSavePart() {
         throw new Exception('Tên linh kiện không được để trống');
     }
     
-    // Check for duplicate part code (excluding current part)
-    if (isCodeExists('parts', $data['part_code'], $partId, [])) {
+    // Check for duplicate part code (for NEW part)
+    if (isCodeExists('parts', $data['part_code'])) {
         throw new Exception('Mã linh kiện đã tồn tại');
     }
     
     $db->beginTransaction();
     
     try {
-        // Update part
+        // INSERT new part
+        $sql = "INSERT INTO parts 
+                (part_code, part_name, description, unit, category, 
+                 specifications, manufacturer, supplier_code, supplier_name, 
+                 unit_price, min_stock, max_stock, lead_time, notes, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        
+        $params = [
+            $data['part_code'], $data['part_name'], $data['description'], $data['unit'],
+            $data['category'], $data['specifications'], $data['manufacturer'], 
+            $data['supplier_code'], $data['supplier_name'], $data['unit_price'],
+            $data['min_stock'], $data['max_stock'], $data['lead_time'], $data['notes']
+        ];
+        
+        $db->execute($sql, $params);
+        $partId = $db->lastInsertId();
+        
+        // Add main supplier if provided
+        if (!empty($data['supplier_code']) && !empty($data['supplier_name'])) {
+            $db->execute(
+                "INSERT INTO part_suppliers (part_id, supplier_code, supplier_name, unit_price, is_preferred) 
+                 VALUES (?, ?, ?, ?, 1)",
+                [$partId, $data['supplier_code'], $data['supplier_name'], $data['unit_price']]
+            );
+        }
+        
+        // Log activity
+        logActivity('create_part', 'bom', "Created part: {$data['part_code']} - {$data['part_name']}");
+        
+        $db->commit();
+        
+        successResponse(['part_id' => $partId], 'Tạo linh kiện thành công');
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        throw $e;
+    }
+}
+
+/**
+ * Update existing part
+ */
+function handleUpdatePart() {
+    requirePermission('bom', 'edit');
+    global $db;
+    
+    $partId = intval($_POST['part_id'] ?? 0);
+    if (!$partId) {
+        throw new Exception('Part ID is required');
+    }
+    
+    // Get current part data
+    $currentPart = $db->fetch("SELECT * FROM parts WHERE id = ?", [$partId]);
+    if (!$currentPart) {
+        throw new Exception('Part not found');
+    }
+    
+    $data = [
+        'part_code' => strtoupper(trim($_POST['part_code'] ?? '')),
+        'part_name' => trim($_POST['part_name'] ?? ''),
+        'description' => trim($_POST['description'] ?? ''),
+        'unit' => trim($_POST['unit'] ?? 'Cái'),
+        'category' => trim($_POST['category'] ?? ''),
+        'specifications' => trim($_POST['specifications'] ?? ''),
+        'manufacturer' => trim($_POST['manufacturer'] ?? ''),
+        'supplier_code' => trim($_POST['supplier_code'] ?? ''),
+        'supplier_name' => trim($_POST['supplier_name'] ?? ''),
+        'unit_price' => floatval($_POST['unit_price'] ?? 0),
+        'min_stock' => floatval($_POST['min_stock'] ?? 0),
+        'max_stock' => floatval($_POST['max_stock'] ?? 0),
+        'lead_time' => intval($_POST['lead_time'] ?? 0),
+        'notes' => trim($_POST['notes'] ?? '')
+    ];
+    
+    // Validate required fields
+    if (empty($data['part_code'])) {
+        throw new Exception('Mã linh kiện không được để trống');
+    }
+    
+    if (empty($data['part_name'])) {
+        throw new Exception('Tên linh kiện không được để trống');
+    }
+    
+    // Check for duplicate part code (excluding current part)
+    if (isCodeExists('parts', $data['part_code'], $partId)) {
+        throw new Exception('Mã linh kiện đã tồn tại');
+    }
+    
+    $db->beginTransaction();
+    
+    try {
+        // UPDATE part
         $sql = "UPDATE parts 
                 SET part_code = ?, part_name = ?, description = ?, unit = ?, category = ?, 
                     specifications = ?, manufacturer = ?, supplier_code = ?, supplier_name = ?, 
@@ -326,7 +441,6 @@ function handleSavePart() {
         }
         
         // Log activity
-        createAuditTrail('parts', $partId, 'updated', $currentPart, $data);
         logActivity('update_part', 'bom', "Updated part: {$data['part_code']} - {$data['part_name']}");
         
         $db->commit();
@@ -440,7 +554,7 @@ function handleBulkUpdateParts() {
         
         $db->execute($sql, $whereParams);
         
-        $affectedRows = $db->rowCount($sql, $whereParams);
+        $affectedRows = count($partIds); // Since we know how many we're updating
         
         // Log activity
         logActivity('bulk_update_parts', 'bom', "Bulk updated $affectedRows parts");
@@ -466,6 +580,7 @@ function handleSearchParts() {
     
     if (strlen($query) < 2) {
         successResponse([]);
+        return;
     }
     
     $sql = "SELECT p.id, p.part_code, p.part_name, p.unit, p.unit_price, p.category,

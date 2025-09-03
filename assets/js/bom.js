@@ -110,10 +110,14 @@ CMMS.BOM = {
     },
     
     // Load BOM list
+// Load BOM list
+// Load BOM list
     loadBOMList: function(filters = {}) {
-        console.log('CMMS:', window.CMMS);
-        console.log('CMMS.showLoading:', typeof window.CMMS?.showLoading);
-        CMMS.showLoading();
+        console.log('Loading BOM list with filters:', filters);
+        
+        if (window.CMMS && typeof CMMS.showLoading === 'function') {
+            CMMS.showLoading();
+        }
 
         const params = new URLSearchParams({
             action: 'list',
@@ -124,16 +128,50 @@ CMMS.BOM = {
         CMMS.ajax({
             url: this.config.apiUrl + 'bom.php?' + params,
             method: 'GET',
+            credentials: 'same-origin', // Include cookies/session
             success: (data) => {
+                console.log('API Response:', data);
+                
                 if (data.success) {
-                    this.renderBOMList(data.data);
-                    this.renderPagination(data.pagination);
+                    // Check if data.data is array
+                    const boms = Array.isArray(data.data) ? data.data : [];
+                    this.renderBOMList(boms);
+                    
+                    if (data.pagination) {
+                        this.renderPagination(data.pagination);
+                    }
                 } else {
-                    CMMS.showToast(data.message, 'error');
+                    console.error('API Error:', data.message);
+                    
+                    // Handle authentication error specifically
+                    if (data.message && data.message.includes('Authentication')) {
+                        CMMS.showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
+                        setTimeout(() => {
+                            window.location.href = '/login.php';
+                        }, 2000);
+                        return;
+                    }
+                    
+                    CMMS.showToast(data.message || 'Lỗi không xác định', 'error');
+                    // Show empty state
+                    this.renderBOMList([]);
                 }
             },
-            error: () => {
-                CMMS.showToast('Lỗi khi tải danh sách BOM', 'error');
+            error: (error) => {
+                console.error('Ajax Error:', error);
+                
+                // Handle different types of errors
+                if (error.message && error.message.includes('401')) {
+                    CMMS.showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/login.php';
+                    }, 2000);
+                } else {
+                    CMMS.showToast('Lỗi khi tải danh sách BOM', 'error');
+                }
+                
+                // Show empty state
+                this.renderBOMList([]);
             }
         });
     },

@@ -9,7 +9,13 @@ if (!window.CMMS) {
 }
 Object.assign(window.CMMS, {
     baseUrl: '<?php echo APP_URL; ?>',
-    
+    // Escape HTML
+    escapeHtml: function(text) {
+        if (text == null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },    
     // Show toast notification
     showToast: function(message, type = 'info') {
         const toast = document.getElementById('liveToast');
@@ -111,16 +117,20 @@ ajax: function(options) {
     },
     
     // Format date
-    formatDate: function(dateString, format = 'dd/MM/yyyy') {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('vi-VN');
-    },
+// Format date
+formatDate: function(dateString, format = 'dd/MM/yyyy') {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN');
+},
     
     // Format datetime
-    formatDateTime: function(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleString('vi-VN');
-    },
+// Format datetime  
+formatDateTime: function(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('vi-VN');
+},
     
     // Validate form
     validateForm: function(formElement) {

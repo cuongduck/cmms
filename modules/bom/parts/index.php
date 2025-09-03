@@ -9,6 +9,7 @@ $pageTitle = 'Quản lý linh kiện';
 $currentModule = 'bom';
 $moduleCSS = 'bom';
 $moduleJS = 'bom-parts';
+require_once '../config.php';
 
 // Check permission
 requirePermission('bom', 'view');
@@ -34,7 +35,6 @@ if (hasPermission('bom', 'import')) {
 }
 
 require_once '../../../includes/header.php';
-require_once '../config.php';
 
 // Get filters
 $filters = [
