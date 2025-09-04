@@ -9,6 +9,7 @@ $pageTitle = 'Thêm linh kiện mới';
 $currentModule = 'bom';
 $moduleCSS = 'bom';
 $moduleJS = 'bom-parts';
+require_once '../config.php';
 
 // Check permission
 requirePermission('bom', 'create');
@@ -21,7 +22,6 @@ $breadcrumb = [
 ];
 
 require_once '../../../includes/header.php';
-require_once '../config.php';
 
 // Get categories and units for dropdowns
 $categories = $bomConfig['part_categories'];

@@ -372,6 +372,8 @@ function updateTotals() {
     document.getElementById('totalItems').textContent = totalItems;
     document.getElementById('totalCost').textContent = CMMS.BOM.formatCurrency(totalCost);
 }
+
+
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

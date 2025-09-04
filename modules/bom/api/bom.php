@@ -243,70 +243,93 @@ function handleSaveBOM() {
     requirePermission('bom', 'create');
     global $db;
     
-    $data = [
-        'machine_type_id' => intval($_POST['machine_type_id'] ?? 0),
-        'bom_name' => trim($_POST['bom_name'] ?? ''),
-        'bom_code' => trim($_POST['bom_code'] ?? ''),
-        'version' => trim($_POST['version'] ?? '1.0'),
-        'description' => trim($_POST['description'] ?? ''),
-        'effective_date' => $_POST['effective_date'] ?? null,
-        'items' => $_POST['items'] ?? []
-    ];
-    
-    // Validate data
-    $errors = validateBOMData($data);
-    if (!empty($errors)) {
-        throw new Exception(implode(', ', $errors));
-    }
-    
-    // Generate BOM code if empty
-    if (empty($data['bom_code'])) {
-        $data['bom_code'] = generateBOMCode($data['machine_type_id']);
-    }
-    
-    // Check for duplicate BOM code
-    if (isCodeExists('machine_bom', $data['bom_code'])) {
-        throw new Exception('Mã BOM đã tồn tại');
-    }
-    
-    $db->beginTransaction();
+    // Debug log
+    error_log("Save BOM - POST data: " . print_r($_POST, true));
     
     try {
-        // Insert BOM
-        $sql = "INSERT INTO machine_bom (machine_type_id, bom_name, bom_code, version, description, effective_date, created_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        // Collect and validate data
+        $data = [
+            'machine_type_id' => intval($_POST['machine_type_id'] ?? 0),
+            'bom_name' => trim($_POST['bom_name'] ?? ''),
+            'bom_code' => trim($_POST['bom_code'] ?? ''),
+            'version' => trim($_POST['version'] ?? '1.0'),
+            'description' => trim($_POST['description'] ?? ''),
+            'effective_date' => $_POST['effective_date'] ?? null,
+            'items' => []
+        ];
         
+        // Process BOM items from $_POST['items'] array
+        if (isset($_POST['items']) && is_array($_POST['items'])) {
+            foreach ($_POST['items'] as $index => $item) {
+                if (!empty($item['part_id']) && !empty($item['quantity'])) {
+                    $data['items'][] = [
+                        'part_id' => intval($item['part_id']),
+                        'quantity' => floatval($item['quantity']),
+                        'unit' => trim($item['unit'] ?? 'Cái'),
+                        'position' => trim($item['position'] ?? ''),
+                        'priority' => trim($item['priority'] ?? 'Medium'),
+                        'maintenance_interval' => !empty($item['maintenance_interval']) ? 
+                                                intval($item['maintenance_interval']) : null
+                    ];
+                }
+            }
+        }
+        
+        // Validate data
+        $errors = validateBOMData($data);
+        if (!empty($errors)) {
+            throw new Exception(implode(', ', $errors));
+        }
+        
+        // Generate BOM code if empty
+        if (empty($data['bom_code'])) {
+            $data['bom_code'] = generateBOMCode($data['machine_type_id']);
+        }
+        
+        // Check for duplicate BOM code
+        $existingBom = $db->fetch("SELECT id FROM machine_bom WHERE bom_code = ?", [$data['bom_code']]);
+        if ($existingBom) {
+            throw new Exception('Mã BOM đã tồn tại: ' . $data['bom_code']);
+        }
+        
+        $db->beginTransaction();
+        
+        // Insert BOM
+        $sql = "INSERT INTO machine_bom (machine_type_id, bom_name, bom_code, version, description, effective_date, created_by, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+        
+        $currentUser = getCurrentUser();
         $params = [
             $data['machine_type_id'],
             $data['bom_name'],
             $data['bom_code'],
             $data['version'],
             $data['description'],
-            $data['effective_date'] ?: null,
-            getCurrentUser()['id']
+            !empty($data['effective_date']) ? $data['effective_date'] : null,
+            $currentUser['id'] ?? null
         ];
         
         $db->execute($sql, $params);
         $bomId = $db->lastInsertId();
         
+        if (!$bomId) {
+            throw new Exception('Không thể tạo BOM - Database error');
+        }
+        
         // Insert BOM items
         if (!empty($data['items'])) {
-            $itemSql = "INSERT INTO bom_items (bom_id, part_id, quantity, unit, position, priority, maintenance_interval) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $itemSql = "INSERT INTO bom_items (bom_id, part_id, quantity, unit, position, priority, maintenance_interval, created_at) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
             
             foreach ($data['items'] as $item) {
-                if (empty($item['part_id']) || empty($item['quantity'])) {
-                    continue;
-                }
-                
                 $itemParams = [
                     $bomId,
-                    intval($item['part_id']),
-                    floatval($item['quantity']),
-                    $item['unit'] ?? '',
-                    $item['position'] ?? '',
-                    $item['priority'] ?? 'Medium',
-                    !empty($item['maintenance_interval']) ? intval($item['maintenance_interval']) : null
+                    $item['part_id'],
+                    $item['quantity'],
+                    $item['unit'],
+                    $item['position'],
+                    $item['priority'],
+                    $item['maintenance_interval']
                 ];
                 
                 $db->execute($itemSql, $itemParams);
@@ -314,18 +337,28 @@ function handleSaveBOM() {
         }
         
         // Log activity
-        logActivity('create_bom', 'bom', "Created BOM: {$data['bom_name']}");
+        if (function_exists('logActivity')) {
+            logActivity('create_bom', 'bom', "Created BOM: {$data['bom_name']} ({$data['bom_code']})");
+        }
         
         $db->commit();
         
         echo json_encode([
             'success' => true,
             'message' => 'Tạo BOM thành công',
-            'data' => ['bom_id' => $bomId]
+            'data' => [
+                'bom_id' => $bomId,
+                'bom_code' => $data['bom_code'],
+                'bom_name' => $data['bom_name']
+            ]
         ], JSON_UNESCAPED_UNICODE);
         
     } catch (Exception $e) {
-        $db->rollback();
+        if ($db->getConnection()->inTransaction()) {
+            $db->rollback();
+        }
+        
+        error_log("BOM Save Error: " . $e->getMessage());
         throw $e;
     }
 }
