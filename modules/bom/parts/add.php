@@ -1,6 +1,6 @@
 <?php
 /**
- * Parts Add Page
+ * Parts Add Page - Fixed Version
  * /modules/bom/parts/add.php
  * Trang thêm linh kiện mới
  */
@@ -90,9 +90,7 @@ $recentSuppliers = $db->fetchAll(
                             <label for="unit" class="form-label">Đơn vị tính</label>
                             <select id="unit" name="unit" class="form-select">
                                 <?php foreach ($units as $unit): ?>
-                                    <option value="<?php echo $unit; ?>" <?php echo ($unit === 'Cái') ? 'selected' : ''; ?>>
-                                        <?php echo $unit; ?>
-                                    </option>
+                                    <option value="<?php echo $unit; ?>"><?php echo $unit; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -116,7 +114,7 @@ $recentSuppliers = $db->fetchAll(
                                   placeholder="Thông số kỹ thuật, kích thước, vật liệu..."></textarea>
                     </div>
                 </div>
-
+                
                 <!-- Stock Management -->
                 <div class="form-section">
                     <h5 class="form-section-title">
@@ -147,7 +145,7 @@ $recentSuppliers = $db->fetchAll(
                         </div>
                     </div>
                 </div>
-
+                
                 <!-- Supplier Information -->
                 <div class="form-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -160,93 +158,38 @@ $recentSuppliers = $db->fetchAll(
                         </button>
                     </div>
                     
-                    <!-- Main Supplier -->
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-2">
-                            <label for="supplier_code" class="form-label">Mã NCC chính</label>
-                            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
-                                   placeholder="Mã NCC" list="supplier-codes">
-                            <datalist id="supplier-codes">
-                                <?php foreach ($recentSuppliers as $supplier): ?>
-                                    <option value="<?php echo htmlspecialchars($supplier['supplier_code']); ?>">
-                                        <?php echo htmlspecialchars($supplier['supplier_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </datalist>
-                        </div>
-                        
-                        <div class="col-md-4 mb-2">
-                            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
-                            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
-                                   placeholder="Tên nhà cung cấp" list="supplier-names">
-                            <datalist id="supplier-names">
-                                <?php foreach ($recentSuppliers as $supplier): ?>
-                                    <option value="<?php echo htmlspecialchars($supplier['supplier_name']); ?>" 
-                                            data-code="<?php echo htmlspecialchars($supplier['supplier_code']); ?>">
-                                <?php endforeach; ?>
-                            </datalist>
-                        </div>
-                        
-                        <div class="col-md-3 mb-2">
-                            <label for="manufacturer" class="form-label">Nhà sản xuất</label>
-                            <input type="text" id="manufacturer" name="manufacturer" class="form-control" 
-                                   placeholder="Tên nhà sản xuất">
-                        </div>
-                        
-                        <div class="col-md-2 mb-2">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="form-text">Nhà cung cấp chính</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Additional Suppliers -->
                     <div id="suppliersContainer">
-                        <!-- Additional supplier rows will be added here -->
-                    </div>
-                </div>
-
-                <!-- Additional Information -->
-                <div class="form-section">
-                    <h5 class="form-section-title">
-                        <i class="fas fa-info-circle"></i>
-                        Thông tin bổ sung
-                    </h5>
-                    
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Ghi chú</label>
-                        <textarea id="notes" name="notes" class="form-control" rows="3"
-                                  placeholder="Ghi chú thêm về linh kiện..."></textarea>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-lg-4">
-            <!-- Action Panel -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-save me-2"></i>
-                        Lưu linh kiện
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Lưu linh kiện
-                        </button>
-                        <button type="button" class="btn btn-outline-success" onclick="saveAndAddNew()">
-                            <i class="fas fa-plus me-2"></i>Lưu và thêm mới
-                        </button>
-                        <a href="index.php" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-2"></i>Hủy bỏ
-                        </a>
+                        <div class="supplier-row row mb-2">
+                            <div class="col-md-4">
+                                <input type="text" id="supplier_code" name="supplier_code" 
+                                       class="form-control form-control-sm" placeholder="Mã NCC">
+                            </div>
+                            <div class="col-md-8">
+                                <input type="text" id="supplier_name" name="supplier_name" 
+                                       class="form-control form-control-sm" placeholder="Tên NCC">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             
+            <!-- Form Actions -->
+            <div class="bom-form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Lưu linh kiện
+                </button>
+                <button type="button" onclick="saveAndAddNew()" class="btn btn-outline-primary">
+                    <i class="fas fa-plus me-2"></i>Lưu và thêm mới
+                </button>
+                <a href="index.php" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
             <!-- Quick Reference -->
-            <div class="card mb-3">
+            <div class="card mb-4">
                 <div class="card-header">
                     <h6 class="mb-0">
                         <i class="fas fa-lightbulb me-2"></i>
@@ -314,7 +257,7 @@ $recentSuppliers = $db->fetchAll(
 </form>
 
 <script>
-// Auto-update preview
+// Update preview on input
 document.addEventListener('input', function(e) {
     if (e.target.closest('#partsForm')) {
         updatePreview();
@@ -322,7 +265,7 @@ document.addEventListener('input', function(e) {
 });
 
 // Update preview function
-function updatePreview() {
+window.updatePreview = function() {
     const partCode = document.getElementById('part_code').value;
     const partName = document.getElementById('part_name').value;
     const category = document.getElementById('category').value;
@@ -358,28 +301,29 @@ function updatePreview() {
             <div class="col-6">
                 <div class="border rounded p-2">
                     <small class="text-muted">Đơn giá</small>
-                    <div class="fw-bold cost-display">${CMMS.Parts.formatCurrency(unitPrice || 0)}</div>
+                    <div class="fw-bold cost-display">${formatCurrency(unitPrice || 0)}</div>
                 </div>
             </div>
         </div>
     `;
-}
+};
 
 // Quick set functions
-function setCategory(category) {
+window.setCategory = function(category) {
     document.getElementById('category').value = category;
     updatePreview();
-}
+};
 
-function setUnit(unit) {
+window.setUnit = function(unit) {
     document.getElementById('unit').value = unit;
     updatePreview();
-}
+};
 
 // Supplier autocomplete
 document.getElementById('supplier_code').addEventListener('input', function(e) {
     const code = e.target.value;
-    const supplier = <?php echo json_encode($recentSuppliers); ?>.find(s => s.supplier_code === code);
+    const suppliers = <?php echo json_encode($recentSuppliers); ?>;
+    const supplier = suppliers.find(s => s.supplier_code === code);
     if (supplier) {
         document.getElementById('supplier_name').value = supplier.supplier_name;
     }
@@ -387,14 +331,15 @@ document.getElementById('supplier_code').addEventListener('input', function(e) {
 
 document.getElementById('supplier_name').addEventListener('input', function(e) {
     const name = e.target.value;
-    const supplier = <?php echo json_encode($recentSuppliers); ?>.find(s => s.supplier_name === name);
+    const suppliers = <?php echo json_encode($recentSuppliers); ?>;
+    const supplier = suppliers.find(s => s.supplier_name === name);
     if (supplier) {
         document.getElementById('supplier_code').value = supplier.supplier_code;
     }
 });
 
 // Save and add new function
-function saveAndAddNew() {
+window.saveAndAddNew = function() {
     const form = document.getElementById('partsForm');
     
     // Add a flag to indicate save and add new
@@ -405,70 +350,27 @@ function saveAndAddNew() {
     form.appendChild(input);
     
     // Submit form
-    CMMS.Parts.savePart();
-}
-
-// Override save function to handle save and add new
-CMMS.Parts.savePart = function() {
-    const form = document.getElementById('partsForm');
-    const formData = new FormData(form);
-    
-    // Validate form
-    if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        return;
+    if (CMMS && CMMS.Parts && typeof CMMS.Parts.savePart === 'function') {
+        CMMS.Parts.savePart();
+    } else {
+        form.submit();
     }
-    
-    // Check for required fields
-    const partCode = formData.get('part_code');
-    const partName = formData.get('part_name');
-    
-    if (!partCode || !partName) {
-        CMMS.showToast('Vui lòng nhập đầy đủ mã và tên linh kiện', 'error');
-        return;
-    }
-    
-    // Add action
-    formData.append('action', 'save');
-    
-    const saveAndNew = formData.has('save_and_new');
-    
-    CMMS.ajax({
-        url: '/modules/bom/api/parts.php',
-        method: 'POST',
-        body: formData,
-        success: (data) => {
-            if (data.success) {
-                CMMS.showToast(data.message, 'success');
-                
-                if (saveAndNew) {
-                    // Reset form for new entry
-                    form.reset();
-                    form.classList.remove('was-validated');
-                    updatePreview();
-                    
-                    // Focus on part code
-                    document.getElementById('part_code').focus();
-                } else {
-                    // Redirect to view page
-                    setTimeout(() => {
-                        window.location.href = 'view.php?id=' + data.part_id;
-                    }, 1500);
-                }
-            } else {
-                CMMS.showToast(data.message, 'error');
-            }
-        }
-    });
 };
 
+// Format currency helper
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
+
 // Initial preview update
-document.addEventListener('DOMContentLoaded', function() {
-    updatePreview();
+updatePreview();
     
-    // Focus on first input
-    document.getElementById('part_code').focus();
-});
+// Focus on first input
+document.getElementById('part_code').focus();
 </script>
 
 <?php require_once '../../../includes/footer.php'; ?>

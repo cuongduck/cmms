@@ -1,6 +1,6 @@
 <?php
 /**
- * Parts Management - Index Page  
+ * Parts Management - Index Page
  * /modules/bom/parts/index.php
  * Quản lý danh sách linh kiện
  */
@@ -55,15 +55,13 @@ $stats = [
     'low_stock' => $db->fetch("
         SELECT COUNT(*) as count 
         FROM parts p 
-        LEFT JOIN part_inventory_mapping pim ON p.id = pim.part_id
-        LEFT JOIN onhand oh ON pim.item_code = oh.ItemCode
+        LEFT JOIN onhand oh ON p.part_code = oh.ItemCode
         WHERE COALESCE(oh.Onhand, 0) < p.min_stock AND p.min_stock > 0
     ")['count'],
     'out_of_stock' => $db->fetch("
         SELECT COUNT(*) as count 
         FROM parts p 
-        LEFT JOIN part_inventory_mapping pim ON p.id = pim.part_id
-        LEFT JOIN onhand oh ON pim.item_code = oh.ItemCode
+        LEFT JOIN onhand oh ON p.part_code = oh.ItemCode
         WHERE COALESCE(oh.Onhand, 0) = 0
     ")['count']
 ];
@@ -73,272 +71,243 @@ $stats = [
 <div class="row mb-4">
     <div class="col-lg-3 col-md-6 mb-3">
         <div class="card stat-card">
-            <div class="col-lg-2 col-md-6">
-                <label for="stock_status" class="form-label">Tồn kho</label>
-                <select id="filterStockStatus" name="stock_status" class="form-select filter-select">
-                    <option value="">-- Tất cả --</option>
-                    <option value="ok" <?php echo ($filters['stock_status'] === 'ok') ? 'selected' : ''; ?>>Đủ hàng</option>
-                    <option value="low" <?php echo ($filters['stock_status'] === 'low') ? 'selected' : ''; ?>>Sắp hết</option>
-                    <option value="out" <?php echo ($filters['stock_status'] === 'out') ? 'selected' : ''; ?>>Hết hàng</option>
-                </select>
-            </div>
-            
-            <div class="col-lg-4 col-md-12">
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search me-1"></i>Tìm kiếm
-                    </button>
-                    <a href="index.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-times me-1"></i>Xóa
-                    </a>
-                    <?php if (hasPermission('bom', 'export')): ?>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-download me-1"></i>Xuất
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="exportAllParts('excel')">
-                                <i class="fas fa-file-excel me-2"></i>Excel
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportAllParts('csv')">
-                                <i class="fas fa-file-csv me-2"></i>CSV
-                            </a></li>
-                        </ul>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-1">Tổng linh kiện</h5>
+                        <h2 class="mb-0"><?php echo number_format($stats['total_parts']); ?></h2>
                     </div>
-                    <?php endif; ?>
+                    <i class="fas fa-cubes fa-2x text-primary opacity-75"></i>
                 </div>
-            </div>
-        </div>
-    </form>
-</div>
-
-<!-- Parts Table -->
-<div class="card">
-    <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fas fa-cubes me-2"></i>
-                Danh sách linh kiện
-            </h5>
-            <div class="d-flex align-items-center gap-3">
-                <small class="text-muted">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Tổng: <span id="totalRecords">0</span> linh kiện
-                </small>
             </div>
         </div>
     </div>
     
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-1">Danh mục</h5>
+                        <h2 class="mb-0"><?php echo number_format($stats['categories']); ?></h2>
+                    </div>
+                    <i class="fas fa-tags fa-2x text-info opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-1">Sắp hết</h5>
+                        <h2 class="mb-0"><?php echo number_format($stats['low_stock']); ?></h2>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-1">Hết hàng</h5>
+                        <h2 class="mb-0"><?php echo number_format($stats['out_of_stock']); ?></h2>
+                    </div>
+                    <i class="fas fa-times-circle fa-2x text-danger opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<form id="partsFilterForm" class="row mb-4">
+    <div class="col-lg-4 col-md-6">
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="text" id="partsSearch" class="form-control" 
+                   placeholder="Tìm theo mã, tên hoặc mô tả..." 
+                   value="<?php echo htmlspecialchars($filters['search']); ?>">
+        </div>
+    </div>
+    
+    <div class="col-lg-2 col-md-6">
+        <label for="category" class="form-label">Danh mục</label>
+        <select id="filterCategory" name="category" class="form-select filter-select">
+            <option value="">-- Tất cả --</option>
+            <?php foreach ($categories as $cat): ?>
+                <option value="<?php echo htmlspecialchars($cat['category']); ?>" 
+                        <?php echo ($filters['category'] === $cat['category']) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($cat['category']); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    
+    <div class="col-lg-2 col-md-6">
+        <label for="stock_status" class="form-label">Tồn kho</label>
+        <select id="filterStockStatus" name="stock_status" class="form-select filter-select">
+            <option value="">-- Tất cả --</option>
+            <option value="ok" <?php echo ($filters['stock_status'] === 'ok') ? 'selected' : ''; ?>>Đủ hàng</option>
+            <option value="low" <?php echo ($filters['stock_status'] === 'low') ? 'selected' : ''; ?>>Sắp hết</option>
+            <option value="out" <?php echo ($filters['stock_status'] === 'out') ? 'selected' : ''; ?>>Hết hàng</option>
+        </select>
+    </div>
+    
+    <div class="col-lg-4 col-md-12">
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search me-1"></i>Tìm kiếm
+            </button>
+            <a href="index.php" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-1"></i>Xóa
+            </a>
+            <?php if (hasPermission('bom', 'export')): ?>
+            <div class="dropdown">
+                <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-download me-1"></i>Xuất
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportAllParts('excel')">
+                        <i class="fas fa-file-excel me-2"></i>Excel
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportAllParts('csv')">
+                        <i class="fas fa-file-csv me-2"></i>CSV
+                    </a></li>
+                </ul>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</form>
+
+<!-- Parts Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-cubes me-2"></i>
+            Danh sách linh kiện
+        </h5>
+        <?php echo $pageActions; ?>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table bom-table mb-0" id="partsTable">
+            <table id="partsTable" class="table table-hover table-sm mb-0">
                 <thead>
                     <tr>
-                        <th>Linh kiện</th>
-                        <th width="120">Danh mục</th>
-                        <th width="80" class="text-center">Đơn vị</th>
-                        <th width="120" class="text-end">Đơn giá</th>
-                        <th width="120" class="text-center">Tồn kho</th>
-                        <th width="150" class="hide-mobile">Nhà cung cấp</th>
-                        <th width="80" class="text-center">Sử dụng</th>
-                        <th width="120">Thao tác</th>
+                        <th width="1%">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAllParts">
+                            </div>
+                        </th>
+                        <th>Mã linh kiện</th>
+                        <th>Tên linh kiện</th>
+                        <th>Danh mục</th>
+                        <th>Tồn kho</th>
+                        <th>Trạng thái</th>
+                        <th>Đơn giá</th>
+                        <th>Thao tác</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="8" class="text-center py-4">
-                            <div class="bom-loading">
-                                <i class="fas fa-spinner fa-spin me-2"></i>
-                                Đang tải dữ liệu...
-                            </div>
-                        </td>
-                    </tr>
+                <tbody id="partsTableBody">
+                    <!-- Data will be loaded via JS -->
                 </tbody>
             </table>
         </div>
     </div>
-    
-    <div class="card-footer">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="text-muted small">
-                Hiển thị <span id="showingFrom">0</span> - <span id="showingTo">0</span> 
-                trong tổng số <span id="totalItems">0</span> linh kiện
-            </div>
-            <div id="partsPagination">
-                <!-- Pagination will be rendered by JavaScript -->
-            </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <div class="small text-muted" id="paginationInfo">
+            Hiển thị <span id="showingFrom">0</span> - <span id="showingTo">0</span> trong tổng <span id="totalItems">0</span> linh kiện
         </div>
+        <div id="partsPagination"></div>
     </div>
 </div>
 
-<!-- Quick Actions & Info -->
-<div class="row mt-4">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-bolt me-2"></i>
-                    Thao tác nhanh
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <?php if (hasPermission('bom', 'create')): ?>
-                    <a href="add.php" class="btn btn-outline-primary">
-                        <i class="fas fa-plus me-2"></i>Thêm linh kiện mới
-                    </a>
-                    <?php endif; ?>
-                    
-                    <a href="../reports/stock_report.php" class="btn btn-outline-info">
-                        <i class="fas fa-chart-bar me-2"></i>Báo cáo tồn kho
-                    </a>
-                    
-                    <?php if ($stats['low_stock'] > 0 || $stats['out_of_stock'] > 0): ?>
-                    <a href="../reports/shortage_report.php" class="btn btn-outline-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>Linh kiện thiếu hàng
-                    </a>
-                    <?php endif; ?>
-                    
-                    <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#bulkUpdateModal">
-                        <i class="fas fa-edit me-2"></i>Cập nhật hàng loạt
-                    </button>
-                </div>
-            </div>
+<!-- Selected Actions -->
+<div class="mt-3 d-none" id="selectedActions">
+    <div class="alert alert-info d-flex align-items-center gap-3">
+        <div>
+            <i class="fas fa-info-circle me-2"></i>
+            Đã chọn <span id="selectedCount">0</span> linh kiện
         </div>
-    </div>
-    
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Hướng dẫn
-                </h6>
-            </div>
-            <div class="card-body">
-                <ul class="list-unstyled mb-0">
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success me-2"></i>
-                        Mã linh kiện phải duy nhất trong hệ thống
-                    </li>
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success me-2"></i>
-                        Tồn kho được đồng bộ tự động từ ERP
-                    </li>
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success me-2"></i>
-                        Cảnh báo khi tồn kho < mức tối thiểu
-                    </li>
-                    <li class="mb-0">
-                        <i class="fas fa-check text-success me-2"></i>
-                        Hỗ trợ nhiều nhà cung cấp cho 1 linh kiện
-                    </li>
-                </ul>
-            </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#bulkUpdateModal">
+                <i class="fas fa-edit me-1"></i>Cập nhật hàng loạt
+            </button>
+            <button onclick="bulkDeleteParts()" class="btn btn-outline-danger btn-sm">
+                <i class="fas fa-trash me-1"></i>Xóa hàng loạt
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Import Modal -->
-<?php if (hasPermission('bom', 'import')): ?>
 <div class="modal fade" id="importModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-file-import me-2"></i>
-                    Import danh sách linh kiện
-                </h5>
+                <h5 class="modal-title">Import linh kiện</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="partsImportForm" enctype="multipart/form-data">
+                <form id="importForm">
                     <div class="mb-3">
-                        <label for="partsImportFile" class="form-label">Chọn file Excel</label>
-                        <input type="file" class="form-control" id="partsImportFile" 
-                               accept=".xlsx,.xls" required>
-                        <div class="form-text">
-                            Chỉ chấp nhận file .xlsx hoặc .xls, tối đa 10MB
-                        </div>
+                        <label for="partsImportFile" class="form-label">Chọn file (.xlsx, .xls, .csv)</label>
+                        <input type="file" id="partsImportFile" name="file" class="form-control" 
+                               accept=".xlsx,.xls,.csv" required>
                     </div>
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="updateExistingParts">
-                            <label class="form-check-label" for="updateExistingParts">
-                                Cập nhật linh kiện đã tồn tại
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Template:</strong> 
-                        <a href="../imports/parts_template.xlsx" target="_blank">Tải template Excel</a> 
-                        với định dạng chuẩn.
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="updateExistingParts" name="update_existing">
+                        <label class="form-check-label" for="updateExistingParts">
+                            Cập nhật linh kiện hiện có (dựa trên mã linh kiện)
+                        </label>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                 <button type="button" class="btn btn-primary" onclick="importParts()">
-                    <i class="fas fa-upload me-1"></i>Import
+                    <i class="fas fa-file-import me-1"></i>Import
                 </button>
             </div>
         </div>
     </div>
 </div>
-<?php endif; ?>
 
 <!-- Bulk Update Modal -->
 <div class="modal fade" id="bulkUpdateModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>
-                    Cập nhật hàng loạt
-                </h5>
+                <h5 class="modal-title">Cập nhật hàng loạt</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="bulkUpdateForm">
                     <div class="mb-3">
-                        <label class="form-label">Chọn linh kiện cần cập nhật</label>
-                        <select id="bulkSelectParts" class="form-select" multiple size="8">
-                            <!-- Options will be loaded by JavaScript -->
-                        </select>
-                        <div class="form-text">
-                            Giữ Ctrl/Cmd để chọn nhiều linh kiện
-                        </div>
+                        <label for="bulkSelectParts" class="form-label">Linh kiện được chọn</label>
+                        <select id="bulkSelectParts" multiple class="form-select" size="5"></select>
                     </div>
-                    
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="bulkCategory" class="form-label">Danh mục mới</label>
-                            <select id="bulkCategory" name="category" class="form-select">
-                                <option value="">-- Không thay đổi --</option>
-                                <?php foreach ($bomConfig['part_categories'] as $key => $name): ?>
-                                    <option value="<?php echo $key; ?>"><?php echo $name; ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                        <div class="col-md-6">
+                            <label for="bulkUnitPrice" class="form-label">Đơn giá (VNĐ)</label>
+                            <input type="number" id="bulkUnitPrice" name="unit_price" class="form-control" 
+                                   step="0.01" placeholder="0">
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="bulkSupplier" class="form-label">Nhà cung cấp</label>
-                            <input type="text" id="bulkSupplier" name="supplier_name" class="form-control" 
-                                   placeholder="Tên nhà cung cấp">
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6">
                             <label for="bulkMinStock" class="form-label">Mức tồn tối thiểu</label>
                             <input type="number" id="bulkMinStock" name="min_stock" class="form-control" 
                                    step="0.1" placeholder="0">
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
                             <label for="bulkMaxStock" class="form-label">Mức tồn tối đa</label>
                             <input type="number" id="bulkMaxStock" name="max_stock" class="form-control" 
                                    step="0.1" placeholder="0">

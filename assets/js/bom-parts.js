@@ -1,5 +1,6 @@
 /**
- * BOM Parts JavaScript - /assets/js/bom-parts.js
+ * BOM Parts JavaScript - Fixed Version
+ * /assets/js/bom-parts.js
  * JavaScript cho quản lý linh kiện BOM
  */
 
@@ -60,7 +61,7 @@ CMMS.Parts = {
             });
         }
         
-        // Category change event
+        // Category change event - Fixed version
         const categorySelect = document.getElementById('category');
         if (categorySelect) {
             categorySelect.addEventListener('change', (e) => {
@@ -127,7 +128,9 @@ CMMS.Parts = {
     
     // Load parts list
     loadPartsList: function(filters = {}) {
-        CMMS.showLoading();
+        if (window.CMMS && typeof CMMS.showLoading === 'function') {
+            CMMS.showLoading();
+        }
         
         const params = new URLSearchParams({
             action: 'list',
@@ -140,15 +143,17 @@ CMMS.Parts = {
             method: 'GET',
             success: (data) => {
                 if (data.success) {
-                    this.renderPartsList(data.data.parts);
+                    this.renderPartsList(data.data.parts || []);
                     this.renderPagination(data.data.pagination);
                     this.updateStatistics(data.data);
                 } else {
                     CMMS.showToast(data.message, 'error');
+                    this.renderPartsList([]);
                 }
             },
             error: () => {
                 CMMS.showToast('Lỗi khi tải danh sách linh kiện', 'error');
+                this.renderPartsList([]);
             }
         });
     },
@@ -186,10 +191,6 @@ CMMS.Parts = {
         tbody.innerHTML = parts.map(part => `
             <tr class="fade-in-up" data-part-id="${part.id}">
                 <td>
-                    <div class="form-check">
-                        <input class="form-check-input part-checkbox" type="checkbox" 
-                               value="${part.id}" data-part-code="${part.part_code}">
-                    </div>
                     <div class="d-flex flex-column">
                         <span class="part-code">${CMMS.escapeHtml(part.part_code)}</span>
                         <strong>${CMMS.escapeHtml(part.part_name)}</strong>
@@ -287,7 +288,7 @@ CMMS.Parts = {
         this.updateSelectedParts();
     },
     
-    // Save part
+    // Save part - Fixed version
     savePart: function() {
         const form = document.getElementById('partsForm');
         const formData = new FormData(form);
@@ -318,16 +319,35 @@ CMMS.Parts = {
             success: (data) => {
                 if (data.success) {
                     CMMS.showToast(data.message, 'success');
-                    setTimeout(() => {
-                        if (isEdit) {
-                            window.location.href = 'view.php?id=' + formData.get('part_id');
-                        } else {
-                            window.location.href = 'view.php?id=' + data.part_id;
+                    
+                    // Check if save and add new
+                    const saveAndNew = formData.has('save_and_new');
+                    if (saveAndNew) {
+                        // Reset form for new entry
+                        form.reset();
+                        form.classList.remove('was-validated');
+                        document.getElementById('part_code').focus();
+                        
+                        // Update preview if it exists
+                        if (typeof updatePreview === 'function') {
+                            updatePreview();
                         }
-                    }, 1500);
+                    } else {
+                        // Redirect after delay
+                        setTimeout(() => {
+                            if (isEdit) {
+                                window.location.href = 'view.php?id=' + formData.get('part_id');
+                            } else {
+                                window.location.href = 'view.php?id=' + data.data.part_id;
+                            }
+                        }, 1500);
+                    }
                 } else {
                     CMMS.showToast(data.message, 'error');
                 }
+            },
+            error: (error) => {
+                CMMS.showToast('Có lỗi xảy ra khi lưu linh kiện', 'error');
             }
         });
     },
@@ -398,13 +418,15 @@ CMMS.Parts = {
         window.open('/modules/bom/api/export.php?' + params, '_blank');
     },
     
-    // Handle category change
+    // Handle category change - Fixed version
     onCategoryChange: function(category) {
-        // Update supplier suggestions based on category
+        if (!category) return;
+        
+        // Load supplier suggestions for this category
         this.loadCategorySuggestions(category);
     },
     
-    // Load supplier suggestions for category
+    // Load supplier suggestions for category - Fixed version
     loadCategorySuggestions: function(category) {
         if (!category) return;
         
@@ -412,9 +434,13 @@ CMMS.Parts = {
             url: this.config.apiUrl + '?action=category_suppliers&category=' + encodeURIComponent(category),
             method: 'GET',
             success: (data) => {
-                if (data.success && data.suppliers) {
-                    this.updateSupplierSuggestions(data.suppliers);
+                if (data.success && data.data && data.data.suppliers) {
+                    this.updateSupplierSuggestions(data.data.suppliers);
                 }
+            },
+            error: (error) => {
+                console.warn('Could not load supplier suggestions:', error.message);
+                // Don't show error to user, just log it
             }
         });
     },

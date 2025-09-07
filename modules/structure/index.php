@@ -442,8 +442,8 @@ try {
                 <div class="row g-2">
                     <div class="col-6">
                         <div class="text-center p-2 bg-primary bg-opacity-10 rounded">
-                            <div class="h4 mb-1 text-primary"><?php echo $stats['industries']; ?></div>
-                            <small class="text-muted">Ngành</small>
+                            <div class="h4 mb-1 text-white"><?php echo $stats['industries']; ?></div>
+                            <small class="text-white">Ngành</small>
                         </div>
                     </div>
                     <div class="col-6">

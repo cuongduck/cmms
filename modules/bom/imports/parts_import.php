@@ -119,17 +119,17 @@ function mapHeaders($headerRow) {
         'Thông số' => 'specifications',
         'Nhà sản xuất' => 'manufacturer',
         'Mã NCC' => 'supplier_code',
-        'Nhà cung cấp' => 'supplier_name',
+        'Tên NCC' => 'supplier_name',
         'Đơn giá' => 'unit_price',
-        'Tối thiểu' => 'min_stock',
-        'Tối đa' => 'max_stock',
-        'Lead time' => 'lead_time',
+        'Tồn tối thiểu' => 'min_stock',
+        'Tồn tối đa' => 'max_stock',
+        'Thời gian giao hàng' => 'lead_time',
         'Ghi chú' => 'notes',
         
-        // English headers
+        // English headers as fallback
         'Part Code' => 'part_code',
         'Part Name' => 'part_name',
-        'Description' => 'description', 
+        'Description' => 'description',
         'Unit' => 'unit',
         'Category' => 'category',
         'Specifications' => 'specifications',
@@ -154,68 +154,45 @@ function mapHeaders($headerRow) {
 }
 
 /**
- * Process parts data and save to database
+ * Process parts data
  */
 function processPartsData($partsData) {
     global $db;
     
-    if (empty($partsData)) {
-        throw new Exception('Không tìm thấy dữ liệu linh kiện trong file');
-    }
-    
+    $updateExisting = isset($_POST['update_existing']) && $_POST['update_existing'] === '1';
     $results = [
-        'total_parts' => count($partsData),
-        'successful' => 0,
-        'updated' => 0,
+        'total' => count($partsData),
+        'success' => 0,
         'failed' => 0,
         'errors' => [],
         'warnings' => []
     ];
     
-    $updateExisting = $_POST['update_existing'] ?? false;
-    
     $db->beginTransaction();
     
     try {
         foreach ($partsData as $index => $partData) {
-            try {
-                $partResult = processSinglePart($partData, $index + 1, $updateExisting);
-                
-                if ($partResult['success']) {
-                    if ($partResult['updated']) {
-                        $results['updated']++;
-                    } else {
-                        $results['successful']++;
-                    }
-                } else {
-                    $results['failed']++;
-                    $results['errors'][] = $partResult['message'];
-                }
-                
-                if (!empty($partResult['warnings'])) {
-                    $results['warnings'] = array_merge($results['warnings'], $partResult['warnings']);
-                }
-                
-            } catch (Exception $e) {
+            $rowNumber = $index + 2; // Account for header row
+            $result = processPartRow($partData, $rowNumber, $updateExisting);
+            
+            if ($result['success']) {
+                $results['success']++;
+            } else {
                 $results['failed']++;
-                $results['errors'][] = "Dòng " . ($index + 2) . ": " . $e->getMessage();
+                $results['errors'][] = $result['message'];
+            }
+            
+            if (!empty($result['warnings'])) {
+                $results['warnings'] = array_merge($results['warnings'], $result['warnings']);
             }
         }
         
-        if ($results['failed'] < $results['total_parts'] / 2) {
-            // Commit nếu thành công > 50%
-            $db->commit();
-        } else {
-            $db->rollback();
-            throw new Exception('Quá nhiều lỗi trong quá trình import. Dữ liệu không được lưu.');
-        }
+        $db->commit();
         
         // Log activity
-        $successCount = $results['successful'] + $results['updated'];
-        logActivity('import_parts', 'bom', "Imported $successCount/{$results['total_parts']} parts");
+        logActivity('import_parts', 'bom', "Imported {$results['success']} parts, {$results['failed']} failed");
         
         return $results;
-        
     } catch (Exception $e) {
         $db->rollback();
         throw $e;
@@ -223,50 +200,70 @@ function processPartsData($partsData) {
 }
 
 /**
- * Process single part
+ * Process single part row
  */
-function processSinglePart($partData, $rowNumber, $updateExisting) {
+function processPartRow($partData, $rowNumber, $updateExisting) {
     global $db;
     
     $result = [
         'success' => false,
-        'updated' => false,
         'message' => '',
         'warnings' => []
     ];
     
-    // Validate required fields
-    if (empty($partData['part_code'])) {
-        $result['message'] = "Dòng $rowNumber: Thiếu mã linh kiện";
-        return $result;
-    }
-    
-    if (empty($partData['part_name'])) {
-        $result['message'] = "Dòng $rowNumber: Thiếu tên linh kiện";
-        return $result;
-    }
-    
-    // Clean and validate data
     $cleanData = cleanPartData($partData);
     
-    // Check for existing part
-    $existingPart = $db->fetch("SELECT id FROM parts WHERE part_code = ?", [$cleanData['part_code']]);
-    
-    if ($existingPart) {
-        if (!$updateExisting) {
-            $result['message'] = "Dòng $rowNumber: Mã linh kiện {$cleanData['part_code']} đã tồn tại";
-            return $result;
-        } else {
-            // Update existing part
-            return updateExistingPart($existingPart['id'], $cleanData, $rowNumber);
-        }
+    // Validate required fields
+    if (empty($cleanData['part_code'])) {
+        $result['message'] = "Dòng $rowNumber: Mã linh kiện không được để trống";
+        return $result;
     }
     
-    // Create new part
-    $sql = "INSERT INTO parts (part_code, part_name, description, unit, category, specifications,
-                              manufacturer, supplier_code, supplier_name, unit_price, min_stock, 
-                              max_stock, lead_time, notes, created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    if (empty($cleanData['part_name'])) {
+        $result['message'] = "Dòng $rowNumber: Tên linh kiện không được để trống";
+        return $result;
+    }
+    
+    // Check for existing part
+    $existingPart = $db->fetch(
+        "SELECT id FROM parts WHERE part_code = ?",
+        [$cleanData['part_code']]
+    );
+    
+    try {
+        if ($existingPart && $updateExisting) {
+            // Update existing part
+            $result = updatePart($existingPart['id'], $cleanData, $rowNumber);
+        } elseif ($existingPart) {
+            $result['message'] = "Dòng $rowNumber: Mã linh kiện {$cleanData['part_code']} đã tồn tại";
+        } else {
+            // Insert new part
+            $result = insertPart($cleanData, $rowNumber);
+        }
+    } catch (Exception $e) {
+        $result['message'] = "Dòng $rowNumber: Lỗi - " . $e->getMessage();
+    }
+    
+    return $result;
+}
+
+/**
+ * Insert new part
+ */
+function insertPart($cleanData, $rowNumber) {
+    global $db;
+    
+    $result = [
+        'success' => false,
+        'message' => '',
+        'warnings' => []
+    ];
+    
+    $sql = "INSERT INTO parts 
+            (part_code, part_name, description, unit, category, specifications, 
+             manufacturer, supplier_code, supplier_name, unit_price, min_stock, 
+             max_stock, lead_time, notes, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
     
     $params = [
         $cleanData['part_code'],
@@ -283,27 +280,46 @@ function processSinglePart($partData, $rowNumber, $updateExisting) {
         $cleanData['max_stock'],
         $cleanData['lead_time'],
         $cleanData['notes'],
-        getCurrentUser()['id']
+        $_SESSION['user_id']
     ];
     
-    $db->execute($sql, $params);
-    $partId = $db->lastInsertId();
-    
-    // Add supplier if provided
-    if (!empty($cleanData['supplier_code']) && !empty($cleanData['supplier_name'])) {
-        $supplierSql = "INSERT INTO part_suppliers (part_id, supplier_code, supplier_name, unit_price, is_preferred) 
-                       VALUES (?, ?, ?, ?, 1)";
-        $supplierParams = [$partId, $cleanData['supplier_code'], $cleanData['supplier_name'], $cleanData['unit_price']];
+    try {
+        $db->execute($sql, $params);
+        $partId = $db->lastInsertId();
         
-        try {
-            $db->execute($supplierSql, $supplierParams);
-        } catch (Exception $e) {
-            $result['warnings'][] = "Dòng $rowNumber: Không thể thêm nhà cung cấp - " . $e->getMessage();
+        // Handle supplier
+        if (!empty($cleanData['supplier_code']) || !empty($cleanData['supplier_name'])) {
+            $existingSupplier = $db->fetch(
+                "SELECT id FROM part_suppliers WHERE part_id = ? AND supplier_code = ?",
+                [$partId, $cleanData['supplier_code']]
+            );
+            
+            if ($existingSupplier) {
+                // Update existing supplier
+                $db->execute(
+                    "UPDATE part_suppliers SET supplier_name = ?, unit_price = ? WHERE id = ?",
+                    [$cleanData['supplier_name'], $cleanData['unit_price'], $existingSupplier['id']]
+                );
+            } else {
+                // Add new supplier
+                try {
+                    $db->execute(
+                        "INSERT INTO part_suppliers (part_id, supplier_code, supplier_name, unit_price, is_preferred) 
+                         VALUES (?, ?, ?, ?, 0)",
+                        [$partId, $cleanData['supplier_code'], $cleanData['supplier_name'], $cleanData['unit_price']]
+                    );
+                } catch (Exception $e) {
+                    $result['warnings'][] = "Dòng $rowNumber: Không thể thêm nhà cung cấp - " . $e->getMessage();
+                }
+            }
         }
+        
+        $result['success'] = true;
+        $result['message'] = "Dòng $rowNumber: Thêm mới thành công ({$cleanData['part_code']})";
+        
+    } catch (Exception $e) {
+        $result['message'] = "Dòng $rowNumber: Không thể thêm mới - " . $e->getMessage();
     }
-    
-    $result['success'] = true;
-    $result['message'] = "Dòng $rowNumber: Tạo thành công ({$cleanData['part_code']})";
     
     return $result;
 }
@@ -311,21 +327,19 @@ function processSinglePart($partData, $rowNumber, $updateExisting) {
 /**
  * Update existing part
  */
-function updateExistingPart($partId, $cleanData, $rowNumber) {
+function updatePart($partId, $cleanData, $rowNumber) {
     global $db;
     
     $result = [
         'success' => false,
-        'updated' => true,
         'message' => '',
         'warnings' => []
     ];
     
-    // Update part
-    $sql = "UPDATE parts 
-            SET part_name = ?, description = ?, unit = ?, category = ?, specifications = ?,
-                manufacturer = ?, supplier_code = ?, supplier_name = ?, unit_price = ?, 
-                min_stock = ?, max_stock = ?, lead_time = ?, notes = ?, updated_at = NOW()
+    $sql = "UPDATE parts SET 
+            part_name = ?, description = ?, unit = ?, category = ?, specifications = ?, 
+            manufacturer = ?, supplier_code = ?, supplier_name = ?, unit_price = ?, 
+            min_stock = ?, max_stock = ?, lead_time = ?, notes = ?, updated_at = NOW()
             WHERE id = ?";
     
     $params = [
@@ -345,38 +359,42 @@ function updateExistingPart($partId, $cleanData, $rowNumber) {
         $partId
     ];
     
-    $db->execute($sql, $params);
-    
-    // Update supplier if provided
-    if (!empty($cleanData['supplier_code']) && !empty($cleanData['supplier_name'])) {
-        // Check if supplier exists
-        $existingSupplier = $db->fetch(
-            "SELECT id FROM part_suppliers WHERE part_id = ? AND supplier_code = ?",
-            [$partId, $cleanData['supplier_code']]
-        );
+    try {
+        $db->execute($sql, $params);
         
-        if ($existingSupplier) {
-            // Update existing supplier
-            $db->execute(
-                "UPDATE part_suppliers SET supplier_name = ?, unit_price = ? WHERE id = ?",
-                [$cleanData['supplier_name'], $cleanData['unit_price'], $existingSupplier['id']]
+        // Handle supplier
+        if (!empty($cleanData['supplier_code']) || !empty($cleanData['supplier_name'])) {
+            $existingSupplier = $db->fetch(
+                "SELECT id FROM part_suppliers WHERE part_id = ? AND supplier_code = ?",
+                [$partId, $cleanData['supplier_code']]
             );
-        } else {
-            // Add new supplier
-            try {
+            
+            if ($existingSupplier) {
+                // Update existing supplier
                 $db->execute(
-                    "INSERT INTO part_suppliers (part_id, supplier_code, supplier_name, unit_price, is_preferred) 
-                     VALUES (?, ?, ?, ?, 0)",
-                    [$partId, $cleanData['supplier_code'], $cleanData['supplier_name'], $cleanData['unit_price']]
+                    "UPDATE part_suppliers SET supplier_name = ?, unit_price = ? WHERE id = ?",
+                    [$cleanData['supplier_name'], $cleanData['unit_price'], $existingSupplier['id']]
                 );
-            } catch (Exception $e) {
-                $result['warnings'][] = "Dòng $rowNumber: Không thể thêm nhà cung cấp - " . $e->getMessage();
+            } else {
+                // Add new supplier
+                try {
+                    $db->execute(
+                        "INSERT INTO part_suppliers (part_id, supplier_code, supplier_name, unit_price, is_preferred) 
+                         VALUES (?, ?, ?, ?, 0)",
+                        [$partId, $cleanData['supplier_code'], $cleanData['supplier_name'], $cleanData['unit_price']]
+                    );
+                } catch (Exception $e) {
+                    $result['warnings'][] = "Dòng $rowNumber: Không thể thêm nhà cung cấp - " . $e->getMessage();
+                }
             }
         }
+        
+        $result['success'] = true;
+        $result['message'] = "Dòng $rowNumber: Cập nhật thành công ({$cleanData['part_code']})";
+        
+    } catch (Exception $e) {
+        $result['message'] = "Dòng $rowNumber: Không thể cập nhật - " . $e->getMessage();
     }
-    
-    $result['success'] = true;
-    $result['message'] = "Dòng $rowNumber: Cập nhật thành công ({$cleanData['part_code']})";
     
     return $result;
 }
@@ -439,8 +457,7 @@ function parseNumeric($value) {
     }
     
     // Remove common non-numeric characters
-    $value = str_replace([',', ' ', '
-            ', '₫'], '', $value);
+    $value = str_replace([',', ' ', '\n', '₫'], '', $value);
     
     return is_numeric($value) ? floatval($value) : 0;
 }

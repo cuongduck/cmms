@@ -76,6 +76,11 @@ ajax: function(options) {
     
     options = Object.assign(defaults, options);
     
+    // Nếu body là FormData, xóa Content-Type để browser set multipart/form-data
+    if (options.body instanceof FormData) {
+        delete options.headers['Content-Type'];
+    }
+    
     this.showLoading();
     
     fetch(options.url, options)
@@ -93,13 +98,13 @@ ajax: function(options) {
         })
         .catch(error => {
             this.hideLoading();
-            console.error('Ajax error:', error, 'URL:', options.url); // Thêm URL vào log
+            console.error('Ajax error:', error, 'URL:', options.url);
             this.showToast(`Có lỗi xảy ra: ${error.message}`, 'error');
             if (options.error) {
                 options.error(error);
             }
         });
-},    
+},   
     // Format number
     formatNumber: function(number, decimals = 0) {
         return new Intl.NumberFormat('vi-VN', {

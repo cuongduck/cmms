@@ -1,6 +1,6 @@
 <?php
 /**
- * Parts View Page
+ * Parts View Page - Rewritten Version without Mapping
  * /modules/bom/parts/view.php
  * Trang xem chi tiết linh kiện
  */
@@ -29,8 +29,7 @@ $sql = "SELECT p.*,
                    ELSE 'OK'
                END as stock_status
         FROM parts p
-        LEFT JOIN part_inventory_mapping pim ON p.id = pim.part_id
-        LEFT JOIN onhand oh ON pim.item_code = oh.ItemCode
+        LEFT JOIN onhand oh ON p.part_code = oh.ItemCode
         WHERE p.id = ?";
 
 $part = $db->fetch($sql, [$partId]);
@@ -39,7 +38,7 @@ if (!$part) {
     exit;
 }
 
-$pageTitle = 'Chi tiết: ' . $part['part_name'];
+$pageTitle = 'Chi tiết: ' . htmlspecialchars($part['part_name']);
 $currentModule = 'bom';
 $moduleCSS = 'bom';
 $moduleJS = 'bom-parts';
@@ -48,7 +47,7 @@ $moduleJS = 'bom-parts';
 $breadcrumb = [
     ['title' => 'BOM thiết bị', 'url' => '../index.php'],
     ['title' => 'Quản lý linh kiện', 'url' => 'index.php'],
-    ['title' => $part['part_name'], 'url' => '']
+    ['title' => htmlspecialchars($part['part_name']), 'url' => '']
 ];
 
 // Page actions
@@ -102,11 +101,10 @@ $bomUsage = $db->fetchAll(
 // Get recent transactions
 $recentTransactions = $db->fetchAll(
     "SELECT t.* FROM transaction t 
-     JOIN part_inventory_mapping pim ON t.ItemCode = pim.item_code
-     WHERE pim.part_id = ?
+     WHERE t.ItemCode = ?
      ORDER BY t.TransactionDate DESC 
      LIMIT 10",
-    [$partId]
+    [$part['part_code']]
 );
 
 // Calculate usage statistics
@@ -159,508 +157,258 @@ $highUsage = count(array_filter($bomUsage, function($usage) {
                 <?php endif; ?>
                 
                 <?php if ($part['specifications']): ?>
-                <p class="mb-0 opacity-90">
-                    <strong>Thông số:</strong> <?php echo nl2br(htmlspecialchars($part['specifications'])); ?>
+                <p class="mb-2 opacity-90">
+                    <strong>Thông số kỹ thuật:</strong> <?php echo nl2br(htmlspecialchars($part['specifications'])); ?>
+                </p>
+                <?php endif; ?>
+                
+                <?php if ($part['notes']): ?>
+                <p class="mb-2 opacity-90">
+                    <strong>Ghi chú:</strong> <?php echo nl2br(htmlspecialchars($part['notes'])); ?>
                 </p>
                 <?php endif; ?>
             </div>
             
             <div class="col-lg-4">
-                <div class="summary-stats">
-                    <div class="summary-stat">
-                        <span class="summary-stat-number"><?php echo formatVND($part['unit_price']); ?></span>
-                        <span class="summary-stat-label">Đơn giá</span>
-                    </div>
-                    <div class="summary-stat">
-                        <span class="summary-stat-number"><?php echo number_format($part['stock_quantity'], 1); ?></span>
-                        <span class="summary-stat-label">Tồn kho</span>
-                    </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <?php echo $pageActions; ?>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
+<!-- Main Content -->
+<div class="row mt-4">
     <div class="col-lg-8">
         <!-- Stock Information -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">
+                <h5 class="card-title mb-0">
                     <i class="fas fa-warehouse me-2"></i>
-                    Thông tin tồn kho
+                    Tồn kho & Giá trị
                 </h5>
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <div class="h3 mb-1 
-                                <?php echo ($part['stock_status'] === 'OK') ? 'text-success' : 
-                                           (($part['stock_status'] === 'Low') ? 'text-warning' : 'text-danger'); ?>">
-                                <?php echo number_format($part['stock_quantity'], 2); ?>
-                            </div>
-                            <div class="text-muted"><?php echo htmlspecialchars($part['stock_unit']); ?></div>
-                            <span class="badge <?php echo getStockStatusClass($part['stock_status']); ?>">
-                                <?php echo getStockStatusText($part['stock_status']); ?>
-                            </span>
+                    <div class="col-md-4 mb-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted">Tồn kho hiện tại</small>
+                            <h4 class="mb-1"><?php echo number_format($part['stock_quantity'], 2); ?></h4>
+                            <small><?php echo htmlspecialchars($part['stock_unit']); ?></small>
                         </div>
                     </div>
                     
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <div class="h5 mb-1"><?php echo number_format($part['min_stock'], 2); ?></div>
-                            <div class="text-muted">Mức tối thiểu</div>
+                    <div class="col-md-4 mb-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted">Trạng thái</small>
+                            <h4 class="mb-1">
+                                <span class="badge <?php echo getStockStatusClass($part['stock_status']); ?>">
+                                    <?php echo getStockStatusText($part['stock_status']); ?>
+                                </span>
+                            </h4>
+                            <small class="d-block">Min: <?php echo number_format($part['min_stock'], 2); ?></small>
+                            <small>Max: <?php echo number_format($part['max_stock'], 2); ?></small>
                         </div>
                     </div>
                     
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <div class="h5 mb-1"><?php echo number_format($part['max_stock'], 2); ?></div>
-                            <div class="text-muted">Mức tối đa</div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <div class="h5 mb-1"><?php echo formatVND($part['stock_value']); ?></div>
-                            <div class="text-muted">Giá trị tồn</div>
+                    <div class="col-md-4 mb-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted">Giá trị tồn kho</small>
+                            <h4 class="mb-1"><?php echo formatVND($part['stock_value']); ?></h4>
+                            <small>Đơn giá: <?php echo formatVND($part['current_price']); ?></small>
                         </div>
                     </div>
                 </div>
-                
-                <?php if ($part['min_stock'] > 0): ?>
-                <div class="mt-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="text-muted">Mức tồn kho</span>
-                        <span class="text-muted">
-                            <?php echo number_format(($part['stock_quantity'] / max($part['max_stock'], 1)) * 100, 1); ?>%
-                        </span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        <?php 
-                        $stockPercent = min(100, ($part['stock_quantity'] / max($part['max_stock'], 1)) * 100);
-                        $minPercent = ($part['min_stock'] / max($part['max_stock'], 1)) * 100;
-                        $progressClass = $part['stock_quantity'] >= $part['min_stock'] ? 'bg-success' : 'bg-danger';
-                        ?>
-                        <div class="progress-bar <?php echo $progressClass; ?>" 
-                             style="width: <?php echo $stockPercent; ?>%"></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-1">
-                        <small class="text-muted">0</small>
-                        <small class="text-warning" style="margin-left: <?php echo $minPercent; ?>%">
-                            Min: <?php echo number_format($part['min_stock'], 1); ?>
-                        </small>
-                        <small class="text-muted"><?php echo number_format($part['max_stock'], 1); ?></small>
-                    </div>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
-        
+
+        <!-- Suppliers -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-truck me-2"></i>
+                    Nhà cung cấp
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Mã NCC</th>
+                            <th>Tên NCC</th>
+                            <th>Giá</th>
+                            <th>Ưu tiên</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($suppliers)): ?>
+                        <tr>
+                            <td colspan="4" class="text-center py-3 text-muted">
+                                <i class="fas fa-truck-loading fa-2x mb-2 d-block"></i>
+                                Chưa có nhà cung cấp
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                        <?php foreach ($suppliers as $supplier): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($supplier['supplier_code']); ?></td>
+                            <td><?php echo htmlspecialchars($supplier['supplier_name']); ?></td>
+                            <td><?php echo formatVND($supplier['unit_price']); ?></td>
+                            <td>
+                                <?php if ($supplier['is_preferred']): ?>
+                                <span class="badge bg-success">Ưu tiên</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- BOM Usage -->
         <div class="card mb-4">
             <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-list me-2"></i>
-                        Sử dụng trong BOM (<?php echo count($bomUsage); ?>)
-                    </h5>
-                    
-                    <?php if (!empty($bomUsage)): ?>
-                    <div class="d-flex gap-2">
-                        <span class="badge bg-dark"><?php echo $criticalUsage; ?> nghiêm trọng</span>
-                        <span class="badge bg-danger"><?php echo $highUsage; ?> cao</span>
-                    </div>
-                    <?php endif; ?>
-                </div>
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cubes me-2"></i>
+                    Sử dụng trong BOM
+                </h5>
             </div>
-            
             <div class="card-body p-0">
-                <?php if (empty($bomUsage)): ?>
-                    <div class="text-center py-4">
-                        <div class="bom-empty">
-                            <div class="bom-empty-icon">
-                                <i class="fas fa-info-circle"></i>
-                            </div>
-                            <div class="bom-empty-text">Linh kiện này chưa được sử dụng trong BOM nào</div>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table bom-table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>BOM</th>
-                                    <th>Dòng máy</th>
-                                    <th class="text-center">Số lượng cần</th>
-                                    <th class="text-center">Ưu tiên</th>
-                                    <th class="text-end">Giá trị</th>
-                                    <th width="100">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($bomUsage as $usage): ?>
-                                <tr class="bom-item-row priority-<?php echo $usage['priority']; ?>">
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="part-code"><?php echo htmlspecialchars($usage['bom_code']); ?></span>
-                                            <strong><?php echo htmlspecialchars($usage['bom_name']); ?></strong>
-                                        </div>
-                                    </td>
-                                    
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span><?php echo htmlspecialchars($usage['machine_type_name']); ?></span>
-                                            <small class="text-muted part-code"><?php echo htmlspecialchars($usage['machine_type_code']); ?></small>
-                                        </div>
-                                    </td>
-                                    
-                                    <td class="text-center">
-                                        <strong><?php echo number_format($usage['quantity'], 2); ?></strong>
-                                        <small class="d-block text-muted"><?php echo htmlspecialchars($usage['unit']); ?></small>
-                                    </td>
-                                    
-                                    <td class="text-center">
-                                        <span class="priority-badge priority-<?php echo $usage['priority']; ?>">
-                                            <?php echo $bomConfig['priorities'][$usage['priority']]['name'] ?? $usage['priority']; ?>
-                                        </span>
-                                    </td>
-                                    
-                                    <td class="text-end">
-                                        <span class="cost-display">
-                                            <?php echo formatVND($usage['quantity'] * $part['unit_price']); ?>
-                                        </span>
-                                    </td>
-                                    
-                                    <td>
-                                        <a href="../view.php?id=<?php echo $usage['bom_id']; ?>" 
-                                           class="btn btn-outline-primary btn-sm" title="Xem BOM">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                            
-                            <tfoot>
-                                <tr class="table-secondary fw-bold">
-                                    <td colspan="2" class="text-end">Tổng cộng:</td>
-                                    <td class="text-center">
-                                        <strong><?php echo number_format($totalUsage, 2); ?></strong>
-                                    </td>
-                                    <td colspan="2" class="text-end">
-                                        <span class="cost-display"><?php echo formatVND($totalUsage * $part['unit_price']); ?></span>
-                                    </td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                <?php endif; ?>
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>BOM</th>
+                            <th>Dòng máy</th>
+                            <th>Số lượng</th>
+                            <th>Ưu tiên</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($bomUsage)): ?>
+                        <tr>
+                            <td colspan="4" class="text-center py-3 text-muted">
+                                <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
+                                Chưa được sử dụng trong BOM nào
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                        <?php foreach ($bomUsage as $usage): ?>
+                        <tr>
+                            <td>
+                                <a href="../bom/view.php?id=<?php echo $usage['bom_id']; ?>">
+                                    <?php echo htmlspecialchars($usage['bom_name']); ?>
+                                </a>
+                                <small class="d-block text-muted"><?php echo $usage['bom_code']; ?></small>
+                            </td>
+                            <td><?php echo htmlspecialchars($usage['machine_type_name']); ?></td>
+                            <td><?php echo number_format($usage['quantity'], 2); ?> <?php echo $usage['unit']; ?></td>
+                            <td>
+                                <span class="badge <?php echo getPriorityClass($usage['priority']); ?>">
+                                    <?php echo htmlspecialchars($usage['priority']); ?>
+                                </span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
-        
+
         <!-- Recent Transactions -->
-        <?php if (!empty($recentTransactions)): ?>
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-exchange-alt me-2"></i>
-                        Giao dịch gần đây (<?php echo count($recentTransactions); ?>)
-                    </h5>
-                    <a href="/modules/inventory/transactions.php?part_id=<?php echo $partId; ?>" 
-                       class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-list me-1"></i>Xem tất cả
-                    </a>
-                </div>
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Lịch sử giao dịch gần đây
+                </h5>
+                <a href="/modules/inventory/transactions.php?part_id=<?php echo $partId; ?>" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-list me-1"></i>Xem tất cả
+                </a>
             </div>
-            
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-sm mb-0">
+                    <table class="table table-hover table-sm mb-0">
                         <thead>
                             <tr>
                                 <th>Ngày</th>
                                 <th>Loại</th>
-                                <th class="text-center">Số lượng</th>
-                                <th class="text-end">Giá trị</th>
+                                <th>Số lượng</th>
+                                <th>Giá trị</th>
                                 <th>Lý do</th>
-                                <th>Người yêu cầu</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($recentTransactions as $trans): ?>
+                            <?php if (empty($recentTransactions)): ?>
                             <tr>
-                                <td>
-                                    <small><?php echo formatDateTime($trans['TransactionDate']); ?></small>
-                                </td>
-                                
-                                <td>
-                                    <span class="badge <?php echo ($trans['TransactionType'] === 'Issue') ? 'bg-danger' : 'bg-success'; ?>">
-                                        <?php echo $trans['TransactionType']; ?>
-                                    </span>
-                                </td>
-                                
-                                <td class="text-center">
-                                    <strong class="<?php echo ($trans['TransactionType'] === 'Issue') ? 'text-danger' : 'text-success'; ?>">
-                                        <?php echo ($trans['TransactionType'] === 'Issue') ? '-' : '+'; ?>
-                                        <?php echo number_format($trans['TransactedQty'], 2); ?>
-                                    </strong>
-                                    <small class="d-block text-muted"><?php echo htmlspecialchars($trans['UOM']); ?></small>
-                                </td>
-                                
-                                <td class="text-end">
-                                    <span class="cost-display">
-                                        <?php echo formatVND($trans['TotalAmount']); ?>
-                                    </span>
-                                </td>
-                                
-                                <td>
-                                    <small><?php echo htmlspecialchars($trans['Reason']); ?></small>
-                                </td>
-                                
-                                <td>
-                                    <small><?php echo htmlspecialchars($trans['Requester']); ?></small>
+                                <td colspan="5" class="text-center py-3 text-muted">
+                                    <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
+                                    Không có giao dịch gần đây
                                 </td>
                             </tr>
+                            <?php else: ?>
+                            <?php foreach ($recentTransactions as $trans): ?>
+                            <tr>
+                                <td><?php echo formatDateTime($trans['TransactionDate']); ?></td>
+                                <td>
+                                    <span class="badge <?php echo getTransactionTypeClass($trans['TransactionType']); ?>">
+                                        <?php echo htmlspecialchars($trans['TransactionType']); ?>
+                                    </span>
+                                </td>
+                                <td class="<?php echo $trans['TransactedQty'] > 0 ? 'text-success' : 'text-danger'; ?>">
+                                    <?php echo number_format($trans['TransactedQty'], 2); ?> <?php echo htmlspecialchars($trans['UOM']); ?>
+                                </td>
+                                <td><?php echo formatVND($trans['TransValue'] ?? 0); ?></td>
+                                <td><?php echo htmlspecialchars($trans['Reason']); ?></td>
+                            </tr>
                             <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-        <?php endif; ?>
     </div>
     
     <div class="col-lg-4">
-        <!-- Part Information -->
-        <div class="card mb-3">
+        <!-- Usage Statistics -->
+        <div class="card mb-4">
             <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Thông tin linh kiện
-                </h6>
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Thống kê sử dụng
+                </h5>
             </div>
             <div class="card-body">
-                <table class="table table-borderless table-sm mb-0">
-                    <tr>
-                        <td><strong>Mã linh kiện:</strong></td>
-                        <td class="part-code"><?php echo htmlspecialchars($part['part_code']); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Tên:</strong></td>
-                        <td><?php echo htmlspecialchars($part['part_name']); ?></td>
-                    </tr>
-                    <?php if ($part['category']): ?>
-                    <tr>
-                        <td><strong>Danh mục:</strong></td>
-                        <td><?php echo htmlspecialchars($part['category']); ?></td>
-                    </tr>
-                    <?php endif; ?>
-                    <tr>
-                        <td><strong>Đơn vị:</strong></td>
-                        <td><?php echo htmlspecialchars($part['unit']); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Đơn giá:</strong></td>
-                        <td><span class="cost-display"><?php echo formatVND($part['unit_price']); ?></span></td>
-                    </tr>
-                    <?php if ($part['lead_time'] > 0): ?>
-                    <tr>
-                        <td><strong>Lead time:</strong></td>
-                        <td><?php echo $part['lead_time']; ?> ngày</td>
-                    </tr>
-                    <?php endif; ?>
-                    <tr>
-                        <td><strong>Ngày tạo:</strong></td>
-                        <td><?php echo formatDateTime($part['created_at']); ?></td>
-                    </tr>
-                    <?php if ($part['updated_at'] !== $part['created_at']): ?>
-                    <tr>
-                        <td><strong>Cập nhật:</strong></td>
-                        <td><?php echo formatDateTime($part['updated_at']); ?></td>
-                    </tr>
-                    <?php endif; ?>
-                </table>
-            </div>
-        </div>
-        
-        <!-- Suppliers -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-truck me-2"></i>
-                    Nhà cung cấp (<?php echo count($suppliers) + (empty($part['supplier_name']) ? 0 : 1); ?>)
-                </h6>
-            </div>
-            <div class="card-body">
-                <!-- Main supplier from parts table -->
-                <?php if (!empty($part['supplier_name'])): ?>
-                <div class="border-bottom pb-2 mb-2">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <strong><?php echo htmlspecialchars($part['supplier_name']); ?></strong>
-                            <?php if ($part['supplier_code']): ?>
-                                <small class="d-block text-muted part-code"><?php echo htmlspecialchars($part['supplier_code']); ?></small>
-                            <?php endif; ?>
-                        </div>
-                        <span class="badge bg-primary">Chính</span>
-                    </div>
-                    <div class="text-end mt-1">
-                        <span class="cost-display"><?php echo formatVND($part['unit_price']); ?></span>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <!-- Additional suppliers -->
-                <?php if (empty($suppliers)): ?>
-                    <?php if (empty($part['supplier_name'])): ?>
-                    <div class="text-center text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Chưa có thông tin nhà cung cấp
-                    </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <?php foreach ($suppliers as $supplier): ?>
-                    <div class="border-bottom pb-2 mb-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong><?php echo htmlspecialchars($supplier['supplier_name']); ?></strong>
-                                <?php if ($supplier['supplier_code']): ?>
-                                    <small class="d-block text-muted part-code"><?php echo htmlspecialchars($supplier['supplier_code']); ?></small>
-                                <?php endif; ?>
-                                <?php if ($supplier['part_number']): ?>
-                                    <small class="d-block text-muted">P/N: <?php echo htmlspecialchars($supplier['part_number']); ?></small>
-                                <?php endif; ?>
-                            </div>
-                            <?php if ($supplier['is_preferred']): ?>
-                                <span class="badge bg-warning">Ưu tiên</span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="d-flex justify-content-between mt-1">
-                            <div>
-                                <?php if ($supplier['min_order_qty'] > 0): ?>
-                                    <small class="text-muted">MOQ: <?php echo number_format($supplier['min_order_qty'], 2); ?></small>
-                                <?php endif; ?>
-                                <?php if ($supplier['lead_time'] > 0): ?>
-                                    <small class="text-muted">LT: <?php echo $supplier['lead_time']; ?> ngày</small>
-                                <?php endif; ?>
-                            </div>
-                            <span class="cost-display"><?php echo formatVND($supplier['unit_price']); ?></span>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <!-- Stock Analysis -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-chart-line me-2"></i>
-                    Phân tích tồn kho
-                </h6>
-            </div>
-            <div class="card-body">
-                <?php
-                // Calculate stock analysis
-                $stockAnalysis = [
-                    'current_stock' => $part['stock_quantity'],
-                    'min_stock' => $part['min_stock'],
-                    'max_stock' => $part['max_stock'],
-                    'stock_value' => $part['stock_value'],
-                    'total_required' => $totalUsage,
-                    'coverage_days' => 0
-                ];
-                
-                // Calculate coverage days if we have usage data
-                if ($totalUsage > 0) {
-                    // Estimate monthly usage from recent transactions
-                    $monthlyUsage = 0;
-                    foreach ($recentTransactions as $trans) {
-                        if ($trans['TransactionType'] === 'Issue') {
-                            $monthlyUsage += $trans['TransactedQty'];
-                        }
-                    }
-                    
-                    if ($monthlyUsage > 0) {
-                        $dailyUsage = $monthlyUsage / 30;
-                        $stockAnalysis['coverage_days'] = $part['stock_quantity'] / $dailyUsage;
-                    }
-                }
-                ?>
-                
-                <div class="row text-center g-2 mb-3">
-                    <div class="col-6">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
                         <div class="border rounded p-2">
-                            <div class="small text-muted">Cần cho BOM</div>
-                            <div class="fw-bold"><?php echo number_format($stockAnalysis['total_required'], 2); ?></div>
+                            <small class="text-muted">Tổng sử dụng</small>
+                            <h4 class="mb-0"><?php echo number_format($totalUsage, 2); ?></h4>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <small class="text-muted">Số BOM</small>
+                            <h4 class="mb-0"><?php echo count($bomUsage); ?></h4>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="border rounded p-2">
-                            <div class="small text-muted">Giá trị tồn</div>
-                            <div class="fw-bold cost-display small"><?php echo formatVND($stockAnalysis['stock_value']); ?></div>
+                            <small class="text-muted">Critical</small>
+                            <h4 class="mb-0"><?php echo $criticalUsage; ?></h4>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted">High</small>
+                            <h4 class="mb-0"><?php echo $highUsage; ?></h4>
                         </div>
                     </div>
                 </div>
-                
-                <?php if ($stockAnalysis['coverage_days'] > 0): ?>
-                <div class="alert alert-info">
-                    <strong>Phủ sóng tồn kho:</strong>
-                    <?php echo number_format($stockAnalysis['coverage_days'], 1); ?> ngày
-                    (dựa trên mức tiêu thụ gần đây)
-                </div>
-                <?php endif; ?>
-                
-                <!-- Recommendations -->
-                <?php
-                $recommendations = [];
-                
-                if ($part['stock_quantity'] < $part['min_stock'] && $part['min_stock'] > 0) {
-                    $shortfall = $part['min_stock'] - $part['stock_quantity'];
-                    $recommendations[] = [
-                        'type' => 'danger',
-                        'icon' => 'fas fa-exclamation-triangle',
-                        'text' => "Cần bổ sung " . number_format($shortfall, 2) . " " . $part['unit'] . " để đạt mức tối thiểu"
-                    ];
-                }
-                
-                if ($part['stock_quantity'] == 0) {
-                    $recommendations[] = [
-                        'type' => 'danger',
-                        'icon' => 'fas fa-times-circle',
-                        'text' => "Hết hàng! Cần nhập khẩn cấp"
-                    ];
-                }
-                
-                if ($totalUsage > $part['stock_quantity'] && $totalUsage > 0) {
-                    $shortage = $totalUsage - $part['stock_quantity'];
-                    $recommendations[] = [
-                        'type' => 'warning',
-                        'icon' => 'fas fa-exclamation-circle',
-                        'text' => "Thiếu " . number_format($shortage, 2) . " " . $part['unit'] . " để đáp ứng tất cả BOM"
-                    ];
-                }
-                
-                if (empty($recommendations)) {
-                    $recommendations[] = [
-                        'type' => 'success',
-                        'icon' => 'fas fa-check-circle',
-                        'text' => "Tình trạng tồn kho tốt"
-                    ];
-                }
-                ?>
-                
-                <?php foreach ($recommendations as $rec): ?>
-                <div class="alert alert-<?php echo $rec['type']; ?> p-2 mb-2">
-                    <i class="<?php echo $rec['icon']; ?> me-2"></i>
-                    <?php echo $rec['text']; ?>
-                </div>
-                <?php endforeach; ?>
             </div>
         </div>
         

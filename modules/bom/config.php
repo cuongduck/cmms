@@ -100,6 +100,7 @@ function getBOMList($machineTypeId = null, $filters = []) {
 /**
  * Lấy chi tiết BOM
  */
+
 function getBOMDetails($bomId) {
     global $db;
     
@@ -127,8 +128,7 @@ function getBOMDetails($bomId) {
                    END as stock_status
             FROM bom_items bi
             JOIN parts p ON bi.part_id = p.id
-            LEFT JOIN part_inventory_mapping pim ON p.id = pim.part_id
-            LEFT JOIN onhand oh ON pim.item_code = oh.ItemCode
+            LEFT JOIN onhand oh ON p.part_code = oh.ItemCode
             WHERE bi.bom_id = ?
             ORDER BY bi.priority DESC, p.part_name";
     
@@ -136,6 +136,7 @@ function getBOMDetails($bomId) {
     
     return $bom;
 }
+
 
 /**
  * Lấy danh sách linh kiện
