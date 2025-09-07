@@ -260,7 +260,8 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                 <i class="fas fa-file-excel me-1"></i>Xuất Excel
             </button>
             <?php endif; ?>
-            
+            <!-- Thêm container cho toggle cột để tránh lỗi null -->
+            <div id="columnToggleContainer" class="ms-2"></div>
             <div class="btn-group">
                 <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="fas fa-eye me-1"></i>Hiển thị

@@ -1,0 +1,684 @@
+/* CMMS Maintenance Module Styles */
+
+:root {
+    --maintenance-primary: #2563eb;
+    --maintenance-success: #10b981;
+    --maintenance-warning: #f59e0b;
+    --maintenance-danger: #ef4444;
+    --maintenance-info: #06b6d4;
+    --maintenance-light: #f8fafc;
+    --maintenance-dark: #1f2937;
+}
+
+/* Statistics Cards */
+.stat-card {
+    background: linear-gradient(135deg, var(--maintenance-primary), #1e40af);
+    color: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30px, -30px);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0.5rem 0;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Maintenance Status Badges */
+.badge-overdue {
+    background-color: var(--maintenance-danger);
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.badge-today {
+    background-color: var(--maintenance-warning);
+    color: white;
+}
+
+.badge-this-week {
+    background-color: var(--maintenance-info);
+    color: white;
+}
+
+.badge-planned {
+    background-color: var(--maintenance-success);
+    color: white;
+}
+
+.badge-no-plan {
+    background-color: #6b7280;
+    color: white;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+/* Maintenance Type Badges */
+.maintenance-type-pm {
+    background: linear-gradient(135deg, var(--maintenance-info), #0891b2);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.maintenance-type-breakdown {
+    background: linear-gradient(135deg, var(--maintenance-danger), #dc2626);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.maintenance-type-clit {
+    background: linear-gradient(135deg, var(--maintenance-warning), #d97706);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Priority Indicators */
+.priority-low {
+    border-left: 4px solid #10b981;
+}
+
+.priority-medium {
+    border-left: 4px solid #f59e0b;
+}
+
+.priority-high {
+    border-left: 4px solid #ef4444;
+}
+
+.priority-critical {
+    border-left: 4px solid #7c2d12;
+    background-color: #fef2f2;
+}
+
+/* Execution Status */
+.execution-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.execution-status.planned {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.execution-status.in-progress {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.execution-status.completed {
+    background-color: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.execution-status.cancelled {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.execution-status.on-hold {
+    background-color: #f9fafb;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+}
+
+/* Progress Bar */
+.maintenance-progress {
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.maintenance-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--maintenance-success), #059669);
+    transition: width 0.3s ease;
+}
+
+/* Checklist Styles */
+.checklist-container {
+    background-color: #f9fafb;
+    border-radius: 0.75rem;
+    padding: 1rem;
+}
+
+.checklist-item {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checklist-item:hover {
+    border-color: var(--maintenance-primary);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+}
+
+.checklist-item.completed {
+    background-color: #f0fdf4;
+    border-color: var(--maintenance-success);
+}
+
+.checklist-item.required {
+    border-left: 4px solid var(--maintenance-warning);
+}
+
+.checklist-checkbox {
+    transform: scale(1.2);
+    margin-right: 0.75rem;
+}
+
+.checklist-description {
+    font-weight: 500;
+    color: var(--maintenance-dark);
+}
+
+.checklist-notes {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+/* Timeline Styles */
+.maintenance-timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.maintenance-timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--maintenance-primary), var(--maintenance-info));
+}
+
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -0.625rem;
+    top: 0.25rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background-color: var(--maintenance-primary);
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px var(--maintenance-primary);
+}
+
+.timeline-item.completed::before {
+    background-color: var(--maintenance-success);
+    box-shadow: 0 0 0 2px var(--maintenance-success);
+}
+
+.timeline-item.in-progress::before {
+    background-color: var(--maintenance-warning);
+    box-shadow: 0 0 0 2px var(--maintenance-warning);
+    animation: pulse-timeline 2s infinite;
+}
+
+@keyframes pulse-timeline {
+    0% {
+        box-shadow: 0 0 0 2px var(--maintenance-warning);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 0 2px var(--maintenance-warning);
+    }
+}
+
+.timeline-content {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-time {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timeline-title {
+    font-weight: 600;
+    color: var(--maintenance-dark);
+    margin: 0.25rem 0;
+}
+
+.timeline-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* Equipment Card */
+.equipment-card {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.equipment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.equipment-code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 700;
+    color: var(--maintenance-primary);
+    font-size: 1.125rem;
+}
+
+.equipment-name {
+    color: var(--maintenance-dark);
+    font-weight: 500;
+    margin: 0.25rem 0;
+}
+
+.equipment-location {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* Maintenance Calendar */
+.maintenance-calendar {
+    background: white;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header {
+    background: linear-gradient(135deg, var(--maintenance-primary), #1e40af);
+    color: white;
+    padding: 1rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.calendar-day {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s ease;
+}
+
+.calendar-day:hover {
+    background-color: var(--maintenance-light);
+}
+
+.calendar-day.has-maintenance {
+    border-left: 4px solid var(--maintenance-warning);
+}
+
+.calendar-day.overdue {
+    border-left: 4px solid var(--maintenance-danger);
+    background-color: #fef2f2;
+}
+
+.calendar-maintenance-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    margin: 0.25rem 0;
+    background-color: #eff6ff;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+/* Parts and Costs */
+.parts-used-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.part-code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 600;
+    color: var(--maintenance-primary);
+}
+
+.part-quantity {
+    color: var(--maintenance-warning);
+    font-weight: 600;
+}
+
+.part-cost {
+    color: var(--maintenance-success);
+    font-weight: 600;
+}
+
+.cost-summary {
+    background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.cost-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cost-item:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: var(--maintenance-primary);
+}
+
+/* Filter Panel */
+.filter-panel {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+.filter-group {
+    margin-bottom: 1rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.filter-label {
+    font-weight: 500;
+    color: var(--maintenance-dark);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Action Buttons */
+.maintenance-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-maintenance {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.btn-maintenance:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-maintenance-primary {
+    background-color: var(--maintenance-primary);
+    color: white;
+}
+
+.btn-maintenance-primary:hover {
+    background-color: #1e40af;
+    color: white;
+}
+
+.btn-maintenance-success {
+    background-color: var(--maintenance-success);
+    color: white;
+}
+
+.btn-maintenance-success:hover {
+    background-color: #059669;
+    color: white;
+}
+
+.btn-maintenance-warning {
+    background-color: var(--maintenance-warning);
+    color: white;
+}
+
+.btn-maintenance-warning:hover {
+    background-color: #d97706;
+    color: white;
+}
+
+.btn-maintenance-outline {
+    background-color: transparent;
+    color: var(--maintenance-primary);
+    border-color: var(--maintenance-primary);
+}
+
+.btn-maintenance-outline:hover {
+    background-color: var(--maintenance-primary);
+    color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stat-card {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    
+    .maintenance-actions {
+        justify-content: center;
+    }
+    
+    .btn-maintenance {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .equipment-card {
+        padding: 1rem;
+    }
+    
+    .filter-panel {
+        padding: 1rem;
+    }
+    
+    .timeline-item {
+        padding-left: 0.5rem;
+    }
+    
+    .maintenance-timeline {
+        padding-left: 1.5rem;
+    }
+    
+    .checklist-item {
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .stat-icon {
+        font-size: 2rem;
+    }
+    
+    .stat-number {
+        font-size: 1.25rem;
+    }
+    
+    .equipment-code {
+        font-size: 1rem;
+    }
+    
+    .maintenance-actions {
+        flex-direction: column;
+    }
+    
+    .btn-maintenance {
+        justify-content: center;
+    }
+    
+    .filter-panel .row > div {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .maintenance-actions,
+    .filter-panel,
+    .btn,
+    .dropdown {
+        display: none !important;
+    }
+    
+    .stat-card {
+        background: white !important;
+        color: black !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .equipment-card,
+    .timeline-content,
+    .checklist-item {
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+    }
+    
+    .maintenance-timeline::before {
+        background: #ddd !important;
+    }
+}
+
+/* Loading States */
+.maintenance-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: #6b7280;
+}
+
+.maintenance-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid var(--maintenance-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Custom Scrollbar */
+.maintenance-timeline::-webkit-scrollbar,
+.checklist-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.maintenance-timeline::-webkit-scrollbar-track,
+.checklist-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.maintenance-timeline::-webkit-scrollbar-thumb,
+.checklist-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.maintenance-timeline::-webkit-scrollbar-thumb:hover,
+.checklist-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

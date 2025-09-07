@@ -50,6 +50,7 @@ cmms/
 │   │   ├── equipment-view.css
 │   │   ├── equipment.css
 │   │   ├── inventory.css
+│   │   ├── maintenance.css
 │   │   ├── structure.css
 │   │   └── style.css
 │   ├── images
@@ -126,6 +127,21 @@ cmms/
     │   ├── dashboard.php
     │   ├── index.php
     │   └── transactions.php
+    ├── maintenance
+    │   ├── api
+    │   │   ├── maintenance.php
+    │   │   └── workshops.php
+    │   ├── config.php
+    │   ├── executions
+    │   │   ├── add.php
+    │   │   ├── edit.php
+    │   │   ├── index.php
+    │   │   └── view.php
+    │   ├── index.php
+    │   └── plans
+    │       ├── add.php
+    │       ├── edit.php
+    │       └── view.php
     └── structure
         ├── api
         │   ├── areas.php

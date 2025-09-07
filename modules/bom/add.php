@@ -37,10 +37,9 @@ $parts = $db->fetchAll(
      ORDER BY p.part_code"
 );
 
-// Get categories and units for dropdowns
-$categories = array_unique(array_column($parts, 'category'));
+// Get units and priorities for dropdowns
 $units = $bomConfig['units'];
-$priorities = $bomConfig['priorities'];
+$priorities = array_keys($bomConfig['priorities']); // ['Low', 'Medium', 'High', 'Critical']
 ?>
 
 <form id="bomForm" class="needs-validation" novalidate>
@@ -101,7 +100,7 @@ $priorities = $bomConfig['priorities'];
                                 Phiên bản
                             </label>
                             <input type="text" id="version" name="version" class="form-control" 
-                                   placeholder="1.0">
+                                   placeholder="1.0" value="1.0">
                         </div>
                     </div>
                     
@@ -149,34 +148,24 @@ $priorities = $bomConfig['priorities'];
                         </table>
                     </div>
                     
-                    <button type="button" class="btn btn-outline-primary btn-sm" 
-                            onclick="CMMS.BOM.addBOMItem()">
-                        <i class="fas fa-plus me-1"></i>Thêm dòng
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-lg-4">
-            <!-- Summary -->
-            <div class="bom-form-container sticky-top pt-3">
-                <div class="form-section">
-                    <h5 class="form-section-title">
-                        <i class="fas fa-calculator"></i>
-                        Tổng quan
-                    </h5>
-                    
                     <div class="mb-3">
-                        <label class="form-label">Tổng số linh kiện</label>
-                        <div class="form-control-plaintext">
-                            <span id="totalItems">0</span> loại
-                        </div>
+                        <button type="button" id="addBOMItem" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-plus me-2"></i>Thêm linh kiện
+                        </button>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Tổng chi phí</label>
-                        <div class="form-control-plaintext">
-                            <span id="totalCost">0</span> VNĐ
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tổng số linh kiện</label>
+                            <div class="form-control-plaintext">
+                                <span id="totalItems">0</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tổng chi phí</label>
+                            <div class="form-control-plaintext">
+                                <span id="totalCost">0</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -195,63 +184,17 @@ $priorities = $bomConfig['priorities'];
     </div>
 </form>
 
+<script src="/assets/js/main.js?v=<?php echo time(); ?>"></script>
+<script src="/assets/js/bom.js?v=<?php echo time(); ?>"></script>
 <script>
-// Initialize parts data for quick search
+// Config từ PHP
+window.bomConfig = <?php 
+echo json_encode(['units' => $units, 'priorities' => $priorities]);
+?>;
 window.bomPartsData = <?php echo json_encode($parts); ?>;
 
-// Form validation
-(function() {
-    'use strict';
-    
-    const form = document.getElementById('bomForm');
-    form.addEventListener('submit', function(event) {
-        if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-        
-        form.classList.add('was-validated');
-        
-        // Additional validation for BOM items
-        const rows = document.querySelectorAll('#bomItemsBody tr');
-        let hasValidItem = false;
-        
-        rows.forEach(row => {
-            const partSelect = row.querySelector('select[name$="[part_id]"]');
-            const quantityInput = row.querySelector('input[name$="[quantity]"]');
-            
-            if (partSelect?.value && quantityInput?.value > 0) {
-                hasValidItem = true;
-            }
-        });
-        
-        if (!hasValidItem) {
-            event.preventDefault();
-            CMMS.showToast('Vui lòng thêm ít nhất một linh kiện với số lượng hợp lệ', 'warning');
-            return;
-        }
-        
-        // Submit form via AJAX
-        event.preventDefault();
-        CMMS.BOM.submitBOM(form);
-    }, false);
-})();
-
-// Generate BOM code when machine type changes
-document.getElementById('machine_type_id').addEventListener('change', function() {
-    const selectedOption = this.selectedOptions[0];
-    const machineCode = selectedOption ? selectedOption.dataset.code : '';
-    const bomCodeInput = document.getElementById('bom_code');
-    
-    if (machineCode) {
-        bomCodeInput.value = `${machineCode}-BOM${Date.now().toString().slice(-6)}`;
-    } else {
-        bomCodeInput.value = '';
-    }
-});
-
 // Quick search functionality
-document.getElementById('quickSearch').addEventListener('input', CMMS.debounce(function(e) {
+document.getElementById('quickSearch').addEventListener('input', CMMS.utils.debounce(function(e) {
     const searchTerm = e.target.value.trim().toLowerCase();
     const searchResults = document.getElementById('quickSearchResults');
     
@@ -271,34 +214,27 @@ document.getElementById('quickSearch').addEventListener('input', CMMS.debounce(f
     }
     
     searchResults.innerHTML = filteredParts.map(part => 
-        `<div class="list-group-item list-group-item-action p-2" style="cursor: pointer;" 
-              onclick="addPartToBOM(${part.id})">
+        `<div class="list-group-item list-group-item-action p-2 cursor-pointer" 
+              onclick="CMMS.BOM.addPartToBOM(${part.id})">
             <div class="d-flex justify-content-between">
                 <div>
                     <small class="part-code">${part.part_code}</small><br>
                     <span class="small">${part.part_name}</span><br>
                     <small class="text-muted">Tồn kho: ${part.stock_quantity}</small>
                 </div>
-                <small class="text-success">${CMMS.BOM.formatCurrency(part.unit_price)}</small>
+                <small class="text-success">${CMMS.formatCurrency(part.unit_price)}</small>
             </div>
         </div>`
     ).join('');
 }, 300));
 
 // Add part to BOM from quick search
-function addPartToBOM(partId) {
-    // Add new row if needed
-    const tbody = document.getElementById('bomItemsBody');
-    if (tbody.children.length === 0) {
-        CMMS.BOM.addBOMItem();
-    }
-    
-    // Find the last empty row or add new one
-    const rows = tbody.querySelectorAll('tr');
+CMMS.BOM.addPartToBOM = function(partId) {
+    let tbody = document.getElementById('bomItemsBody');
     let targetRow = null;
     
-    for (let row of rows) {
-        const partSelect = row.querySelector('select[name$="[part_id]"]');
+    for (let row of tbody.rows) {
+        let partSelect = row.querySelector('select[name$="[part_id]"]');
         if (partSelect && !partSelect.value) {
             targetRow = row;
             break;
@@ -310,60 +246,36 @@ function addPartToBOM(partId) {
         targetRow = tbody.lastElementChild;
     }
     
-    // Set the part
-    const partSelect = targetRow.querySelector('select[name$="[part_id]"]');
-    if (partSelect) {
-        partSelect.value = partId;
-        partSelect.dispatchEvent(new Event('change'));
-    }
+    let partSelect = targetRow.querySelector('select[name$="[part_id]"]');
+    partSelect.value = partId;
+    partSelect.dispatchEvent(new Event('change', { bubbles: true }));
     
-    // Clear search
     document.getElementById('quickSearch').value = '';
     document.getElementById('quickSearchResults').innerHTML = '';
     
-    // Focus on quantity
-    const quantityInput = targetRow.querySelector('input[name$="[quantity]"]');
-    if (quantityInput) {
-        quantityInput.focus();
-        quantityInput.select();
-    }
-}
+    targetRow.querySelector('input[name$="[quantity]"]').focus();
+};
 
-// Update totals when items change
-document.addEventListener('change', function(e) {
-    if (e.target.closest('#bomItemsBody')) {
-        updateTotals();
-    }
-});
-
-document.addEventListener('input', function(e) {
-    if (e.target.closest('#bomItemsBody')) {
-        updateTotals();
-    }
-});
-
+// Update totals
 function updateTotals() {
-    const rows = document.querySelectorAll('#bomItemsBody tr');
     let totalItems = 0;
     let totalCost = 0;
+    let rows = document.querySelectorAll('#bomItemsBody tr');
     
     rows.forEach(row => {
-        const partSelect = row.querySelector('select[name$="[part_id]"]');
-        const quantityInput = row.querySelector('input[name$="[quantity]"]');
+        let partSelect = row.querySelector('select[name$="[part_id]"]');
+        let quantityInput = row.querySelector('input[name$="[quantity]"]');
         
-        if (partSelect && quantityInput && partSelect.value && quantityInput.value) {
+        if (partSelect.value && quantityInput.value > 0) {
             totalItems++;
-            
-            const partOption = partSelect.selectedOptions[0];
-            const unitPrice = parseFloat(partOption.dataset.price || 0);
-            const quantity = parseFloat(quantityInput.value || 0);
-            
+            let unitPrice = parseFloat(partSelect.selectedOptions[0].dataset.price) || 0;
+            let quantity = parseFloat(quantityInput.value) || 0;
             totalCost += unitPrice * quantity;
         }
     });
     
     document.getElementById('totalItems').textContent = totalItems;
-    document.getElementById('totalCost').textContent = CMMS.BOM.formatCurrency(totalCost);
+    document.getElementById('totalCost').textContent = CMMS.formatCurrency(totalCost);
 }
 </script>
 

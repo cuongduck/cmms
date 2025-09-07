@@ -3,8 +3,8 @@
  * Main JavaScript functionality for BOM module
  */
 
-// Extend CMMS object for BOM module
 if (!window.CMMS) {
+    console.error('CMMS namespace not found. Please include main.js first.');
     window.CMMS = {};
 }
 
@@ -47,7 +47,11 @@ CMMS.BOM = {
         if (bomForm) {
             bomForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                this.saveBOM();
+                if (bomForm.querySelector('input[name="bom_id"]')) {
+                    this.updateBOM(bomForm);
+                } else {
+                    this.submitBOM(bomForm);
+                }
             });
         }
         
@@ -66,6 +70,28 @@ CMMS.BOM = {
                 this.generateBOMCode(e.target.value);
             });
         }
+        
+        // Parts page specific
+        const partsSearch = document.getElementById('partsSearch');
+        if (partsSearch) {
+            partsSearch.addEventListener('input', CMMS.utils.debounce((e) => {
+                this.searchParts(e.target.value);
+            }, 300));
+        }
+        
+        const categoryFilter = document.getElementById('filterCategory');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', () => {
+                this.applyFilters();
+            });
+        }
+        
+        const stockFilter = document.getElementById('filterStockStatus');
+        if (stockFilter) {
+            stockFilter.addEventListener('change', () => {
+                this.applyFilters();
+            });
+        }
     },
     
     // Initialize components
@@ -74,7 +100,7 @@ CMMS.BOM = {
         const bomTable = document.getElementById('bomTable');
         if (bomTable) {
             CMMS.dataTable.init('bomTable', {
-                searching: false, // We handle search separately
+                searching: false,
                 pageSize: this.config.pageSize
             });
         }
@@ -84,6 +110,19 @@ CMMS.BOM = {
         
         // Load initial data
         this.loadBOMList();
+        
+        // Add initial BOM item row for add.php
+        if (document.getElementById('bomItemsBody') && document.getElementById('bomItemsBody').children.length === 0) {
+            this.addBOMItem();
+        }
+    },
+    
+    // Initialize tooltips
+    initializeTooltips: function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
     },
     
     // Search BOMs
@@ -109,9 +148,35 @@ CMMS.BOM = {
         };
     },
     
+    // Generate BOM code
+    generateBOMCode: function(machineTypeId) {
+        if (!machineTypeId) {
+            document.getElementById('bom_code').value = '';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('action', 'generateCode');
+        formData.append('machine_type_id', machineTypeId);
+        
+        CMMS.ajax({
+            url: this.config.apiUrl + 'bom.php',
+            method: 'POST',
+            body: formData,
+            success: (data) => {
+                if (data.success) {
+                    document.getElementById('bom_code').value = data.data.code;
+                } else {
+                    CMMS.showToast(data.message || 'Lỗi tạo mã BOM', 'error');
+                }
+            },
+            error: () => {
+                CMMS.showToast('Lỗi khi tạo mã BOM', 'error');
+            }
+        });
+    },
+    
     // Load BOM list
-// Load BOM list
-// Load BOM list
     loadBOMList: function(filters = {}) {
         console.log('Loading BOM list with filters:', filters);
         
@@ -128,12 +193,11 @@ CMMS.BOM = {
         CMMS.ajax({
             url: this.config.apiUrl + 'bom.php?' + params,
             method: 'GET',
-            credentials: 'same-origin', // Include cookies/session
+            credentials: 'same-origin',
             success: (data) => {
                 console.log('API Response:', data);
                 
                 if (data.success) {
-                    // Check if data.data is array
                     const boms = Array.isArray(data.data) ? data.data : [];
                     this.renderBOMList(boms);
                     
@@ -142,8 +206,6 @@ CMMS.BOM = {
                     }
                 } else {
                     console.error('API Error:', data.message);
-                    
-                    // Handle authentication error specifically
                     if (data.message && data.message.includes('Authentication')) {
                         CMMS.showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
                         setTimeout(() => {
@@ -153,14 +215,11 @@ CMMS.BOM = {
                     }
                     
                     CMMS.showToast(data.message || 'Lỗi không xác định', 'error');
-                    // Show empty state
                     this.renderBOMList([]);
                 }
             },
             error: (error) => {
                 console.error('Ajax Error:', error);
-                
-                // Handle different types of errors
                 if (error.message && error.message.includes('401')) {
                     CMMS.showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
                     setTimeout(() => {
@@ -169,8 +228,6 @@ CMMS.BOM = {
                 } else {
                     CMMS.showToast('Lỗi khi tải danh sách BOM', 'error');
                 }
-                
-                // Show empty state
                 this.renderBOMList([]);
             }
         });
@@ -191,7 +248,7 @@ CMMS.BOM = {
                             </div>
                             <div class="bom-empty-text">Chưa có BOM nào</div>
                             <a href="/modules/bom/add.php" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>Tạo BOM đầu tiên
+                                <i class="fas fa-plus me-2"></i>Thêm BOM đầu tiên
                             </a>
                         </div>
                     </td>
@@ -204,28 +261,16 @@ CMMS.BOM = {
             <tr class="fade-in-up">
                 <td>
                     <div class="d-flex flex-column">
+                        <span class="bom-code">${CMMS.escapeHtml(bom.bom_code)}</span>
                         <strong>${CMMS.escapeHtml(bom.bom_name)}</strong>
-                        <small class="text-muted">${CMMS.escapeHtml(bom.bom_code)}</small>
                     </div>
                 </td>
-                <td>
-                    <div class="d-flex flex-column">
-                        <span>${CMMS.escapeHtml(bom.machine_type_name)}</span>
-                        <small class="text-muted part-code">${CMMS.escapeHtml(bom.machine_type_code)}</small>
-                    </div>
-                </td>
-                <td class="text-center">
-                    <span class="badge bg-info">${bom.total_items || 0}</span>
-                </td>
-                <td class="text-end">
-                    <span class="cost-display">${this.formatCurrency(bom.total_cost || 0)}</span>
-                </td>
-                <td class="hide-mobile">
-                    <small class="text-muted">${CMMS.formatDate(bom.created_at)}</small>
-                </td>
-                <td class="hide-mobile">
-                    <small class="text-muted">${CMMS.escapeHtml(bom.created_by_name || '')}</small>
-                </td>
+                <td>${CMMS.escapeHtml(bom.machine_type_name)}</td>
+                <td>${CMMS.escapeHtml(bom.version)}</td>
+                <td class="text-center">${bom.total_items}</td>
+                <td class="text-end">${CMMS.BOM.formatCurrency(bom.total_cost)}</td>
+                <td class="hide-mobile">${CMMS.formatDateTime(bom.created_at)}</td>
+                <td class="hide-mobile">${CMMS.escapeHtml(bom.created_by_name)}</td>
                 <td>
                     <div class="btn-group btn-group-sm">
                         <a href="/modules/bom/view.php?id=${bom.id}" class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
@@ -243,224 +288,40 @@ CMMS.BOM = {
         `).join('');
     },
     
-    // Generate BOM code automatically
-    generateBOMCode: function(machineTypeId) {
-        if (!machineTypeId) return;
+    // Render pagination
+    renderPagination: function(pagination) {
+        const paginationElement = document.getElementById('bomPagination');
+        if (!paginationElement) return;
         
-        CMMS.ajax({
-            url: this.config.apiUrl + 'bom.php',
-            method: 'POST',
-            body: `action=generateCode&machine_type_id=${machineTypeId}`,
-            success: (data) => {
-                if (data.success) {
-                    const bomCodeInput = document.getElementById('bom_code');
-                    if (bomCodeInput) {
-                        bomCodeInput.value = data.code;
-                    }
-                }
-            }
-        });
-    },
-    
-    // Add new BOM item row
-    addBOMItem: function() {
-        const tbody = document.getElementById('bomItemsBody');
-        if (!tbody) return;
-        
-        const rowCount = tbody.children.length;
-        const newRow = this.createBOMItemRow(rowCount);
-        
-        tbody.appendChild(newRow);
-        
-        // Focus on part selection
-        const partSelect = newRow.querySelector('select[name$="[part_id]"]');
-        if (partSelect) {
-            partSelect.focus();
+        let pages = [];
+        for (let i = 1; i <= pagination.total_pages; i++) {
+            pages.push(`
+                <li class="page-item ${i === pagination.current_page ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="CMMS.BOM.changePage(${i});return false;">${i}</a>
+                </li>
+            `);
         }
         
-        // Update row numbers
-        this.updateRowNumbers();
-    },
-    
-    // Create BOM item row
-    createBOMItemRow: function(index, itemData = {}) {
-        const row = document.createElement('tr');
-        row.className = 'bom-item-row bom-item-new';
-        
-        row.innerHTML = `
-            <td class="text-center">${index + 1}</td>
-            <td>
-                <select name="items[${index}][part_id]" class="form-select" required>
-                    <option value="">-- Chọn linh kiện --</option>
-                    ${this.getPartsOptions(itemData.part_id)}
-                </select>
-            </td>
-            <td>
-                <input type="number" name="items[${index}][quantity]" class="form-control" 
-                       value="${itemData.quantity || 1}" min="0.01" step="0.01" required>
-            </td>
-            <td>
-                <select name="items[${index}][unit]" class="form-select">
-                    ${this.getUnitsOptions(itemData.unit)}
-                </select>
-            </td>
-            <td>
-                <input type="text" name="items[${index}][position]" class="form-control" 
-                       value="${itemData.position || ''}" placeholder="Vị trí lắp đặt">
-            </td>
-            <td>
-                <select name="items[${index}][priority]" class="form-select">
-                    <option value="Low" ${itemData.priority === 'Low' ? 'selected' : ''}>Thấp</option>
-                    <option value="Medium" ${itemData.priority === 'Medium' || !itemData.priority ? 'selected' : ''}>Trung bình</option>
-                    <option value="High" ${itemData.priority === 'High' ? 'selected' : ''}>Cao</option>
-                    <option value="Critical" ${itemData.priority === 'Critical' ? 'selected' : ''}>Nghiêm trọng</option>
-                </select>
-            </td>
-            <td>
-                <input type="number" name="items[${index}][maintenance_interval]" class="form-control" 
-                       value="${itemData.maintenance_interval || ''}" placeholder="Giờ">
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn-remove-item" onclick="CMMS.BOM.removeBOMItem(this)">
-                    <i class="fas fa-times"></i>
-                </button>
-            </td>
+        paginationElement.innerHTML = `
+            <nav aria-label="BOM pagination">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item ${pagination.has_previous ? '' : 'disabled'}">
+                        <a class="page-link" href="#" onclick="CMMS.BOM.changePage(${pagination.current_page - 1});return false;">Trước</a>
+                    </li>
+                    ${pages.join('')}
+                    <li class="page-item ${pagination.has_next ? '' : 'disabled'}">
+                        <a class="page-link" href="#" onclick="CMMS.BOM.changePage(${pagination.current_page + 1});return false;">Sau</a>
+                    </li>
+                </ul>
+            </nav>
         `;
-        
-        // Bind events for the new row
-        this.bindRowEvents(row);
-        
-        return row;
     },
     
-    // Remove BOM item row
-    removeBOMItem: function(button) {
-        const row = button.closest('tr');
-        if (row) {
-            row.remove();
-            this.updateRowNumbers();
-            this.calculateTotalCost();
-        }
-    },
-    
-    // Update row numbers after add/remove
-    updateRowNumbers: function() {
-        const rows = document.querySelectorAll('#bomItemsBody tr');
-        rows.forEach((row, index) => {
-            const numberCell = row.querySelector('td:first-child');
-            if (numberCell) {
-                numberCell.textContent = index + 1;
-            }
-            
-            // Update input names
-            const inputs = row.querySelectorAll('input, select');
-            inputs.forEach(input => {
-                const name = input.name;
-                if (name && name.includes('[')) {
-                    input.name = name.replace(/\[\d+\]/, `[${index}]`);
-                }
-            });
-        });
-    },
-    
-    // Bind events for BOM item row
-    bindRowEvents: function(row) {
-        // Part selection change
-        const partSelect = row.querySelector('select[name$="[part_id]"]');
-        if (partSelect) {
-            partSelect.addEventListener('change', (e) => {
-                this.onPartChange(e.target);
-            });
-        }
-        
-        // Quantity change
-        const quantityInput = row.querySelector('input[name$="[quantity]"]');
-        if (quantityInput) {
-            quantityInput.addEventListener('input', () => {
-                this.calculateTotalCost();
-            });
-        }
-    },
-    
-    // Handle part selection change
-    onPartChange: function(partSelect) {
-        const partId = partSelect.value;
-        if (!partId) return;
-        
-        // Get part details and update UI
-        CMMS.ajax({
-            url: this.config.apiUrl + 'parts.php',
-            method: 'POST',
-            body: `action=getDetails&id=${partId}`,
-            success: (data) => {
-                if (data.success) {
-                    const row = partSelect.closest('tr');
-                    const unitSelect = row.querySelector('select[name$="[unit]"]');
-                    
-                    if (unitSelect && data.part.unit) {
-                        unitSelect.value = data.part.unit;
-                    }
-                    
-                    // Update cost calculation
-                    this.calculateTotalCost();
-                }
-            }
-        });
-    },
-    
-    // Calculate total BOM cost
-    calculateTotalCost: function() {
-        let totalCost = 0;
-        const rows = document.querySelectorAll('#bomItemsBody tr');
-        
-        rows.forEach(row => {
-            const partSelect = row.querySelector('select[name$="[part_id]"]');
-            const quantityInput = row.querySelector('input[name$="[quantity]"]');
-            
-            if (partSelect && quantityInput && partSelect.value && quantityInput.value) {
-                const partOption = partSelect.selectedOptions[0];
-                const unitPrice = parseFloat(partOption.dataset.price || 0);
-                const quantity = parseFloat(quantityInput.value || 0);
-                
-                totalCost += unitPrice * quantity;
-            }
-        });
-        
-        const totalCostElement = document.getElementById('totalCost');
-        if (totalCostElement) {
-            totalCostElement.textContent = this.formatCurrency(totalCost);
-        }
-    },
-    
-    // Save BOM
-    saveBOM: function() {
-        const form = document.getElementById('bomForm');
-        const formData = new FormData(form);
-        
-        // Validate form
-        if (!form.checkValidity()) {
-            form.classList.add('was-validated');
-            return;
-        }
-        
-        // Add action
-        formData.append('action', 'save');
-        
-        CMMS.ajax({
-            url: this.config.apiUrl + 'bom.php',
-            method: 'POST',
-            body: formData,
-            success: (data) => {
-                if (data.success) {
-                    CMMS.showToast(data.message, 'success');
-                    setTimeout(() => {
-                        window.location.href = '/modules/bom/view.php?id=' + data.bom_id;
-                    }, 1500);
-                } else {
-                    CMMS.showToast(data.message, 'error');
-                }
-            }
-        });
+    // Change page
+    changePage: function(page) {
+        if (page < 1) return;
+        this.config.currentPage = page;
+        this.loadBOMList();
     },
     
     // Delete BOM
@@ -484,169 +345,182 @@ CMMS.BOM = {
     
     // Export BOM
     exportBOM: function(bomId, format = 'excel') {
-        const url = `${this.config.apiUrl}export.php?action=bom&id=${bomId}&format=${format}`;
-        window.open(url, '_blank');
+        const url = `/modules/bom/export.php?id=${bomId}&format=${format}`;
+        window.location.href = url;
     },
     
-    // Import BOM from Excel
+    // Import BOM
     importBOM: function() {
-        const fileInput = document.getElementById('bomImportFile');
-        if (!fileInput || !fileInput.files[0]) {
-            CMMS.showToast('Vui lòng chọn file để import', 'warning');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('action', 'import');
-        
-        CMMS.ajax({
-            url: '/modules/bom/imports/bom_import.php',
-            method: 'POST',
-            body: formData,
-            success: (data) => {
-                if (data.success) {
-                    CMMS.showToast(data.message, 'success');
-                    this.loadBOMList();
-                } else {
-                    CMMS.showToast(data.message, 'error');
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('action', 'import');
+            
+            CMMS.ajax({
+                url: this.config.apiUrl + 'bom.php',
+                method: 'POST',
+                body: formData,
+                success: (data) => {
+                    if (data.success) {
+                        CMMS.showToast(data.message, 'success');
+                        this.loadBOMList();
+                    } else {
+                        CMMS.showToast(data.message, 'error');
+                    }
                 }
-            }
-        });
-    },
-    
-    // Get parts options HTML
-    getPartsOptions: function(selectedId = '') {
-        // This should be populated from server data
-        if (window.bomPartsData) {
-            return window.bomPartsData.map(part => 
-                `<option value="${part.id}" data-price="${part.unit_price}" data-unit="${part.unit}" 
-                 ${part.id == selectedId ? 'selected' : ''}>${part.part_code} - ${part.part_name}</option>`
-            ).join('');
-        }
-        return '';
-    },
-    
-    // Get units options HTML
-    getUnitsOptions: function(selectedUnit = '') {
-        const units = ['Cái', 'Bộ', 'Chiếc', 'Kg', 'g', 'Lít', 'ml', 'm', 'cm', 'mm', 'Tấm', 'Cuộn', 'Gói', 'Hộp', 'Thùng'];
-        return units.map(unit => 
-            `<option value="${unit}" ${unit === selectedUnit ? 'selected' : ''}>${unit}</option>`
-        ).join('');
+            });
+        };
+        input.click();
     },
     
     // Format currency
     formatCurrency: function(amount) {
         return new Intl.NumberFormat('vi-VN', {
             style: 'currency',
-            currency: 'VND',
-            minimumFractionDigits: 0
+            currency: 'VND'
         }).format(amount);
     },
     
-    // Initialize tooltips
-    initializeTooltips: function() {
-        const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-        tooltipElements.forEach(element => {
-            new bootstrap.Tooltip(element);
-        });
+    // Add BOM item
+    addBOMItem: function() {
+        const tbody = document.getElementById('bomItemsBody');
+        if (!tbody) return;
+        const rowIndex = tbody.children.length;
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>
+                <select name="items[${rowIndex}][part_id]" class="form-select part-select" required onchange="CMMS.BOM.updatePartDetails(this)">
+                    <option value="">-- Chọn linh kiện --</option>
+                    ${window.bomPartsData ? window.bomPartsData.map(part => `<option value="${part.id}" data-price="${part.unit_price}" data-unit="${part.unit}" data-name="${part.part_name}" data-code="${part.part_code}">${part.part_code} - ${part.part_name}</option>`).join('') : ''}
+                </select>
+            </td>
+            <td><input type="number" name="items[${rowIndex}][quantity]" class="form-control quantity" min="0.01" step="0.01" required oninput="updateTotals()"></td>
+            <td><input type="text" name="items[${rowIndex}][unit]" class="form-control" readonly></td>
+            <td><input type="number" name="items[${rowIndex}][unit_price]" class="form-control" readonly></td>
+            <td>
+                <select name="items[${rowIndex}][priority]" class="form-select">
+                    ${window.bomConfig && Array.isArray(window.bomConfig.priorities) ? window.bomConfig.priorities.map(p => `<option value="${p}">${p}</option>`).join('') : '<option value="Medium">Medium</option>'}
+                </select>
+            </td>
+            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); updateTotals()">Xóa</button></td>
+        `;
     },
     
-    // Render pagination
-    renderPagination: function(pagination) {
-        const paginationContainer = document.getElementById('bomPagination');
-        if (!paginationContainer || !pagination) return;
-        
-        if (pagination.total_pages <= 1) {
-            paginationContainer.innerHTML = '';
-            return;
-        }
-        
-        let html = '<nav><ul class="pagination pagination-sm justify-content-center">';
-        
-        // Previous
-        if (pagination.current_page > 1) {
-            html += `<li class="page-item">
-                <a class="page-link" href="#" data-page="${pagination.current_page - 1}">‹</a>
-            </li>`;
-        } else {
-            html += '<li class="page-item disabled"><span class="page-link">‹</span></li>';
-        }
-        
-        // Page numbers
-        const start = Math.max(1, pagination.current_page - 2);
-        const end = Math.min(pagination.total_pages, pagination.current_page + 2);
-        
-        for (let i = start; i <= end; i++) {
-            if (i === pagination.current_page) {
-                html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
-            } else {
-                html += `<li class="page-item">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>`;
+    // Update part details
+    updatePartDetails: function(select) {
+        const row = select.closest('tr');
+        const option = select.selectedOptions[0];
+        row.querySelector('input[name$="[unit]"]').value = option.dataset.unit || '';
+        row.querySelector('input[name$="[unit_price]"]').value = option.dataset.price || 0;
+        updateTotals();
+    },
+    
+    // Add part to BOM (from quick search)
+    addPartToBOM: function(partId) {
+        const existingSelects = document.querySelectorAll('select[name$="[part_id]"]');
+        for (let select of existingSelects) {
+            if (select.value == partId) {
+                select.closest('tr').style.backgroundColor = '#fef3c7';
+                setTimeout(() => {
+                    select.closest('tr').style.backgroundColor = '';
+                }, 2000);
+                CMMS.showToast('Linh kiện này đã có trong BOM', 'warning');
+                return;
             }
         }
         
-        // Next
-        if (pagination.current_page < pagination.total_pages) {
-            html += `<li class="page-item">
-                <a class="page-link" href="#" data-page="${pagination.current_page + 1}">›</a>
-            </li>`;
-        } else {
-            html += '<li class="page-item disabled"><span class="page-link">›</span></li>';
+        this.addBOMItem();
+        const tbody = document.getElementById('bomItemsBody');
+        const newRow = tbody.lastElementChild;
+        const partSelect = newRow.querySelector('select[name$="[part_id]"]');
+        
+        if (partSelect) {
+            partSelect.value = partId;
+            partSelect.dispatchEvent(new Event('change'));
         }
         
-        html += '</ul></nav>';
+        document.getElementById('quickSearch').value = '';
+        document.getElementById('quickSearchResults').innerHTML = '';
         
-        paginationContainer.innerHTML = html;
+        const quantityInput = newRow.querySelector('input[name$="[quantity]"]');
+        if (quantityInput) {
+            quantityInput.focus();
+            quantityInput.select();
+        }
         
-        // Bind pagination events
-        paginationContainer.querySelectorAll('a.page-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = parseInt(e.target.dataset.page);
-                if (page) {
-                    this.config.currentPage = page;
-                    this.loadBOMList(this.getFilters());
-                }
-            });
-        });
-    }
-};
-
-// Parts management functionality
-CMMS.Parts = {
-    // Initialize parts management
-    init: function() {
-        this.bindEvents();
-        this.loadPartsList();
+        updateTotals();
     },
     
-    // Bind events
-    bindEvents: function() {
-        // Search parts
-        const searchInput = document.getElementById('partsSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', CMMS.utils.debounce((e) => {
-                this.searchParts(e.target.value);
-            }, 300));
+    // Submit BOM (for add)
+    submitBOM: function(form) {
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            CMMS.showToast('Vui lòng kiểm tra dữ liệu form', 'warning');
+            return;
         }
         
-        // Category filter
-        const categoryFilter = document.getElementById('filterCategory');
-        if (categoryFilter) {
-            categoryFilter.addEventListener('change', () => {
-                this.applyFilters();
-            });
+        const formData = new FormData(form);
+        formData.append('action', 'save');
+        
+        CMMS.showLoading();
+        CMMS.ajax({
+            url: this.config.apiUrl + 'bom.php',
+            method: 'POST',
+            body: formData,
+            success: (data) => {
+                CMMS.hideLoading();
+                if (data.success) {
+                    CMMS.showToast(data.message || 'Tạo BOM thành công!', 'success');
+                    setTimeout(() => window.location.href = '/modules/bom/index.php', 1500);
+                } else {
+                    CMMS.showToast(data.message || 'Lỗi lưu BOM', 'error');
+                }
+            },
+            error: (err) => {
+                CMMS.hideLoading();
+                CMMS.showToast('Lỗi kết nối server: ' + err.message, 'error');
+                console.error(err);
+            }
+        });
+    },
+    
+    // Update BOM (for edit)
+    updateBOM: function(form) {
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            CMMS.showToast('Vui lòng kiểm tra dữ liệu form', 'warning');
+            return;
         }
         
-        // Stock status filter
-        const stockFilter = document.getElementById('filterStockStatus');
-        if (stockFilter) {
-            stockFilter.addEventListener('change', () => {
-                this.applyFilters();
-            });
-        }
+        const formData = new FormData(form);
+        formData.append('action', 'update');
+        
+        CMMS.showLoading();
+        CMMS.ajax({
+            url: this.config.apiUrl + 'bom.php',
+            method: 'POST',
+            body: formData,
+            success: (data) => {
+                CMMS.hideLoading();
+                if (data.success) {
+                    CMMS.showToast(data.message || 'Cập nhật BOM thành công!', 'success');
+                    setTimeout(() => window.location.href = '/modules/bom/view.php?id=' + formData.get('bom_id'), 1500);
+                } else {
+                    CMMS.showToast(data.message || 'Lỗi cập nhật BOM', 'error');
+                }
+            },
+            error: (err) => {
+                CMMS.hideLoading();
+                CMMS.showToast('Lỗi kết nối server: ' + err.message, 'error');
+                console.error(err);
+            }
+        });
     },
     
     // Load parts list
@@ -676,21 +550,6 @@ CMMS.Parts = {
         const filters = this.getFilters();
         filters.search = searchTerm;
         this.loadPartsList(filters);
-    },
-    
-    // Apply filters
-    applyFilters: function() {
-        const filters = this.getFilters();
-        this.loadPartsList(filters);
-    },
-    
-    // Get filter values
-    getFilters: function() {
-        return {
-            category: document.getElementById('filterCategory')?.value || '',
-            stock_status: document.getElementById('filterStockStatus')?.value || '',
-            search: document.getElementById('partsSearch')?.value || ''
-        };
     },
     
     // Render parts list
@@ -782,7 +641,6 @@ CMMS.Parts = {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Check which page we're on and initialize accordingly
     const path = window.location.pathname;
     
     if (path.includes('/modules/bom/parts/')) {

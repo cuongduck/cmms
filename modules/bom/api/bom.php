@@ -1,6 +1,6 @@
 <?php
 /**
- * BOM API Handler - Fixed Version
+ * BOM API Handler
  * /modules/bom/api/bom.php
  * API endpoint cho BOM operations
  */
@@ -9,7 +9,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Error handling
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Don't show errors in JSON response
+ini_set('display_errors', 0);
 
 try {
     require_once '../../../config/config.php';
@@ -123,7 +123,6 @@ function handleBOMList() {
         $totalResult = $db->fetch($countSql, $params);
         $totalItems = intval($totalResult['total']);
     } catch (Exception $e) {
-        // If query fails, return empty result
         echo json_encode([
             'success' => true,
             'data' => [],
@@ -161,64 +160,32 @@ function handleBOMList() {
         $queryParams = array_merge($params, [$filters['limit'], $offset]);
         $boms = $db->fetchAll($sql, $queryParams);
         
-        // Ensure boms is always an array
         if (!is_array($boms)) {
             $boms = [];
         }
         
-        // Format data
-        $formattedBoms = [];
-        foreach ($boms as $bom) {
-            $formattedBoms[] = [
-                'id' => intval($bom['id']),
-                'bom_name' => $bom['bom_name'],
-                'bom_code' => $bom['bom_code'],
-                'version' => $bom['version'],
-                'description' => $bom['description'],
-                'machine_type_name' => $bom['machine_type_name'],
-                'machine_type_code' => $bom['machine_type_code'],
-                'created_by_name' => $bom['created_by_name'],
-                'total_items' => intval($bom['total_items']),
-                'total_cost' => floatval($bom['total_cost']),
-                'created_at' => $bom['created_at'],
-                'updated_at' => $bom['updated_at']
-            ];
-        }
-        
-    } catch (Exception $e) {
-        // If main query fails, return empty result with error message
         echo json_encode([
-            'success' => false,
-            'message' => 'Database error: ' . $e->getMessage(),
-            'data' => []
+            'success' => true,
+            'data' => $boms,
+            'pagination' => [
+                'current_page' => $filters['page'],
+                'total_pages' => ceil($totalItems / $filters['limit']),
+                'total_items' => $totalItems,
+                'per_page' => $filters['limit'],
+                'has_previous' => $filters['page'] > 1,
+                'has_next' => $filters['page'] < ceil($totalItems / $filters['limit'])
+            ]
         ], JSON_UNESCAPED_UNICODE);
-        return;
+    } catch (Exception $e) {
+        throw new Exception('Error fetching BOM list: ' . $e->getMessage());
     }
-    
-    // Pagination info
-    $totalPages = ceil($totalItems / $filters['limit']);
-    $pagination = [
-        'current_page' => $filters['page'],
-        'total_pages' => $totalPages,
-        'total_items' => $totalItems,
-        'per_page' => $filters['limit'],
-        'has_previous' => $filters['page'] > 1,
-        'has_next' => $filters['page'] < $totalPages
-    ];
-    
-    // Return successful response
-    echo json_encode([
-        'success' => true,
-        'data' => $formattedBoms, // This should be an array
-        'pagination' => $pagination
-    ], JSON_UNESCAPED_UNICODE);
 }
 
 /**
- * Get BOM details by ID
+ * Get BOM details
  */
 function handleGetBOMDetails() {
-    requirePermission('bom', 'view');
+    global $db;
     
     $bomId = intval($_GET['id'] ?? 0);
     if (!$bomId) {
@@ -232,7 +199,7 @@ function handleGetBOMDetails() {
     
     echo json_encode([
         'success' => true,
-        'data' => ['bom' => $bom]
+        'data' => $bom
     ], JSON_UNESCAPED_UNICODE);
 }
 
@@ -240,63 +207,56 @@ function handleGetBOMDetails() {
  * Save new BOM
  */
 function handleSaveBOM() {
-    requirePermission('bom', 'create');
     global $db;
     
-    // Debug log
-    error_log("Save BOM - POST data: " . print_r($_POST, true));
+    requirePermission('bom', 'create');
     
-    try {
-        // Collect and validate data
-        $data = [
-            'machine_type_id' => intval($_POST['machine_type_id'] ?? 0),
-            'bom_name' => trim($_POST['bom_name'] ?? ''),
-            'bom_code' => trim($_POST['bom_code'] ?? ''),
-            'version' => trim($_POST['version'] ?? '1.0'),
-            'description' => trim($_POST['description'] ?? ''),
-            'effective_date' => $_POST['effective_date'] ?? null,
-            'items' => []
-        ];
-        
-        // Process BOM items from $_POST['items'] array
-        if (isset($_POST['items']) && is_array($_POST['items'])) {
-            foreach ($_POST['items'] as $index => $item) {
-                if (!empty($item['part_id']) && !empty($item['quantity'])) {
-                    $data['items'][] = [
-                        'part_id' => intval($item['part_id']),
-                        'quantity' => floatval($item['quantity']),
-                        'unit' => trim($item['unit'] ?? 'Cái'),
-                        'position' => trim($item['position'] ?? ''),
-                        'priority' => trim($item['priority'] ?? 'Medium'),
-                        'maintenance_interval' => !empty($item['maintenance_interval']) ? 
-                                                intval($item['maintenance_interval']) : null
-                    ];
-                }
+    $data = [
+        'machine_type_id' => intval($_POST['machine_type_id'] ?? 0),
+        'bom_name' => trim($_POST['bom_name'] ?? ''),
+        'bom_code' => trim($_POST['bom_code'] ?? ''),
+        'version' => trim($_POST['version'] ?? '1.0'),
+        'description' => trim($_POST['description'] ?? ''),
+        'items' => []
+    ];
+    
+    // Process items
+    if (!empty($_POST['items']) && is_array($_POST['items'])) {
+        foreach ($_POST['items'] as $item) {
+            if (!empty($item['part_id']) && !empty($item['quantity'])) {
+                $data['items'][] = [
+                    'part_id' => intval($item['part_id']),
+                    'quantity' => floatval($item['quantity']),
+                    'unit' => trim($item['unit'] ?? 'Cái'),
+                    'priority' => trim($item['priority'] ?? 'Medium')
+                ];
             }
         }
-        
-        // Validate data
-        $errors = validateBOMData($data);
-        if (!empty($errors)) {
-            throw new Exception(implode(', ', $errors));
-        }
-        
-        // Generate BOM code if empty
-        if (empty($data['bom_code'])) {
-            $data['bom_code'] = generateBOMCode($data['machine_type_id']);
-        }
-        
-        // Check for duplicate BOM code
-        $existingBom = $db->fetch("SELECT id FROM machine_bom WHERE bom_code = ?", [$data['bom_code']]);
-        if ($existingBom) {
-            throw new Exception('Mã BOM đã tồn tại: ' . $data['bom_code']);
-        }
-        
-        $db->beginTransaction();
-        
+    }
+    
+    // Validate data
+    $errors = validateBOMData($data);
+    if (!empty($errors)) {
+        throw new Exception(implode(', ', $errors));
+    }
+    
+    // Generate BOM code if empty
+    if (empty($data['bom_code'])) {
+        $data['bom_code'] = generateBOMCode($data['machine_type_id']);
+    }
+    
+    // Check for duplicate BOM code
+    $existingBom = $db->fetch("SELECT id FROM machine_bom WHERE bom_code = ?", [$data['bom_code']]);
+    if ($existingBom) {
+        throw new Exception('Mã BOM đã tồn tại: ' . $data['bom_code']);
+    }
+    
+    $db->beginTransaction();
+    
+    try {
         // Insert BOM
-        $sql = "INSERT INTO machine_bom (machine_type_id, bom_name, bom_code, version, description, effective_date, created_by, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+        $sql = "INSERT INTO machine_bom (machine_type_id, bom_name, bom_code, version, description, created_by, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, NOW())";
         
         $currentUser = getCurrentUser();
         $params = [
@@ -305,7 +265,6 @@ function handleSaveBOM() {
             $data['bom_code'],
             $data['version'],
             $data['description'],
-            !empty($data['effective_date']) ? $data['effective_date'] : null,
             $currentUser['id'] ?? null
         ];
         
@@ -318,8 +277,8 @@ function handleSaveBOM() {
         
         // Insert BOM items
         if (!empty($data['items'])) {
-            $itemSql = "INSERT INTO bom_items (bom_id, part_id, quantity, unit, position, priority, maintenance_interval, created_at) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+            $itemSql = "INSERT INTO bom_items (bom_id, part_id, quantity, unit, priority, created_at) 
+                       VALUES (?, ?, ?, ?, ?, NOW())";
             
             foreach ($data['items'] as $item) {
                 $itemParams = [
@@ -327,9 +286,7 @@ function handleSaveBOM() {
                     $item['part_id'],
                     $item['quantity'],
                     $item['unit'],
-                    $item['position'],
-                    $item['priority'],
-                    $item['maintenance_interval']
+                    $item['priority']
                 ];
                 
                 $db->execute($itemSql, $itemParams);
@@ -354,10 +311,7 @@ function handleSaveBOM() {
         ], JSON_UNESCAPED_UNICODE);
         
     } catch (Exception $e) {
-        if ($db->getConnection()->inTransaction()) {
-            $db->rollback();
-        }
-        
+        $db->rollback();
         error_log("BOM Save Error: " . $e->getMessage());
         throw $e;
     }
@@ -367,20 +321,136 @@ function handleSaveBOM() {
  * Update existing BOM
  */
 function handleUpdateBOM() {
+    global $db;
+    
     requirePermission('bom', 'edit');
-    // Implementation similar to save but with UPDATE
-    echo json_encode([
-        'success' => false,
-        'message' => 'Update function not implemented yet'
-    ], JSON_UNESCAPED_UNICODE);
+    
+    // Xử lý FormData cho nested arrays
+    $rawInput = file_get_contents("php://input");
+    $boundary = substr($rawInput, 0, strpos($rawInput, "\r\n"));
+    if (empty($boundary)) {
+        throw new Exception('Invalid FormData');
+    }
+    
+    $blocks = array_slice(explode($boundary, $rawInput), 1);
+    $data = [];
+    $items = [];
+    
+    foreach ($blocks as $block) {
+        if (trim($block) === '--') break;
+        
+        if (strpos($block, "name=\"") !== false) {
+            preg_match('/name="([^"]*)"/', $block, $matches);
+            $name = $matches[1];
+            
+            if (strpos($name, 'items[') === 0) {
+                // Parse nested items
+                preg_match('/items\[(\d+)\]\[([^\]]+)\]/', $name, $itemMatches);
+                if (count($itemMatches) == 3) {
+                    $index = $itemMatches[1];
+                    $field = $itemMatches[2];
+                    if (!isset($items[$index])) $items[$index] = [];
+                    $items[$index][$field] = $this->extractValue($block);
+                }
+            } else {
+                $data[$name] = $this->extractValue($block);
+            }
+        }
+    }
+    
+    // Validate
+    $data['bom_id'] = intval($data['bom_id'] ?? 0);
+    $data['machine_type_id'] = intval($data['machine_type_id'] ?? 0);
+    $data['bom_name'] = trim($data['bom_name'] ?? '');
+    $data['bom_code'] = trim($data['bom_code'] ?? '');
+    $data['version'] = trim($data['version'] ?? '1.0');
+    $data['description'] = trim($data['description'] ?? '');
+    $data['notes'] = trim($data['notes'] ?? '');
+    
+    // Process items
+    $data['items'] = array_values($items); // Convert to indexed array
+    
+    if (empty($data['bom_id'])) {
+        throw new Exception('BOM ID is required');
+    }
+    if (empty($data['machine_type_id'])) {
+        throw new Exception('Vui lòng chọn dòng máy');
+    }
+    if (empty($data['bom_name'])) {
+        throw new Exception('Vui lòng nhập tên BOM');
+    }
+    if (empty($data['items'])) {
+        throw new Exception('BOM phải có ít nhất 1 linh kiện');
+    }
+    
+    // Check duplicate code
+    if (!empty($data['bom_code'])) {
+        $existingBom = $db->fetch("SELECT id FROM machine_bom WHERE bom_code = ? AND id != ?", [$data['bom_code'], $data['bom_id']]);
+        if ($existingBom) {
+            throw new Exception('Mã BOM đã tồn tại: ' . $data['bom_code']);
+        }
+    }
+    
+    // Generate code if empty
+    if (empty($data['bom_code'])) {
+        $data['bom_code'] = generateBOMCode($data['machine_type_id']);
+    }
+    
+    $db->beginTransaction();
+    
+    try {
+        // Update BOM
+        $sql = "UPDATE machine_bom SET machine_type_id = ?, bom_name = ?, bom_code = ?, version = ?, description = ?, notes = ?, updated_by = ?, updated_at = NOW() WHERE id = ?";
+        $currentUser = getCurrentUser();
+        $params = [
+            $data['machine_type_id'], $data['bom_name'], $data['bom_code'], $data['version'],
+            $data['description'], $data['notes'], $currentUser['id'] ?? null, $data['bom_id']
+        ];
+        $db->execute($sql, $params);
+        
+        // Delete old items
+        $db->execute("DELETE FROM bom_items WHERE bom_id = ?", [$data['bom_id']]);
+        
+        // Insert new items
+        $itemSql = "INSERT INTO bom_items (bom_id, part_id, quantity, unit, priority, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
+        foreach ($data['items'] as $item) {
+            if (!empty($item['part_id']) && ($item['quantity'] ?? 0) > 0) {
+                $itemParams = [
+                    $data['bom_id'], intval($item['part_id']), floatval($item['quantity']),
+                    trim($item['unit'] ?? 'Cái'), trim($item['priority'] ?? 'Medium')
+                ];
+                $db->execute($itemSql, $itemParams);
+            }
+        }
+        
+        if (function_exists('logActivity')) {
+            logActivity('update_bom', 'bom', "Updated BOM: {$data['bom_name']} ({$data['bom_code']})");
+        }
+        
+        $db->commit();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Cập nhật BOM thành công',
+            'data' => ['bom_id' => $data['bom_id']]
+        ], JSON_UNESCAPED_UNICODE);
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        error_log("BOM Update Error: " . $e->getMessage() . " Data: " . print_r($data, true));
+        throw $e;
+    }
 }
+
+// Helper function to extract value from multipart block
 
 /**
  * Delete BOM
  */
 function handleDeleteBOM() {
-    requirePermission('bom', 'delete');
     global $db;
+    
+    requirePermission('bom', 'delete');
     
     $bomId = intval($_POST['id'] ?? 0);
     if (!$bomId) {
@@ -445,7 +515,6 @@ function handleGenerateBOMCode() {
  */
 function handleCopyBOM() {
     requirePermission('bom', 'create');
-    // Implementation for copy functionality
     echo json_encode([
         'success' => false,
         'message' => 'Copy function not implemented yet'
