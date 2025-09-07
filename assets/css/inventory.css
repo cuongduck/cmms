@@ -1,0 +1,468 @@
+/* Inventory Module Styles */
+
+:root {
+    --inventory-primary: #2563eb;
+    --inventory-success: #10b981;
+    --inventory-warning: #f59e0b;
+    --inventory-danger: #ef4444;
+    --inventory-info: #06b6d4;
+    --inventory-light: #f8fafc;
+    --inventory-dark: #1f2937;
+}
+
+/* Statistics Cards */
+.stat-card {
+    border-radius: 1rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30px, -30px);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Filter Card */
+.filter-card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 0.75rem;
+}
+
+.filter-card .card-header {
+    background: linear-gradient(135deg, var(--inventory-light), #ffffff);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+
+/* Inventory Table */
+.inventory-table {
+    font-size: 0.875rem;
+}
+
+.inventory-table th {
+    background: var(--inventory-light);
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 600;
+    color: var(--inventory-dark);
+    white-space: nowrap;
+}
+
+.inventory-table td {
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.inventory-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Stock Status Indicators */
+.stock-quantity {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.stock-quantity.low {
+    color: var(--inventory-warning);
+}
+
+.stock-quantity.critical {
+    color: var(--inventory-danger);
+    animation: pulse 2s infinite;
+}
+
+.stock-quantity.normal {
+    color: var(--inventory-success);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Stock Status Badges */
+.badge.stock-status {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+}
+
+.badge.stock-status.out-of-stock {
+    background-color: var(--inventory-danger);
+    color: white;
+}
+
+.badge.stock-status.low-stock {
+    background-color: var(--inventory-warning);
+    color: white;
+}
+
+.badge.stock-status.excess-stock {
+    background-color: var(--inventory-info);
+    color: white;
+}
+
+.badge.stock-status.normal {
+    background-color: var(--inventory-success);
+    color: white;
+}
+
+/* BOM Status Badges */
+.badge.bom-status {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+}
+
+.badge.bom-status.in-bom {
+    background-color: var(--inventory-primary);
+    color: white;
+}
+
+.badge.bom-status.out-bom {
+    background-color: #6b7280;
+    color: white;
+}
+
+/* Transaction Type Badges */
+.transaction-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.transaction-badge.receipt {
+    background-color: var(--inventory-success);
+    color: white;
+}
+
+.transaction-badge.issue {
+    background-color: var(--inventory-danger);
+    color: white;
+}
+
+.transaction-badge.transfer {
+    background-color: var(--inventory-info);
+    color: white;
+}
+
+.transaction-badge.adjustment {
+    background-color: var(--inventory-warning);
+    color: white;
+}
+
+.transaction-badge.return {
+    background-color: #6b7280;
+    color: white;
+}
+
+/* Modal Styles */
+.modal-xl {
+    max-width: 1200px;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--inventory-primary), #3b82f6);
+    color: white;
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+.modal-body {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* Item Details Card */
+.item-details-card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+}
+
+.item-details-card .card-header {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: var(--inventory-dark);
+}
+
+/* Transaction History Table */
+.transaction-history-table {
+    font-size: 0.875rem;
+}
+
+.transaction-history-table .transaction-in {
+    color: var(--inventory-success);
+    font-weight: 600;
+}
+
+.transaction-history-table .transaction-out {
+    color: var(--inventory-danger);
+    font-weight: 600;
+}
+
+.transaction-history-table .transaction-value-in {
+    color: var(--inventory-success);
+}
+
+.transaction-history-table .transaction-value-out {
+    color: var(--inventory-danger);
+}
+
+/* Quick Action Buttons */
+.quick-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.btn-action {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Loading States */
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid var(--inventory-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state h5 {
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.empty-state p {
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+/* Progress Bars */
+.stock-progress {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #e5e7eb;
+    overflow: hidden;
+}
+
+.stock-progress-bar {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.stock-progress-bar.normal {
+    background-color: var(--inventory-success);
+}
+
+.stock-progress-bar.low {
+    background-color: var(--inventory-warning);
+}
+
+.stock-progress-bar.critical {
+    background-color: var(--inventory-danger);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stat-card {
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    
+    .inventory-table {
+        font-size: 0.75rem;
+    }
+    
+    .btn-action {
+        padding: 0.25rem 0.375rem;
+        font-size: 0.7rem;
+    }
+    
+    .modal-xl {
+        max-width: 95%;
+    }
+    
+    .transaction-history-table {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .quick-actions {
+        flex-direction: column;
+        gap: 0.125rem;
+    }
+    
+    .filter-card .row .col-md-3,
+    .filter-card .row .col-md-2 {
+        margin-bottom: 1rem;
+    }
+    
+    .stat-card .card-body {
+        padding: 1rem;
+    }
+    
+    .inventory-table th,
+    .inventory-table td {
+        padding: 0.5rem 0.25rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .btn, 
+    .dropdown,
+    .quick-actions,
+    .modal,
+    .filter-card {
+        display: none !important;
+    }
+    
+    .inventory-table {
+        font-size: 0.7rem;
+    }
+    
+    .stat-card {
+        page-break-inside: avoid;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+    }
+    
+    .card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --inventory-light: #374151;
+        --inventory-dark: #f9fafb;
+    }
+    
+    .inventory-table th {
+        background: #374151;
+        color: #f9fafb;
+    }
+    
+    .modal-content {
+        background-color: #1f2937;
+        color: #f9fafb;
+    }
+    
+    .card {
+        background-color: #1f2937;
+        border-color: #374151;
+    }
+    
+    .empty-state {
+        color: #9ca3af;
+    }
+}
+
+/* Accessibility */
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .card {
+        border: 2px solid #000;
+    }
+    
+    .btn {
+        border-width: 2px;
+    }
+    
+    .badge {
+        border: 1px solid #000;
+    }
+}

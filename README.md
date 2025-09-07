@@ -17,7 +17,7 @@ Quản lý toàn diện thiết bị sản xuất trong dây chuyền thực ph�
 - **Web Server**: Apache/Nginx
 - **Extensions**: PDO, MySQLi, JSON, FileInfo
 
-## 📦 Cài đặt.
+## 📦 Cài đặt
 
 1. **Clone repository**
 ```bash
@@ -43,11 +43,13 @@ chown -R www-data:www-data assets/uploads/
 
 ```
 cmms/
+├── README.md
 ├── assets
 │   ├── css
 │   │   ├── bom.css
 │   │   ├── equipment-view.css
 │   │   ├── equipment.css
+│   │   ├── inventory.css
 │   │   ├── structure.css
 │   │   └── style.css
 │   ├── images
@@ -59,6 +61,7 @@ cmms/
 │   │   ├── equipment-edit.js
 │   │   ├── equipment-view.js
 │   │   ├── equipment.js
+│   │   ├── inventory.js
 │   │   ├── main.js
 │   │   └── structure.js
 │   └── uploads
@@ -114,6 +117,14 @@ cmms/
     │   │       └── images
     │   └── view.php
     ├── inventory
+    │   ├── api
+    │   │   ├── export.php
+    │   │   ├── item_details.php
+    │   │   ├── search_suggestions.php
+    │   │   ├── stats.php
+    │   │   └── transactions.php
+    │   ├── dashboard.php
+    │   ├── index.php
     │   └── transactions.php
     └── structure
         ├── api
@@ -131,6 +142,7 @@ cmms/
             ├── lines.php
             ├── machine_types.php
             └── workshops.php
+
 
 
 ## 🎛️ Modules chính

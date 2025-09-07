@@ -139,6 +139,7 @@ function getBOMDetails($bomId) {
 
 
 /**
+/**
  * Lấy danh sách linh kiện
  */
 function getPartsList($filters = []) {
@@ -155,8 +156,7 @@ function getPartsList($filters = []) {
                    END as stock_status
             FROM parts p
             LEFT JOIN bom_items bi ON p.id = bi.part_id
-            LEFT JOIN part_inventory_mapping pim ON p.id = pim.part_id
-            LEFT JOIN onhand oh ON pim.item_code = oh.ItemCode
+            LEFT JOIN onhand oh ON p.part_code = oh.ItemCode
             WHERE 1=1";
     
     $params = [];
@@ -184,6 +184,7 @@ function getPartsList($filters = []) {
     
     return $db->fetchAll($sql, $params);
 }
+
 
 /**
  * Tạo mã BOM tự động
