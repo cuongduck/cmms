@@ -17,7 +17,7 @@ Quản lý toàn diện thiết bị sản xuất trong dây chuyền thực ph�
 - **Web Server**: Apache/Nginx
 - **Extensions**: PDO, MySQLi, JSON, FileInfo
 
-## 📦 Cài đặt
+## 📦 Cài đặt.
 
 1. **Clone repository**
 ```bash
