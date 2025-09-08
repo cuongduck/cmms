@@ -1309,18 +1309,7 @@ require_once '../../includes/header.php';
                 </div>
 
                 <!-- Related Equipment (if any) -->
-                <div class="info-section mt-3">
-                    <div class="info-section-header">
-                        <i class="fas fa-link section-icon"></i>
-                        <h5>Thiết bị liên quan</h5>
-                    </div>
-                    <div class="info-section-body">
-                        <div class="text-center py-3 text-muted">
-                            <i class="fas fa-sitemap fa-2x mb-2 opacity-25"></i>
-                            <p class="mb-0 small">Chức năng đang phát triển</p>
-                        </div>
-                    </div>
-                </div>
+              
             </div>
         </div>
     </div>

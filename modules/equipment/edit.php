@@ -155,12 +155,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $manualPath = $equipment['manual_path'];
                 
                 // Handle image removal
-                if (isset($_POST['remove_current_image']) && $_POST['remove_current_image'] === '1') {
-                    if ($imagePath && file_exists($imagePath)) {
-                        unlink($imagePath);
-                    }
-                    $imagePath = null;
-                }
+                // Handle image removal
+if (isset($_POST['remove_current_image']) && $_POST['remove_current_image'] === '1') {
+    if ($imagePath && file_exists(BASE_PATH . '/' . $imagePath)) { // ✅ Sửa
+        unlink(BASE_PATH . '/' . $imagePath);
+    }
+    $imagePath = null;
+}
+
+// Handle manual removal
+if (isset($_POST['remove_current_manual']) && $_POST['remove_current_manual'] === '1') {
+    if ($manualPath && file_exists(BASE_PATH . '/' . $manualPath)) { // ✅ Sửa
+        unlink(BASE_PATH . '/' . $manualPath);
+    }
+    $manualPath = null;
+}
                 
                 // Handle manual removal
                 if (isset($_POST['remove_current_manual']) && $_POST['remove_current_manual'] === '1') {
@@ -171,47 +180,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
                 
                 // Handle new image upload
-                if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-                    $imageUpload = uploadFile(
-                        $_FILES['image'],
-                        ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                        getConfig('upload.paths.equipment_images'),
-                        5 * 1024 * 1024 // 5MB
-                    );
-                    
-                    if ($imageUpload['success']) {
-                        // Delete old image if exists
-                        if ($imagePath && file_exists($imagePath)) {
-                            unlink($imagePath);
-                        }
-                        $imagePath = $imageUpload['path'];
-                        
-                        // Resize image if needed
-                        resizeImage($imagePath, $imagePath, 800, 600);
-                    } else {
-                        $errors[] = $imageUpload['message'];
-                    }
-                }
-                
-                // Handle new manual upload
-                if (isset($_FILES['manual']) && $_FILES['manual']['error'] === UPLOAD_ERR_OK) {
-                    $manualUpload = uploadFile(
-                        $_FILES['manual'],
-                        ['pdf', 'doc', 'docx'],
-                        getConfig('upload.paths.manuals'),
-                        10 * 1024 * 1024 // 10MB
-                    );
-                    
-                    if ($manualUpload['success']) {
-                        // Delete old manual if exists
-                        if ($manualPath && file_exists($manualPath)) {
-                            unlink($manualPath);
-                        }
-                        $manualPath = $manualUpload['path'];
-                    } else {
-                        $errors[] = $manualUpload['message'];
-                    }
-                }
+// Handle new image upload
+if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+    $imageUpload = uploadFile(
+        $_FILES['image'],
+        ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        'uploads/equipment/images/', // ✅ Sửa
+        5 * 1024 * 1024 // 5MB
+    );
+    
+    if ($imageUpload['success']) {
+        // Delete old image if exists
+        if ($imagePath && file_exists(BASE_PATH . '/' . $imagePath)) { // ✅ Sửa
+            unlink(BASE_PATH . '/' . $imagePath);
+        }
+        $imagePath = $imageUpload['relative_path']; // ✅ Sửa
+        
+        // Resize image if needed
+        if (function_exists('resizeImage')) {
+            resizeImage($imageUpload['path'], $imageUpload['path'], 800, 600);
+        }
+    } else {
+        $errors[] = 'Lỗi upload hình ảnh: ' . $imageUpload['message'];
+    }
+}
+
+// Handle new manual upload
+if (isset($_FILES['manual']) && $_FILES['manual']['error'] === UPLOAD_ERR_OK) {
+    $manualUpload = uploadFile(
+        $_FILES['manual'],
+        ['pdf', 'doc', 'docx'],
+        'uploads/equipment/manuals/', // ✅ Sửa
+        10 * 1024 * 1024 // 10MB
+    );
+    
+    if ($manualUpload['success']) {
+        // Delete old manual if exists
+        if ($manualPath && file_exists(BASE_PATH . '/' . $manualPath)) { // ✅ Sửa
+            unlink(BASE_PATH . '/' . $manualPath);
+        }
+        $manualPath = $manualUpload['relative_path']; // ✅ Sửa
+    } else {
+        $errors[] = 'Lỗi upload tài liệu: ' . $manualUpload['message'];
+    }
+}
                 if (empty($errors)) {
                     // Update equipment in database
                     $sql = "UPDATE equipment SET 

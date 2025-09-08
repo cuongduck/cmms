@@ -243,6 +243,66 @@ function validateEquipmentStructure($data) {
 /**
  * Tạo mã thiết bị tự động
  */
+function uploadFile($file, $allowedTypes, $uploadPath, $maxSize = null) {
+    if (!$maxSize) {
+        $maxSize = 10 * 1024 * 1024; // 10MB default
+    }
+    
+    // Check for upload errors
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $errorMessages = [
+            UPLOAD_ERR_INI_SIZE => 'File quá lớn (vượt quá giới hạn của server)',
+            UPLOAD_ERR_FORM_SIZE => 'File quá lớn (vượt quá giới hạn của form)',
+            UPLOAD_ERR_PARTIAL => 'File chỉ được upload một phần',
+            UPLOAD_ERR_NO_FILE => 'Không có file được upload',
+            UPLOAD_ERR_NO_TMP_DIR => 'Thiếu thư mục tạm',
+            UPLOAD_ERR_CANT_WRITE => 'Không thể ghi file',
+            UPLOAD_ERR_EXTENSION => 'Upload bị chặn bởi extension'
+        ];
+        
+        $message = $errorMessages[$file['error']] ?? 'Lỗi upload không xác định';
+        return ['success' => false, 'message' => $message];
+    }
+    
+    // Check file size
+    if ($file['size'] > $maxSize) {
+        return ['success' => false, 'message' => 'File quá lớn. Tối đa ' . formatFileSize($maxSize)];
+    }
+    
+    // Check file type
+    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($extension, $allowedTypes)) {
+        return ['success' => false, 'message' => 'Loại file không được phép. Chỉ chấp nhận: ' . implode(', ', $allowedTypes)];
+    }
+    
+    // Create upload directory if it doesn't exist
+    $fullUploadPath = BASE_PATH . '/' . $uploadPath;
+    if (!is_dir($fullUploadPath)) {
+        if (!mkdir($fullUploadPath, 0755, true)) {
+            return ['success' => false, 'message' => 'Không thể tạo thư mục upload'];
+        }
+    }
+    
+    // Generate unique filename
+    $fileName = uniqid() . '_' . time() . '.' . $extension;
+    $filePath = $fullUploadPath . $fileName;
+    $relativePath = $uploadPath . $fileName;
+    
+    // Move uploaded file
+    if (move_uploaded_file($file['tmp_name'], $filePath)) {
+        return [
+            'success' => true,
+            'filename' => $fileName,
+            'path' => $filePath,
+            'relative_path' => $relativePath,
+            'url' => APP_URL . '/' . $relativePath
+        ];
+    } else {
+        return ['success' => false, 'message' => 'Không thể di chuyển file đã upload'];
+    }
+}
+
+// Also add generateEquipmentCode function if missing
 function generateEquipmentCode($industryCode, $workshopCode, $lineCode = '', $areaCode = '', $sequence = null) {
     global $db;
     
@@ -257,65 +317,24 @@ function generateEquipmentCode($industryCode, $workshopCode, $lineCode = '', $ar
     }
     
     if ($sequence === null) {
-        // Tìm sequence number tiếp theo
-        $sql = "SELECT MAX(CAST(SUBSTRING(code, ?) AS UNSIGNED)) as max_seq 
-                FROM equipment 
-                WHERE code LIKE ?";
-        
-        $prefixLength = strlen($prefix) + 1;
-        $pattern = $prefix . '%';
-        
-        $result = $db->fetch($sql, [$prefixLength, $pattern]);
-        $sequence = ($result['max_seq'] ?? 0) + 1;
+        // Find next sequence number
+        try {
+            $sql = "SELECT MAX(CAST(SUBSTRING(code, ?) AS UNSIGNED)) as max_seq 
+                    FROM equipment 
+                    WHERE code LIKE ?";
+            
+            $prefixLength = strlen($prefix) + 1;
+            $pattern = $prefix . '%';
+            
+            $result = $db->fetch($sql, [$prefixLength, $pattern]);
+            $sequence = ($result['max_seq'] ?? 0) + 1;
+        } catch (Exception $e) {
+            // If query fails, use timestamp
+            $sequence = substr(time(), -3);
+        }
     }
     
     return $prefix . str_pad($sequence, 3, '0', STR_PAD_LEFT);
-}
-
-/**
- * Upload file
- */
-function uploadFile($file, $allowedTypes, $uploadPath, $maxSize = null) {
-    if (!$maxSize) {
-        $maxSize = getConfig('upload.max_size');
-    }
-    
-    // Kiểm tra lỗi upload
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        return ['success' => false, 'message' => 'Lỗi upload file'];
-    }
-    
-    // Kiểm tra kích thước
-    if ($file['size'] > $maxSize) {
-        return ['success' => false, 'message' => 'File quá lớn. Tối đa ' . formatFileSize($maxSize)];
-    }
-    
-    // Kiểm tra loại file
-    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($extension, $allowedTypes)) {
-        return ['success' => false, 'message' => 'Loại file không được phép'];
-    }
-    
-    // Tạo tên file mới
-    $fileName = uniqid() . '.' . $extension;
-    $fullPath = $uploadPath . $fileName;
-    
-    // Tạo thư mục nếu chưa tồn tại
-    if (!is_dir($uploadPath)) {
-        mkdir($uploadPath, 0755, true);
-    }
-    
-    // Upload file
-    if (move_uploaded_file($file['tmp_name'], $fullPath)) {
-        return [
-            'success' => true,
-            'filename' => $fileName,
-            'path' => $fullPath,
-            'url' => str_replace(BASE_PATH, '', $fullPath)
-        ];
-    } else {
-        return ['success' => false, 'message' => 'Không thể upload file'];
-    }
 }
 
 /**
@@ -684,4 +703,5 @@ function resizeImage($source, $destination, $maxWidth = 800, $maxHeight = 600, $
     
     return $result;
 }
+
 ?>

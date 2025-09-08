@@ -221,7 +221,6 @@ $currentModule = $currentModule ?? '';
                         </div>
                         <div class="d-none d-md-block">
                             <div class="fw-semibold"><?php echo htmlspecialchars($currentUser['full_name']); ?></div>
-                            <small class="text-light opacity-75"><?php echo htmlspecialchars($currentUser['role']); ?></small>
                         </div>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">

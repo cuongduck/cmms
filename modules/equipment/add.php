@@ -1,14 +1,12 @@
 <?php
 /**
  * Add New Equipment - modules/equipment/add.php
- * Form to create new equipment in the system
- * PART 1: PHP Logic & Data Processing
+ * Complete implementation with proper error handling
  */
 
 $pageTitle = 'Thêm thiết bị mới';
 $currentModule = 'equipment';
 $moduleCSS = 'equipment';
-$moduleJS = 'equipment';
 
 $breadcrumb = [
     ['title' => 'Quản lý thiết bị', 'url' => '/modules/equipment/'],
@@ -35,6 +33,19 @@ $pageActions = '
         <i class="fas fa-arrow-left me-1"></i> Quay lại
     </a>
 </div>';
+
+// Create upload directories if not exist
+$uploadDirs = [
+    'uploads/equipment/images/',
+    'uploads/equipment/manuals/'
+];
+
+foreach ($uploadDirs as $dir) {
+    $fullPath = BASE_PATH . '/' . $dir;
+    if (!is_dir($fullPath)) {
+        mkdir($fullPath, 0755, true);
+    }
+}
 
 // Handle form submission
 $errors = [];
@@ -95,11 +106,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     );
                     
                     if ($imageUpload['success']) {
-                        $imagePath = $imageUpload['path'];
+                        $imagePath = $imageUpload['relative_path'];
+                        
                         // Resize image if needed
-                        resizeImage($imagePath, $imagePath, 800, 600);
+                        if (function_exists('resizeImage')) {
+                            resizeImage($imageUpload['path'], $imageUpload['path'], 800, 600);
+                        }
                     } else {
-                        $errors[] = $imageUpload['message'];
+                        $errors[] = 'Lỗi upload hình ảnh: ' . $imageUpload['message'];
                     }
                 }
                 
@@ -112,29 +126,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     );
                     
                     if ($manualUpload['success']) {
-                        $manualPath = $imageUpload['path'];
+                        $manualPath = $manualUpload['relative_path'];
                     } else {
-                        $errors[] = $manualUpload['message'];
+                        $errors[] = 'Lỗi upload tài liệu: ' . $manualUpload['message'];
                     }
                 }
                 
                 if (empty($errors)) {
                     // Auto-generate code if empty
                     if (empty($formData['code'])) {
-                        // Fetch codes
-                        $industry = $db->fetch("SELECT code FROM industries WHERE id = ?", [$formData['industry_id']]);
-                        $workshop = $db->fetch("SELECT code FROM workshops WHERE id = ?", [$formData['workshop_id']]);
-                        $lineCode = '';
-                        if ($formData['line_id']) {
-                            $line = $db->fetch("SELECT code FROM production_lines WHERE id = ?", [$formData['line_id']]);
-                            $lineCode = $line['code'] ?? '';
+                        try {
+                            $industry = $db->fetch("SELECT code FROM industries WHERE id = ?", [$formData['industry_id']]);
+                            $workshop = $db->fetch("SELECT code FROM workshops WHERE id = ?", [$formData['workshop_id']]);
+                            
+                            $lineCode = '';
+                            if ($formData['line_id']) {
+                                $line = $db->fetch("SELECT code FROM production_lines WHERE id = ?", [$formData['line_id']]);
+                                $lineCode = $line['code'] ?? '';
+                            }
+                            
+                            $areaCode = '';
+                            if ($formData['area_id']) {
+                                $area = $db->fetch("SELECT code FROM areas WHERE id = ?", [$formData['area_id']]);
+                                $areaCode = $area['code'] ?? '';
+                            }
+                            
+                            $formData['code'] = generateEquipmentCode(
+                                $industry['code'] ?? 'EQ', 
+                                $workshop['code'] ?? 'WS', 
+                                $lineCode, 
+                                $areaCode
+                            );
+                        } catch (Exception $e) {
+                            $formData['code'] = 'EQ' . date('YmdHis');
                         }
-                        $areaCode = '';
-                        if ($formData['area_id']) {
-                            $area = $db->fetch("SELECT code FROM areas WHERE id = ?", [$formData['area_id']]);
-                            $areaCode = $area['code'] ?? '';
-                        }
-                        $formData['code'] = generateEquipmentCode($industry['code'] ?? '', $workshop['code'] ?? '', $lineCode, $areaCode);
                     }
                     
                     // Insert equipment
@@ -162,15 +187,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $equipmentId = $db->lastInsertId();
                     
                     // Log activity
-                    logActivity('create', 'equipment', "Tạo thiết bị: {$formData['name']} ({$formData['code']})", getCurrentUser()['id']);
+                    if (function_exists('logActivity')) {
+                        logActivity('create', 'equipment', "Tạo thiết bị: {$formData['name']} ({$formData['code']})", getCurrentUser()['id']);
+                    }
                     
                     // Create audit trail
-                    createAuditTrail('equipment', $equipmentId, 'create', null, $formData);
+                    if (function_exists('createAuditTrail')) {
+                        createAuditTrail('equipment', $equipmentId, 'create', null, $formData);
+                    }
                     
                     $db->commit();
                     
                     if ($action === 'save') {
-                        $success = 'Tạo thiết bị thành công!';
+                        $success = 'Tạo thiết bị thành công! Mã: ' . $formData['code'];
                         // Redirect after success
                         header('Refresh: 2; url=view.php?id=' . $equipmentId);
                     } else {
@@ -186,6 +215,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } catch (Exception $e) {
                 $db->rollback();
                 $errors[] = 'Lỗi khi lưu thiết bị: ' . $e->getMessage();
+                
+                // Clean up uploaded files if database insert failed
+                if (isset($imagePath) && $imagePath && file_exists(BASE_PATH . '/' . $imagePath)) {
+                    unlink(BASE_PATH . '/' . $imagePath);
+                }
+                if (isset($manualPath) && $manualPath && file_exists(BASE_PATH . '/' . $manualPath)) {
+                    unlink(BASE_PATH . '/' . $manualPath);
+                }
             }
         }
     }
@@ -200,14 +237,99 @@ $machineTypes = $db->fetchAll("SELECT id, name, code FROM machine_types WHERE st
 $equipmentGroups = $db->fetchAll("SELECT id, name, machine_type_id FROM equipment_groups WHERE status = 'active' ORDER BY name");
 $users = $db->fetchAll("SELECT id, full_name, email FROM users WHERE status = 'active' ORDER BY full_name");
 
+/**
+ * Validation Functions
+ */
+function validateEquipmentForm($data) {
+    global $db;
+    $errors = [];
+    
+    // Required fields validation
+    if (empty($data['name'])) {
+        $errors[] = 'Tên thiết bị không được trống';
+    } elseif (strlen($data['name']) < 2 || strlen($data['name']) > 200) {
+        $errors[] = 'Tên thiết bị phải từ 2-200 ký tự';
+    }
+    
+    if (empty($data['industry_id'])) {
+        $errors[] = 'Vui lòng chọn ngành sản xuất';
+    } else {
+        $sql = "SELECT id FROM industries WHERE id = ? AND status = 'active'";
+        if (!$db->fetch($sql, [$data['industry_id']])) {
+            $errors[] = 'Ngành sản xuất không hợp lệ';
+        }
+    }
+    
+    if (empty($data['workshop_id'])) {
+        $errors[] = 'Vui lòng chọn xưởng sản xuất';
+    } else {
+        $sql = "SELECT id FROM workshops WHERE id = ? AND industry_id = ? AND status = 'active'";
+        if (!$db->fetch($sql, [$data['workshop_id'], $data['industry_id']])) {
+            $errors[] = 'Xưởng sản xuất không hợp lệ';
+        }
+    }
+    
+    if (empty($data['machine_type_id'])) {
+        $errors[] = 'Vui lòng chọn dòng máy';
+    } else {
+        $sql = "SELECT id FROM machine_types WHERE id = ? AND status = 'active'";
+        if (!$db->fetch($sql, [$data['machine_type_id']])) {
+            $errors[] = 'Dòng máy không hợp lệ';
+        }
+    }
+    
+    // Code validation
+    if (!empty($data['code'])) {
+        if (!preg_match('/^[A-Z0-9_-]+$/', $data['code'])) {
+            $errors[] = 'Mã thiết bị chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới';
+        } elseif (strlen($data['code']) > 30) {
+            $errors[] = 'Mã thiết bị không được quá 30 ký tự';
+        } else {
+            $sql = "SELECT id FROM equipment WHERE code = ?";
+            if ($db->fetch($sql, [$data['code']])) {
+                $errors[] = 'Mã thiết bị đã tồn tại';
+            }
+        }
+    }
+    
+    // Optional field validations
+    if ($data['manufacture_year'] && ($data['manufacture_year'] < 1900 || $data['manufacture_year'] > date('Y') + 1)) {
+        $errors[] = 'Năm sản xuất không hợp lệ';
+    }
+    
+    if ($data['maintenance_frequency_days'] && ($data['maintenance_frequency_days'] < 1 || $data['maintenance_frequency_days'] > 365)) {
+        $errors[] = 'Chu kỳ bảo trì phải từ 1 đến 365 ngày';
+    }
+    
+    if (!in_array($data['criticality'], ['Low', 'Medium', 'High', 'Critical'])) {
+        $errors[] = 'Mức độ quan trọng không hợp lệ';
+    }
+    
+    if (!in_array($data['status'], ['active', 'inactive', 'maintenance', 'broken'])) {
+        $errors[] = 'Trạng thái không hợp lệ';
+    }
+    
+    return $errors;
+}
+
+/**
+ * Upload file function
+ */
+
 require_once '../../includes/header.php';
 ?>
-
-<!-- PART 1 END -->
-<!-- PART 2: CSS Styles & HTML Structure -->
-
-<link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/equipment.css">
+<!-- CSS Styles for Equipment Add Form -->
 <style>
+:root {
+    --equipment-primary: #1e3a8a;
+    --equipment-success: #10b981;
+    --equipment-warning: #f59e0b;
+    --equipment-danger: #ef4444;
+    --equipment-info: #06b6d4;
+    --equipment-light: #f8fafc;
+    --equipment-dark: #374151;
+}
+
 .equipment-form-container {
     background: var(--equipment-light);
     min-height: 100vh;
@@ -276,28 +398,12 @@ require_once '../../includes/header.php';
     margin-bottom: 1rem;
 }
 
-.file-upload-text {
-    color: #6b7280;
-    margin-bottom: 0.5rem;
-}
-
 .file-preview {
     margin-top: 1rem;
     padding: 1rem;
     background: white;
     border-radius: 0.5rem;
     border: 1px solid #e5e7eb;
-}
-
-.file-preview img {
-    max-width: 200px;
-    max-height: 150px;
-    border-radius: 0.375rem;
-}
-
-.progress-container {
-    margin-top: 1rem;
-    display: none;
 }
 
 .equipment-preview {
@@ -340,24 +446,6 @@ require_once '../../includes/header.php';
     font-style: italic;
 }
 
-.error-summary {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.success-summary {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    color: #166534;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
 .form-progress {
     background: white;
     border-radius: 0.5rem;
@@ -394,6 +482,24 @@ require_once '../../includes/header.php';
 
 .character-counter.danger {
     color: #ef4444;
+}
+
+.error-summary {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.success-summary {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
 }
 
 @media (max-width: 768px) {
@@ -471,7 +577,7 @@ require_once '../../includes/header.php';
                                            placeholder="Tên thiết bị" required maxlength="200"
                                            value="<?php echo htmlspecialchars($formData['name'] ?? ''); ?>">
                                     <label for="equipmentName">Tên thiết bị *</label>
-                                    <div class="invalid-feedback"></div>
+                                    <div class="invalid-feedback">Vui lòng nhập tên thiết bị</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -538,89 +644,97 @@ require_once '../../includes/header.php';
                                 <div class="form-floating">
                                     <select class="form-select" id="industryId" name="industry_id" required onchange="updateWorkshops()">
                                         <option value="">Chọn ngành</option>
-                                        <?php echo buildSelectOptions($industries, 'id', 'name', $formData['industry_id'] ?? null); ?>
+                                        <?php foreach ($industries as $industry): ?>
+                                            <option value="<?php echo $industry['id']; ?>" 
+                                                    <?php echo ($formData['industry_id'] ?? null) == $industry['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($industry['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <label for="industryId">Ngành sản xuất *</label>
-                                    <div class="invalid-feedback"></div>
+                                    <div class="invalid-feedback">Vui lòng chọn ngành sản xuất</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="workshopId" name="workshop_id" required onchange="updateLines()">
-    <option value="">Chọn xưởng</option>
-    <?php foreach ($workshops as $workshop): ?>
-        <option value="<?php echo $workshop['id']; ?>" 
-                data-industry="<?php echo $workshop['industry_id']; ?>"
-                <?php echo ($formData['workshop_id'] ?? null) == $workshop['id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($workshop['name']); ?>
-        </option>
-    <?php endforeach; ?>
-</select>
+                                        <option value="">Chọn xưởng</option>
+                                        <?php foreach ($workshops as $workshop): ?>
+                                            <option value="<?php echo $workshop['id']; ?>" 
+                                                    data-industry="<?php echo $workshop['industry_id']; ?>"
+                                                    <?php echo ($formData['workshop_id'] ?? null) == $workshop['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($workshop['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                     <label for="workshopId">Xưởng sản xuất *</label>
-                                    <div class="invalid-feedback"></div>
+                                    <div class="invalid-feedback">Vui lòng chọn xưởng sản xuất</div>
                                 </div>
                             </div>
                         </div>
 
-<div class="row g-3 mt-1">
-    <div class="col-md-6">
-        <div class="form-floating">
-           <select class="form-select" id="lineId" name="line_id">
-    <option value="">Chọn line sản xuất</option>
-    <?php foreach ($lines as $line): ?>
-        <option value="<?php echo $line['id']; ?>" 
-                data-workshop="<?php echo $line['workshop_id']; ?>"
-                <?php echo ($formData['line_id'] ?? null) == $line['id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($line['name']); ?>
-        </option>
-    <?php endforeach; ?>
-</select>
-            <label for="lineId">Line sản xuất</label>
-            <div class="invalid-feedback"></div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="form-floating">
-            <select class="form-select" id="areaId" name="area_id">
-    <option value="">Chọn khu vực</option>
-    <?php foreach ($areas as $area): ?>
-        <option value="<?php echo $area['id']; ?>" 
-                data-workshop="<?php echo $area['workshop_id']; ?>"
-                <?php echo ($formData['area_id'] ?? null) == $area['id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($area['name']); ?>
-        </option>
-    <?php endforeach; ?>
-</select>
-            <label for="areaId">Khu vực</label>
-            <div class="invalid-feedback"></div>
-        </div>
-    </div>
-</div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="lineId" name="line_id">
+                                        <option value="">Chọn line sản xuất</option>
+                                        <?php foreach ($lines as $line): ?>
+                                            <option value="<?php echo $line['id']; ?>" 
+                                                    data-workshop="<?php echo $line['workshop_id']; ?>"
+                                                    <?php echo ($formData['line_id'] ?? null) == $line['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($line['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <label for="lineId">Line sản xuất</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="areaId" name="area_id">
+                                        <option value="">Chọn khu vực</option>
+                                        <?php foreach ($areas as $area): ?>
+                                            <option value="<?php echo $area['id']; ?>" 
+                                                    data-workshop="<?php echo $area['workshop_id']; ?>"
+                                                    <?php echo ($formData['area_id'] ?? null) == $area['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($area['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <label for="areaId">Khu vực</label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="row g-3 mt-1">
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="machineTypeId" name="machine_type_id" required onchange="updateEquipmentGroups()">
                                         <option value="">Chọn dòng máy</option>
-                                        <?php echo buildSelectOptions($machineTypes, 'id', 'name', $formData['machine_type_id'] ?? null); ?>
+                                        <?php foreach ($machineTypes as $machineType): ?>
+                                            <option value="<?php echo $machineType['id']; ?>" 
+                                                    <?php echo ($formData['machine_type_id'] ?? null) == $machineType['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($machineType['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <label for="machineTypeId">Dòng máy *</label>
-                                    <div class="invalid-feedback"></div>
+                                    <div class="invalid-feedback">Vui lòng chọn dòng máy</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
                                     <select class="form-select" id="equipmentGroupId" name="equipment_group_id">
-    <option value="">Chọn cụm thiết bị</option>
-    <?php foreach ($equipmentGroups as $group): ?>
-        <option value="<?php echo $group['id']; ?>" 
-                data-machine-type="<?php echo $group['machine_type_id']; ?>"
-                <?php echo ($formData['equipment_group_id'] ?? null) == $group['id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($group['name']); ?>
-        </option>
-    <?php endforeach; ?>
-</select>
+                                        <option value="">Chọn cụm thiết bị</option>
+                                        <?php foreach ($equipmentGroups as $group): ?>
+                                            <option value="<?php echo $group['id']; ?>" 
+                                                    data-machine-type="<?php echo $group['machine_type_id']; ?>"
+                                                    <?php echo ($formData['equipment_group_id'] ?? null) == $group['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($group['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                     <label for="equipmentGroupId">Cụm thiết bị</label>
-                                    <div class="invalid-feedback"></div>
                                 </div>
                             </div>
                         </div>
@@ -637,7 +751,6 @@ require_once '../../includes/header.php';
                         </div>
                     </div>
                 </div>
-
                 <!-- Management & Maintenance Section -->
                 <div class="form-section">
                     <div class="form-section-header">
@@ -650,7 +763,12 @@ require_once '../../includes/header.php';
                                 <div class="form-floating">
                                     <select class="form-select" id="ownerUserId" name="owner_user_id">
                                         <option value="">Chọn người quản lý</option>
-                                        <?php echo buildSelectOptions($users, 'id', 'full_name', $formData['owner_user_id'] ?? null); ?>
+                                        <?php foreach ($users as $user): ?>
+                                            <option value="<?php echo $user['id']; ?>" 
+                                                    <?php echo ($formData['owner_user_id'] ?? null) == $user['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($user['full_name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <label for="ownerUserId">Người quản lý chính</label>
                                 </div>
@@ -659,7 +777,12 @@ require_once '../../includes/header.php';
                                 <div class="form-floating">
                                     <select class="form-select" id="backupOwnerUserId" name="backup_owner_user_id">
                                         <option value="">Chọn người quản lý phụ</option>
-                                        <?php echo buildSelectOptions($users, 'id', 'full_name', $formData['backup_owner_user_id'] ?? null); ?>
+                                        <?php foreach ($users as $user): ?>
+                                            <option value="<?php echo $user['id']; ?>" 
+                                                    <?php echo ($formData['backup_owner_user_id'] ?? null) == $user['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($user['full_name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <label for="backupOwnerUserId">Người quản lý phụ</label>
                                 </div>
@@ -783,11 +906,6 @@ require_once '../../includes/header.php';
                                         Chấp nhận: JPG, PNG, GIF, WEBP (tối đa 5MB)
                                     </small>
                                     <div id="imagePreview" class="file-preview d-none"></div>
-                                    <div id="imageProgress" class="progress-container">
-                                        <div class="progress">
-                                            <div class="progress-bar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             
@@ -808,11 +926,6 @@ require_once '../../includes/header.php';
                                         Chấp nhận: PDF, DOC, DOCX (tối đa 10MB)
                                     </small>
                                     <div id="manualPreview" class="file-preview d-none"></div>
-                                    <div id="manualProgress" class="progress-container">
-                                        <div class="progress">
-                                            <div class="progress-bar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -915,7 +1028,6 @@ require_once '../../includes/header.php';
     </form>
 </div>
 
-<!-- PART 4 END -->
 <!-- Full Preview Modal -->
 <div class="modal fade" id="fullPreviewModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
@@ -956,242 +1068,6 @@ window.formData = <?php echo json_encode($formData); ?>;
 </script>
 
 <!-- Load Equipment Add JavaScript -->
-<script src="<?php echo APP_URL; ?>/assets/js/equipment-add.js"></script>
+<script src="<?php echo APP_URL; ?>/assets/js/equipment-add.js?v=<?php echo time(); ?>"></script>
 
-<?php
-/**
- * PHP Helper Functions for Equipment Add
- */
-
-function validateEquipmentForm($data) {
-    global $db;
-    $errors = [];
-    
-    // Required fields validation
-    if (empty($data['name'])) {
-        $errors[] = 'Tên thiết bị không được trống';
-    } elseif (strlen($data['name']) < 2 || strlen($data['name']) > 200) {
-        $errors[] = 'Tên thiết bị phải từ 2-200 ký tự';
-    }
-    
-    if (empty($data['industry_id'])) {
-        $errors[] = 'Vui lòng chọn ngành sản xuất';
-    } else {
-        $sql = "SELECT id FROM industries WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['industry_id']])) {
-            $errors[] = 'Ngành sản xuất không hợp lệ';
-        }
-    }
-    
-    if (empty($data['workshop_id'])) {
-        $errors[] = 'Vui lòng chọn xưởng sản xuất';
-    } else {
-        $sql = "SELECT id FROM workshops WHERE id = ? AND industry_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['workshop_id'], $data['industry_id']])) {
-            $errors[] = 'Xưởng sản xuất không hợp lệ';
-        }
-    }
-    
-    if (empty($data['machine_type_id'])) {
-        $errors[] = 'Vui lòng chọn dòng máy';
-    } else {
-        $sql = "SELECT id FROM machine_types WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['machine_type_id']])) {
-            $errors[] = 'Dòng máy không hợp lệ';
-        }
-    }
-    
-    // Code validation
-    if (!empty($data['code'])) {
-        if (!preg_match('/^[A-Z0-9_-]+$/', $data['code'])) {
-            $errors[] = 'Mã thiết bị chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới';
-        } elseif (strlen($data['code']) > 30) {
-            $errors[] = 'Mã thiết bị không được quá 30 ký tự';
-        } else {
-            // Check uniqueness
-            $sql = "SELECT id FROM equipment WHERE code = ?";
-            if ($db->fetch($sql, [$data['code']])) {
-                $errors[] = 'Mã thiết bị đã tồn tại';
-            }
-        }
-    }
-    
-    // Optional field validations
-    if ($data['manufacture_year'] && ($data['manufacture_year'] < 1900 || $data['manufacture_year'] > date('Y') + 1)) {
-        $errors[] = 'Năm sản xuất không hợp lệ';
-    }
-    
-    if ($data['maintenance_frequency_days'] && ($data['maintenance_frequency_days'] < 1 || $data['maintenance_frequency_days'] > 365)) {
-        $errors[] = 'Chu kỳ bảo trì phải từ 1 đến 365 ngày';
-    }
-    
-    if (!in_array($data['criticality'], ['Low', 'Medium', 'High', 'Critical'])) {
-        $errors[] = 'Mức độ quan trọng không hợp lệ';
-    }
-    
-    if (!in_array($data['status'], ['active', 'inactive', 'maintenance', 'broken'])) {
-        $errors[] = 'Trạng thái không hợp lệ';
-    }
-    
-    // Validate optional references
-    if (!empty($data['line_id'])) {
-        $sql = "SELECT id FROM production_lines WHERE id = ? AND workshop_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['line_id'], $data['workshop_id']])) {
-            $errors[] = 'Line sản xuất không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['area_id'])) {
-        $sql = "SELECT id FROM areas WHERE id = ? AND workshop_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['area_id'], $data['workshop_id']])) {
-            $errors[] = 'Khu vực không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['equipment_group_id'])) {
-        $sql = "SELECT id FROM equipment_groups WHERE id = ? AND machine_type_id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['equipment_group_id'], $data['machine_type_id']])) {
-            $errors[] = 'Cụm thiết bị không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['owner_user_id'])) {
-        $sql = "SELECT id FROM users WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['owner_user_id']])) {
-            $errors[] = 'Người quản lý chính không hợp lệ';
-        }
-    }
-    
-    if (!empty($data['backup_owner_user_id'])) {
-        $sql = "SELECT id FROM users WHERE id = ? AND status = 'active'";
-        if (!$db->fetch($sql, [$data['backup_owner_user_id']])) {
-            $errors[] = 'Người quản lý phụ không hợp lệ';
-        }
-    }
-    
-    return $errors;
-}
-
-if (!function_exists('logActivity')) {
-    function logActivity($action, $module, $description, $userId) {
-        global $db;
-        try {
-            $sql = "INSERT INTO activity_logs (user_id, action, module, description, ip_address, user_agent, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, NOW())";
-            $params = [
-                $userId, $action, $module, $description,
-                $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? ''
-            ];
-            $db->execute($sql, $params);
-        } catch (Exception $e) {
-            error_log("Failed to log activity: " . $e->getMessage());
-        }
-    }
-}
-
-if (!function_exists('createAuditTrail')) {
-    function createAuditTrail($table, $recordId, $action, $oldData = null, $newData = null) {
-        global $db;
-        try {
-            $sql = "INSERT INTO audit_trails (table_name, record_id, action, old_data, new_data, user_id, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, NOW())";
-            $params = [
-                $table, $recordId, $action,
-                $oldData ? json_encode($oldData) : null,
-                $newData ? json_encode($newData) : null,
-                getCurrentUser()['id']
-            ];
-            $db->execute($sql, $params);
-        } catch (Exception $e) {
-            error_log("Failed to create audit trail: " . $e->getMessage());
-        }
-    }
-}
-
-if (!function_exists('formatFileSize')) {
-    function formatFileSize($bytes) {
-        if ($bytes == 0) return '0 Bytes';
-        $k = 1024;
-        $sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        $i = floor(log($bytes) / log($k));
-        return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
-    }
-}
-
-if (!function_exists('resizeImage')) {
-    function resizeImage($source, $destination, $maxWidth = 800, $maxHeight = 600, $quality = 85) {
-        $imageInfo = getimagesize($source);
-        if (!$imageInfo) return false;
-        
-        $width = $imageInfo[0];
-        $height = $imageInfo[1];
-        $type = $imageInfo[2];
-        
-        // Calculate new dimensions
-        $ratio = min($maxWidth / $width, $maxHeight / $height);
-        if ($ratio < 1) {
-            $newWidth = (int)($width * $ratio);
-            $newHeight = (int)($height * $ratio);
-        } else {
-            $newWidth = $width;
-            $newHeight = $height;
-        }
-        
-        // Create image resource
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $sourceImage = imagecreatefromjpeg($source);
-                break;
-            case IMAGETYPE_PNG:
-                $sourceImage = imagecreatefrompng($source);
-                break;
-            case IMAGETYPE_GIF:
-                $sourceImage = imagecreatefromgif($source);
-                break;
-            default:
-                return false;
-        }
-        
-        if (!$sourceImage) return false;
-        
-        // Create new image
-        $newImage = imagecreatetruecolor($newWidth, $newHeight);
-        
-        // Preserve transparency for PNG and GIF
-        if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
-            imagealphablending($newImage, false);
-            imagesavealpha($newImage, true);
-            $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
-            imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $transparent);
-        }
-        
-        // Resize image
-        imagecopyresampled($newImage, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
-        
-        // Save image
-        $result = false;
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $result = imagejpeg($newImage, $destination, $quality);
-                break;
-            case IMAGETYPE_PNG:
-                $result = imagepng($newImage, $destination, 9);
-                break;
-            case IMAGETYPE_GIF:
-                $result = imagegif($newImage, $destination);
-                break;
-        }
-        
-        // Clean up
-        imagedestroy($sourceImage);
-        imagedestroy($newImage);
-        
-        return $result;
-    }
-}
-
-require_once '../../includes/footer.php';
-?>
-
-<!-- PART 5 END -->
-<!-- FILE COMPLETE -->
+<?php require_once '../../includes/footer.php'; ?>

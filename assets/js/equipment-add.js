@@ -1,5 +1,5 @@
 /**
- * Equipment Add Form JavaScript
+ * Equipment Add Form JavaScript - Complete Implementation
  * File: /assets/js/equipment-add.js
  */
 
@@ -18,6 +18,7 @@ const EquipmentAddForm = {
     state: {
         isDirty: false,
         autoSaveTimer: null,
+        autoSaveTimeout: null,
         validationErrors: {},
         dependentData: {
             workshops: [],
@@ -70,7 +71,6 @@ const EquipmentAddForm = {
                 name: option.text,
                 industryId: option.getAttribute('data-industry')
             })).filter(item => item.id);
-            console.log('Loaded workshops:', this.state.dependentData.workshops); // Thêm log để kiểm tra
         }
         
         const lineSelect = document.getElementById('lineId');
@@ -87,7 +87,7 @@ const EquipmentAddForm = {
             this.state.dependentData.areas = Array.from(areaSelect.options).map(option => ({
                 id: option.value,
                 name: option.text,
-                workshopId: option.getAttribute('data-workshop') // SỬA: Dùng data-workshop thay vì data-line
+                workshopId: option.getAttribute('data-workshop')
             })).filter(item => item.id);
         }
         
@@ -143,10 +143,7 @@ const EquipmentAddForm = {
                 break;
             case 'workshopId':
                 this.updateLines();
-                this.updateAreas(); // SỬA: Gọi updateAreas khi workshop thay đổi
-                break;
-            case 'lineId':
-                // Không gọi updateAreas vì area phụ thuộc workshop, không phụ thuộc line
+                this.updateAreas();
                 break;
             case 'machineTypeId':
                 this.updateEquipmentGroups();
@@ -155,32 +152,26 @@ const EquipmentAddForm = {
     },
     
     // Update workshops based on selected industry
-updateWorkshops: function() {
-    const industrySelect = document.getElementById('industryId');
-    const workshopSelect = document.getElementById('workshopId');
-    
-    if (!industrySelect || !workshopSelect) {
-        console.log('Không tìm thấy industry hoặc workshop select');
-        return;
-    }
-    
-    const selectedIndustryId = industrySelect.value;
-    console.log('Selected industry ID:', selectedIndustryId);
-    
-    // Clear dependent selects
-    this.clearSelect(workshopSelect, 'Chọn xưởng');
-    this.clearSelect(document.getElementById('lineId'), 'Chọn line sản xuất');
-    this.clearSelect(document.getElementById('areaId'), 'Chọn khu vực');
-    
-    // Filter and populate workshops
-    const availableWorkshops = this.state.dependentData.workshops.filter(workshop => 
-        !selectedIndustryId || workshop.industryId === selectedIndustryId
-    );
-    
-    this.populateSelect(workshopSelect, availableWorkshops);
-    
-    console.log('Updated workshops for industry:', selectedIndustryId, 'Found workshops:', availableWorkshops);
-},
+    updateWorkshops: function() {
+        const industrySelect = document.getElementById('industryId');
+        const workshopSelect = document.getElementById('workshopId');
+        
+        if (!industrySelect || !workshopSelect) return;
+        
+        const selectedIndustryId = industrySelect.value;
+        
+        // Clear dependent selects
+        this.clearSelect(workshopSelect, 'Chọn xưởng');
+        this.clearSelect(document.getElementById('lineId'), 'Chọn line sản xuất');
+        this.clearSelect(document.getElementById('areaId'), 'Chọn khu vực');
+        
+        // Filter and populate workshops
+        const availableWorkshops = this.state.dependentData.workshops.filter(workshop => 
+            !selectedIndustryId || workshop.industryId === selectedIndustryId
+        );
+        
+        this.populateSelect(workshopSelect, availableWorkshops);
+    },
     
     // Update lines based on selected workshop
     updateLines: function() {
@@ -200,8 +191,6 @@ updateWorkshops: function() {
         );
         
         this.populateSelect(lineSelect, availableLines);
-        
-        console.log('Updated lines for workshop:', selectedWorkshopId);
     },
     
     // Update areas based on selected workshop
@@ -222,8 +211,6 @@ updateWorkshops: function() {
         );
         
         this.populateSelect(areaSelect, availableAreas);
-        
-        console.log('Updated areas for workshop:', selectedWorkshopId);
     },
     
     // Update equipment groups based on selected machine type
@@ -244,8 +231,6 @@ updateWorkshops: function() {
         );
         
         this.populateSelect(equipmentGroupSelect, availableGroups);
-        
-        console.log('Updated equipment groups for machine type:', selectedMachineTypeId);
     },
     
     // Helper function to clear select options
@@ -312,7 +297,8 @@ updateWorkshops: function() {
     initializeCharacterCounters: function() {
         const textareas = [
             { id: 'specifications', counterId: 'specificationsCounter', maxLength: 2000 },
-            { id: 'notes', counterId: 'notesCounter', maxLength: 1000 }
+            { id: 'notes', counterId: 'notesCounter', maxLength: 1000 },
+            { id: 'locationDetails', counterId: 'locationDetailsCounter', maxLength: 500 }
         ];
         
         textareas.forEach(({ id, counterId, maxLength }) => {
@@ -398,6 +384,337 @@ updateWorkshops: function() {
         }
     },
     
+    // Initialize validation
+    initializeValidation: function() {
+        const form = document.querySelector(this.config.formSelector);
+        if (!form) return;
+        
+        // Add validation to required fields
+        const requiredFields = form.querySelectorAll('[required]');
+        requiredFields.forEach(field => {
+            field.addEventListener('blur', () => {
+                this.validateField(field);
+            });
+            
+            field.addEventListener('input', () => {
+                if (field.classList.contains('is-invalid')) {
+                    this.validateField(field);
+                }
+            });
+        });
+        
+        // Equipment code validation
+        const codeField = document.getElementById('equipmentCode');
+        if (codeField) {
+            codeField.addEventListener('input', () => {
+                const value = codeField.value.trim();
+                if (value && !/^[A-Z0-9_-]+$/.test(value)) {
+                    this.setFieldError(codeField, 'Mã thiết bị chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới');
+                } else {
+                    this.clearFieldError(codeField);
+                }
+            });
+        }
+        
+        // Year validation
+        const yearField = document.getElementById('manufactureYear');
+        if (yearField) {
+            yearField.addEventListener('input', () => {
+                const value = parseInt(yearField.value);
+                const currentYear = new Date().getFullYear();
+                if (value && (value < 1900 || value > currentYear + 1)) {
+                    this.setFieldError(yearField, `Năm sản xuất phải từ 1900 đến ${currentYear + 1}`);
+                } else {
+                    this.clearFieldError(yearField);
+                }
+            });
+        }
+    },
+    
+    // Validate Field
+    validateField: function(field) {
+        if (!field) return true;
+        
+        // Clear previous validation
+        this.clearFieldError(field);
+        
+        // Check required
+        if (field.hasAttribute('required') && !field.value.trim()) {
+            this.setFieldError(field, 'Trường này là bắt buộc');
+            return false;
+        }
+        
+        // Check pattern
+        if (field.pattern && field.value && !new RegExp(field.pattern).test(field.value)) {
+            this.setFieldError(field, 'Định dạng không hợp lệ');
+            return false;
+        }
+        
+        // Check min/max length
+        if (field.minLength && field.value.length < field.minLength) {
+            this.setFieldError(field, `Tối thiểu ${field.minLength} ký tự`);
+            return false;
+        }
+        
+        if (field.maxLength && field.value.length > field.maxLength) {
+            this.setFieldError(field, `Tối đa ${field.maxLength} ký tự`);
+            return false;
+        }
+        
+        return true;
+    },
+    
+    // Set Field Error
+    setFieldError: function(field, message) {
+        field.classList.add('is-invalid');
+        field.classList.remove('is-valid');
+        
+        let feedback = field.parentNode.querySelector('.invalid-feedback');
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            field.parentNode.appendChild(feedback);
+        }
+        feedback.textContent = message;
+    },
+    
+    // Clear Field Error
+    clearFieldError: function(field) {
+        field.classList.remove('is-invalid');
+        field.classList.add('is-valid');
+        
+        const feedback = field.parentNode.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = '';
+        }
+    },
+    
+    // Clear All Validation Errors
+    clearValidationErrors: function() {
+        const form = document.querySelector(this.config.formSelector);
+        if (!form) return;
+        
+        form.querySelectorAll('.is-invalid').forEach(field => {
+            this.clearFieldError(field);
+        });
+        
+        form.classList.remove('was-validated');
+    },
+    
+    // Initialize Drag and Drop
+    initializeDragAndDrop: function() {
+        const imageUpload = document.querySelector('[onclick*="imageFile"]');
+        const manualUpload = document.querySelector('[onclick*="manualFile"]');
+        
+        if (imageUpload) {
+            this.setupDragAndDrop(imageUpload, document.getElementById('imageFile'));
+        }
+        
+        if (manualUpload) {
+            this.setupDragAndDrop(manualUpload, document.getElementById('manualFile'));
+        }
+    },
+    
+    // Setup Drag and Drop for element
+    setupDragAndDrop: function(dropZone, fileInput) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    },
+    
+    // Initialize Auto Save
+    initializeAutoSave: function() {
+        // Load existing draft
+        this.loadDraft();
+        
+        // Set up auto-save timer
+        if (this.state.autoSaveTimer) {
+            clearInterval(this.state.autoSaveTimer);
+        }
+        
+        this.state.autoSaveTimer = setInterval(() => {
+            if (this.state.isDirty) {
+                this.autoSave();
+            }
+        }, this.config.autoSaveInterval);
+    },
+    
+    // Schedule Auto Save
+    scheduleAutoSave: function() {
+        if (this.state.autoSaveTimeout) {
+            clearTimeout(this.state.autoSaveTimeout);
+        }
+        
+        this.state.autoSaveTimeout = setTimeout(() => {
+            this.autoSave();
+        }, 5000); // Auto save after 5 seconds of inactivity
+    },
+    
+    // Auto Save Function
+    autoSave: function() {
+        if (!this.state.isDirty) return;
+        
+        const formData = this.getFormData();
+        if (Object.keys(formData).length === 0) return;
+
+        const autoSaveKey = 'equipment_autosave_new';
+        try {
+            localStorage.setItem(autoSaveKey, JSON.stringify({
+                data: formData,
+                timestamp: Date.now()
+            }));
+            console.log('Auto-saved form data');
+        } catch (error) {
+            console.error('Failed to auto-save:', error);
+        }
+    },
+    
+    // Load Draft Function
+    loadDraft: function() {
+        const autoSaveKey = 'equipment_autosave_new';
+        try {
+            const saved = localStorage.getItem(autoSaveKey);
+            if (saved) {
+                const parsedData = JSON.parse(saved);
+                const data = parsedData.data;
+                
+                // Check if data is not too old (24 hours)
+                const age = Date.now() - parsedData.timestamp;
+                if (age > 24 * 60 * 60 * 1000) {
+                    localStorage.removeItem(autoSaveKey);
+                    return;
+                }
+                
+                // Ask user if they want to restore
+                if (confirm('Có dữ liệu đã lưu tự động. Bạn có muốn khôi phục không?')) {
+                    this.restoreFormData(data);
+                    this.showInfo('Đã khôi phục dữ liệu tự động');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load draft:', error);
+        }
+    },
+    
+    // Restore Form Data
+    restoreFormData: function(data) {
+        Object.keys(data).forEach(key => {
+            const field = document.querySelector(`[name="${key}"]`);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    field.checked = !!data[key];
+                } else if (field.type === 'radio') {
+                    if (field.value === data[key]) {
+                        field.checked = true;
+                    }
+                } else {
+                    field.value = data[key] || '';
+                }
+                
+                // Trigger events
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    },
+    
+    // Save Equipment Function
+    saveEquipment: function() {
+        console.log('Saving equipment...');
+        
+        const form = document.querySelector(this.config.formSelector);
+        if (!form) {
+            console.error('Form not found');
+            return;
+        }
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            this.showError('Vui lòng điền đầy đủ thông tin bắt buộc');
+            
+            // Focus on first invalid field
+            const firstInvalid = form.querySelector(':invalid');
+            if (firstInvalid) {
+                firstInvalid.focus();
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+        }
+
+        // Set action to save
+        const actionInput = document.getElementById('formAction');
+        if (actionInput) {
+            actionInput.value = 'save';
+        }
+
+        // Show loading
+        this.showLoading(true);
+
+        // Submit form
+        try {
+            form.submit();
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            this.showError('Có lỗi xảy ra khi lưu thiết bị');
+            this.showLoading(false);
+        }
+    },
+    
+    // Save Draft Function
+    saveDraft: function() {
+        console.log('Saving draft...');
+        
+        const form = document.querySelector(this.config.formSelector);
+        if (!form) {
+            console.error('Form not found');
+            return;
+        }
+
+        // Set action to draft
+        const actionInput = document.getElementById('formAction');
+        if (actionInput) {
+            actionInput.value = 'draft';
+        }
+
+        // Show loading
+        this.showLoading(true);
+
+        // Submit form
+        try {
+            form.submit();
+        } catch (error) {
+            console.error('Error saving draft:', error);
+            this.showError('Có lỗi xảy ra khi lưu nháp');
+            this.showLoading(false);
+        }
+    },
+    
+    // Preview Equipment Function
+    previewEquipment: function() {
+        const modal = new bootstrap.Modal(document.getElementById('fullPreviewModal'));
+        const previewContent = this.generateFullPreview();
+        document.getElementById('fullPreviewContent').innerHTML = previewContent;
+        modal.show();
+    },
+    
+    // Generate Full Preview
     generateFullPreview: function() {
         const formData = this.getFormData();
         
@@ -481,16 +798,182 @@ updateWorkshops: function() {
         return html;
     },
     
+    // Handle File Select
+    handleFileSelect: function(input, type) {
+        console.log('File selected:', type, input.files[0]);
+        
+        if (!input.files || input.files.length === 0) {
+            this.clearFilePreview(type);
+            return;
+        }
+        
+        const file = input.files[0];
+        const maxSize = type === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024; // 5MB for images, 10MB for docs
+        
+        // Validate file size
+        if (file.size > maxSize) {
+            this.showError(`File quá lớn. Tối đa ${this.formatFileSize(maxSize)}`);
+            input.value = '';
+            return;
+        }
+        
+        // Validate file type
+        const allowedTypes = type === 'image' 
+            ? ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+            : ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        
+        if (!allowedTypes.includes(file.type)) {
+            this.showError(`Loại file không được phép. Chỉ chấp nhận: ${allowedTypes.join(', ')}`);
+            input.value = '';
+            return;
+        }
+        
+        // Show preview
+        this.showFilePreview(file, type);
+        this.state.isDirty = true;
+        this.updateProgress();
+    },
+    
+    // Show File Preview
+    showFilePreview: function(file, type) {
+        const previewId = type + 'Preview';
+        const preview = document.getElementById(previewId);
+        
+        if (!preview) return;
+        
+        preview.classList.remove('d-none');
+        
+        if (type === 'image') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-between">
+                        <img src="${e.target.result}" class="img-thumbnail" style="max-width: 100px; max-height: 100px;">
+                        <div class="ms-3">
+                            <div class="fw-semibold">${file.name}</div>
+                            <small class="text-muted">${this.formatFileSize(file.size)}</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="EquipmentAddForm.clearFilePreview('${type}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-file-pdf fs-2 text-danger me-3"></i>
+                        <div>
+                            <div class="fw-semibold">${file.name}</div>
+                            <small class="text-muted">${this.formatFileSize(file.size)}</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="EquipmentAddForm.clearFilePreview('${type}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }
+    },
+    
+    // Clear File Preview
+    clearFilePreview: function(type) {
+        const fileInput = document.getElementById(type + 'File');
+        const preview = document.getElementById(type + 'Preview');
+        
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        if (preview) {
+            preview.classList.add('d-none');
+            preview.innerHTML = '';
+        }
+        
+        this.state.isDirty = true;
+        this.updateProgress();
+    },
+    
+    // Format File Size
+    formatFileSize: function(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    
+    // Reset Form
+    resetForm: function() {
+        if (!confirm('Bạn có chắc chắn muốn reset form? Tất cả dữ liệu sẽ bị mất.')) {
+            return;
+        }
+        
+        const form = document.querySelector(this.config.formSelector);
+        if (form) {
+            form.reset();
+            form.classList.remove('was-validated');
+            
+            // Clear custom validation
+            this.clearValidationErrors();
+            
+            // Clear file previews
+            this.clearFilePreview('image');
+            this.clearFilePreview('manual');
+            
+            // Clear auto-save
+            localStorage.removeItem('equipment_autosave_new');
+            
+            // Reset state
+            this.state.isDirty = false;
+            
+            // Update UI
+            this.updateProgress();
+            this.updatePreview();
+            
+            this.showInfo('Form đã được reset');
+        }
+    },
+    
+    // Get Form Data
+    getFormData: function() {
+        const form = document.querySelector(this.config.formSelector);
+        if (!form) return {};
+        
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Convert FormData to regular object
+        for (let [key, value] of formData.entries()) {
+            // Skip file inputs for JSON storage
+            if (key !== 'image' && key !== 'manual') {
+                data[key] = value;
+            }
+        }
+        
+        return data;
+    },
+    
     // UI helper methods
     showLoading: function(show = true) {
         if (window.CMMS && window.CMMS.showLoading) {
-            CMMS.showLoading(show);
+            if (show) {
+                CMMS.showLoading();
+            } else {
+                CMMS.hideLoading();
+            }
         } else {
             const buttons = document.querySelectorAll('button[type="button"]');
             buttons.forEach(btn => {
                 btn.disabled = show;
-                if (show) {
+                if (show && !btn.dataset.originalHtml) {
+                    btn.dataset.originalHtml = btn.innerHTML;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + btn.textContent;
+                } else if (!show && btn.dataset.originalHtml) {
+                    btn.innerHTML = btn.dataset.originalHtml;
+                    delete btn.dataset.originalHtml;
                 }
             });
         }
@@ -526,80 +1009,11 @@ updateWorkshops: function() {
             clearInterval(this.state.autoSaveTimer);
         }
         
-        if (this.autoSaveTimeout) {
-            clearTimeout(this.autoSaveTimeout);
+        if (this.state.autoSaveTimeout) {
+            clearTimeout(this.state.autoSaveTimeout);
         }
         
         console.log('EquipmentAddForm destroyed');
-    },
-    
-    // Placeholder for missing methods (to avoid undefined errors)
-    initializeValidation: function() {
-        console.log('Placeholder: initializeValidation not implemented');
-    },
-    
-    initializeDragAndDrop: function() {
-        console.log('Placeholder: initializeDragAndDrop not implemented');
-    },
-    
-    initializeAutoSave: function() {
-        console.log('Placeholder: initializeAutoSave not implemented');
-    },
-    
-    validateField: function(field) {
-        console.log('Placeholder: validateField not implemented', field);
-    },
-    
-    scheduleAutoSave: function() {
-        console.log('Placeholder: scheduleAutoSave not implemented');
-    },
-    
-    clearValidationErrors: function() {
-        console.log('Placeholder: clearValidationErrors not implemented');
-    },
-    
-    getFormData: function() {
-        const form = document.querySelector(this.config.formSelector);
-        if (!form) return {};
-        
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => {
-            data[key] = value;
-        });
-        return data;
-    },
-    
-    saveEquipment: function() {
-        console.log('Placeholder: saveEquipment not implemented');
-    },
-    
-    saveDraft: function() {
-        console.log('Placeholder: saveDraft not implemented');
-    },
-    
-    previewEquipment: function() {
-        console.log('Placeholder: previewEquipment not implemented');
-        const modal = new bootstrap.Modal(document.getElementById('fullPreviewModal'));
-        const previewContent = this.generateFullPreview();
-        document.getElementById('fullPreviewContent').innerHTML = previewContent;
-        modal.show();
-    },
-    
-    resetForm: function() {
-        console.log('Placeholder: resetForm not implemented');
-    },
-    
-    handleFileSelect: function(input, type) {
-        console.log('Placeholder: handleFileSelect not implemented', input, type);
-    },
-    
-    clearFilePreview: function(type) {
-        console.log('Placeholder: clearFilePreview not implemented', type);
-    },
-    
-    loadDraft: function() {
-        console.log('Placeholder: loadDraft not implemented');
     }
 };
 
@@ -654,17 +1068,21 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // Apply configuration from window if available
     if (window.equipmentConfig) {
         Object.assign(EquipmentAddForm.config, window.equipmentConfig);
     }
     
+    // Initialize the form
     EquipmentAddForm.init();
     
+    // Check if there's existing form data to load draft
     const hasFormData = equipmentForm.querySelector('input[value]:not([value=""])') !== null;
     if (!hasFormData) {
         EquipmentAddForm.loadDraft();
     }
     
+    // Setup form submission handlers
     setupFormSubmission();
     setupPageUnload();
     
@@ -726,95 +1144,6 @@ window.addEventListener('error', function(e) {
 // Extend CMMS object if available
 if (window.CMMS) {
     window.CMMS.equipmentAdd = EquipmentAddForm;
-    
-    Object.assign(window.CMMS, {
-        formatFileSize: function(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        },
-        
-        generateEquipmentCode: function(industryCode, workshopCode, lineCode, areaCode) {
-            const parts = [
-                industryCode || 'EQ',
-                workshopCode || '',
-                lineCode || '',
-                areaCode || ''
-            ].filter(Boolean);
-            
-            const baseCode = parts.join('-');
-            const timestamp = Date.now().toString().slice(-4);
-            return `${baseCode}-${timestamp}`.toUpperCase();
-        },
-        
-        setupFieldDependency: function(parentSelector, childSelector, dataAttr) {
-            const parent = document.querySelector(parentSelector);
-            const child = document.querySelector(childSelector);
-            
-            if (!parent || !child) return;
-            
-            parent.addEventListener('change', function() {
-                const parentValue = this.value;
-                const childOptions = child.querySelectorAll(`option[${dataAttr}]`);
-                
-                child.value = '';
-                childOptions.forEach(option => {
-                    const attrValue = option.getAttribute(dataAttr);
-                    option.style.display = (!parentValue || attrValue === parentValue) ? '' : 'none';
-                });
-            });
-        }
-    });
-}
-
-// Development helpers (only in development mode)
-if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
-    window.equipmentAddDebug = {
-        form: EquipmentAddForm,
-        
-        fillSampleData: function() {
-            const sampleData = {
-                name: 'Máy ép phun nhựa ABC-123',
-                manufacturer: 'Honda',
-                model: 'HM-2000',
-                serial_number: 'HM2000-2024-001',
-                manufacture_year: '2024',
-                specifications: 'Công suất: 100HP\nTốc độ: 1800 rpm\nÁp suất: 150 bar',
-                location_details: 'Tầng 1, khu vực sản xuất chính',
-                notes: 'Thiết bị mới, cần kiểm tra định kỳ hàng tuần'
-            };
-            
-            Object.entries(sampleData).forEach(([key, value]) => {
-                const field = document.querySelector(`[name="${key}"]`);
-                if (field) {
-                    field.value = value;
-                    field.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            });
-            
-            console.log('Sample data filled');
-        },
-        
-        validateAll: function() {
-            const form = document.getElementById('equipmentForm');
-            const fields = form.querySelectorAll('input, select, textarea');
-            
-            fields.forEach(field => {
-                EquipmentAddForm.validateField(field);
-            });
-            
-            console.log('All fields validated');
-        },
-        
-        showState: function() {
-            console.log('Form State:', EquipmentAddForm.state);
-            console.log('Form Data:', EquipmentAddForm.getFormData());
-        }
-    };
-    
-    console.log('Equipment Add Debug helpers available:', window.equipmentAddDebug);
 }
 
 // Auto-focus first input

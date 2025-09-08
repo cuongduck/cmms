@@ -265,20 +265,7 @@ $recentActivities = [
                     </tr>
                 </table>
                 
-                <div class="mt-3">
-                    <h6>Liên kết hữu ích</h6>
-                    <div class="d-grid gap-1">
-                        <a href="#" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-book me-1"></i> Hướng dẫn sử dụng
-                        </a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-life-ring me-1"></i> Hỗ trợ kỹ thuật
-                        </a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-bug me-1"></i> Báo lỗi
-                        </a>
-                    </div>
-                </div>
+           
             </div>
         </div>
     </div>

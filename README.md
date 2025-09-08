@@ -55,23 +55,16 @@ cmms/
 │   │   └── style.css
 │   ├── images
 │   │   └── logo.png
-│   ├── js
-│   │   ├── bom-parts.js
-│   │   ├── bom.js
-│   │   ├── equipment-add.js
-│   │   ├── equipment-edit.js
-│   │   ├── equipment-view.js
-│   │   ├── equipment.js
-│   │   ├── inventory.js
-│   │   ├── main.js
-│   │   └── structure.js
-│   └── uploads
-│       ├── bom
-│       ├── equipment_images
-│       ├── equipment_manuals
-│       ├── equipment_settings
-│       ├── manuals
-│       └── temp
+│   └── js
+│       ├── bom-parts.js
+│       ├── bom.js
+│       ├── equipment-add.js
+│       ├── equipment-edit.js
+│       ├── equipment-view.js
+│       ├── equipment.js
+│       ├── inventory.js
+│       ├── main.js
+│       └── structure.js
 ├── config
 │   ├── auth.php
 │   ├── config.php
@@ -85,79 +78,85 @@ cmms/
 ├── index.php
 ├── login.php
 ├── logout.php
-└── modules
-    ├── bom
-    │   ├── add.php
-    │   ├── api
-    │   │   ├── bom.php
-    │   │   ├── export.php
-    │   │   └── parts.php
-    │   ├── config.php
-    │   ├── edit.php
-    │   ├── imports
-    │   │   ├── bom_import.php
-    │   │   └── parts_import.php
-    │   ├── index.php
-    │   ├── parts
-    │   │   ├── add.php
-    │   │   ├── edit.php
-    │   │   ├── index.php
-    │   │   └── view.php
-    │   ├── reports
-    │   │   ├── shortage_report.php
-    │   │   └── stock_report.php
-    │   └── view.php
-    ├── equipment
-    │   ├── add.php
-    │   ├── api
-    │   │   └── equipment.php
-    │   ├── edit.php
-    │   ├── index.php
-    │   ├── uploads
-    │   │   └── equipment
-    │   │       └── images
-    │   └── view.php
-    ├── inventory
-    │   ├── api
-    │   │   ├── export.php
-    │   │   ├── item_details.php
-    │   │   ├── search_suggestions.php
-    │   │   ├── stats.php
-    │   │   └── transactions.php
-    │   ├── dashboard.php
-    │   ├── index.php
-    │   └── transactions.php
-    ├── maintenance
-    │   ├── api
-    │   │   ├── maintenance.php
-    │   │   └── workshops.php
-    │   ├── config.php
-    │   ├── executions
-    │   │   ├── add.php
-    │   │   ├── edit.php
-    │   │   ├── index.php
-    │   │   └── view.php
-    │   ├── index.php
-    │   └── plans
-    │       ├── add.php
-    │       ├── edit.php
-    │       └── view.php
-    └── structure
-        ├── api
-        │   ├── areas.php
-        │   ├── equipment_groups.php
-        │   ├── industries.php
-        │   ├── lines.php
-        │   ├── machine_types.php
-        │   └── workshops.php
-        ├── index.php
-        └── views
-            ├── areas.php
-            ├── equipment_groups.php
-            ├── industries.php
-            ├── lines.php
-            ├── machine_types.php
-            └── workshops.php
+├── modules
+│   ├── bom
+│   │   ├── add.php
+│   │   ├── api
+│   │   │   ├── bom.php
+│   │   │   ├── export.php
+│   │   │   └── parts.php
+│   │   ├── config.php
+│   │   ├── edit.php
+│   │   ├── imports
+│   │   │   ├── bom_import.php
+│   │   │   └── parts_import.php
+│   │   ├── index.php
+│   │   ├── parts
+│   │   │   ├── add.php
+│   │   │   ├── edit.php
+│   │   │   ├── index.php
+│   │   │   └── view.php
+│   │   ├── reports
+│   │   │   ├── shortage_report.php
+│   │   │   └── stock_report.php
+│   │   └── view.php
+│   ├── equipment
+│   │   ├── add.php
+│   │   ├── api
+│   │   │   └── equipment.php
+│   │   ├── edit.php
+│   │   ├── index.php
+│   │   ├── uploads
+│   │   │   └── equipment
+│   │   │       └── images
+│   │   └── view.php
+│   ├── inventory
+│   │   ├── api
+│   │   │   ├── export.php
+│   │   │   ├── item_details.php
+│   │   │   ├── search_suggestions.php
+│   │   │   ├── stats.php
+│   │   │   └── transactions.php
+│   │   ├── dashboard.php
+│   │   ├── index.php
+│   │   └── transactions.php
+│   ├── maintenance
+│   │   ├── api
+│   │   │   ├── maintenance.php
+│   │   │   └── workshops.php
+│   │   ├── config.php
+│   │   ├── executions
+│   │   │   ├── add.php
+│   │   │   ├── edit.php
+│   │   │   ├── index.php
+│   │   │   └── view.php
+│   │   ├── index.php
+│   │   └── plans
+│   │       ├── add.php
+│   │       ├── edit.php
+│   │       └── view.php
+│   └── structure
+│       ├── api
+│       │   ├── areas.php
+│       │   ├── equipment_groups.php
+│       │   ├── industries.php
+│       │   ├── lines.php
+│       │   ├── machine_types.php
+│       │   └── workshops.php
+│       ├── index.php
+│       └── views
+│           ├── areas.php
+│           ├── equipment_groups.php
+│           ├── industries.php
+│           ├── lines.php
+│           ├── machine_types.php
+│           └── workshops.php
+└── uploads
+    └── equipment
+        ├── images
+        │   └── 68be8e9761160_1757318807.png
+        └── manuals
+            └── 68be8e9816ed1_1757318808.doc
 
 
 
@@ -210,7 +209,7 @@ Kế hoạch bảo trì và CLIT thiết bị:
 ```php
 // Singleton pattern - kết nối duy nhất
 class Database {
-    private $host = '10.18.15.43';    // IP server MariaDB
+    private $host = '0';    // IP server MariaDB
     private $dbname = 'cmms';          // Database name
     private $username = 'cf';          // DB user
     private $charset = 'utf8mb4';      // UTF-8 support Vietnamese
