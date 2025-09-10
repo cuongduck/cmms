@@ -48,6 +48,37 @@ $sql = "
     
     WHERE e.id = ?
 ";
+// Get settings images
+$sql_settings = "
+    SELECT id, image_path, title, description, category, sort_order, created_at
+    FROM equipment_settings_images 
+    WHERE equipment_id = ? 
+    ORDER BY category, sort_order, created_at DESC
+";
+$settings_images = $db->fetchAll($sql_settings, [$equipmentId]);
+
+// Group by category
+$settings_by_category = [];
+foreach ($settings_images as $image) {
+    $category = $image['category'] ?: 'general';
+    if (!isset($settings_by_category[$category])) {
+        $settings_by_category[$category] = [];
+    }
+    
+    // Format image URL
+    $image['image_url'] = APP_URL . '/' . ltrim($image['image_path'], '/');
+    $settings_by_category[$category][] = $image;
+}
+
+// Categories mapping
+$category_names = [
+    'general' => 'Tổng quát',
+    'electrical' => 'Điện',
+    'mechanical' => 'Cơ khí', 
+    'software' => 'Phần mềm',
+    'safety' => 'An toàn',
+    'maintenance' => 'Bảo trì'
+];
 
 $equipment = $db->fetch($sql, [$equipmentId]);
 
@@ -56,6 +87,7 @@ if (!$equipment) {
     include '../../errors/404.php';
     exit;
 }
+
 
 // Set page variables
 $pageTitle = 'Chi tiết thiết bị: ' . $equipment['name'];
@@ -225,6 +257,223 @@ if (!empty($equipment['manual_path'])) {
 require_once '../../includes/header.php';
 ?>
 <!-- CSS Styles - Sửa lỗi và tối ưu -->
+<!-- Thêm vào phần CSS - dòng khoảng 50 -->
+<style>
+/* Settings Images Styles */
+.settings-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.settings-image-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.settings-image-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.image-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+}
+
+.image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.image-container:hover img {
+    transform: scale(1.05);
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.image-container:hover .image-overlay {
+    opacity: 1;
+}
+
+.image-info {
+    padding: 1rem;
+}
+
+.image-title {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.image-description {
+    color: #6b7280;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.image-meta {
+    border-top: 1px solid #f3f4f6;
+    padding-top: 0.5rem;
+}
+
+.settings-category {
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 1rem;
+}
+
+.settings-category:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Modal Styles */
+.settings-upload-area {
+    border: 2px dashed #d1d5db;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background: #f9fafb;
+}
+
+.settings-upload-area:hover,
+.settings-upload-area.drag-over {
+    border-color: var(--equipment-primary);
+    background: rgba(30, 58, 138, 0.05);
+}
+
+.settings-upload-icon {
+    font-size: 2rem;
+    color: #9ca3af;
+    margin-bottom: 1rem;
+}
+
+.image-viewer-modal .modal-dialog {
+    max-width: 90vw;
+}
+
+.image-viewer-modal .modal-body {
+    padding: 0;
+    text-align: center;
+}
+
+.image-viewer-modal img {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+}
+
+@media (max-width: 768px) {
+    .settings-images-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .image-container {
+        height: 150px;
+    }
+    
+    .image-info {
+        padding: 0.75rem;
+    }
+}
+/* Notification Styles */
+.toast-notification {
+    animation: slideInRight 0.3s ease-out;
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.toast-notification.alert-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border-left: 4px solid #065f46;
+}
+
+.toast-notification.alert-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border-left: 4px solid #991b1b;
+}
+
+.toast-notification.alert-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border-left: 4px solid #92400e;
+}
+
+.toast-notification.alert-info {
+    background: linear-gradient(135deg, #06b6d4, #0891b2);
+    color: white;
+    border-left: 4px solid #164e63;
+}
+
+.toast-notification .btn-close {
+    filter: invert(1);
+    opacity: 0.8;
+}
+
+.toast-notification .btn-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Loading Overlay */
+#pageLoadingOverlay {
+    backdrop-filter: blur(2px);
+}
+
+/* Equipment code hover effect */
+.equipment-code-badge:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+    cursor: pointer;
+}
+
+.equipment-code-badge:active {
+    transform: scale(0.98);
+}
+</style>
 <style>
 .equipment-view-container {
     background: var(--equipment-light, #f8fafc);
@@ -763,9 +1012,9 @@ require_once '../../includes/header.php';
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-md-8">
-                    <div class="equipment-code-badge" title="Click để copy mã thiết bị">
-                        <?php echo htmlspecialchars($equipment['code']); ?>
-                    </div>
+                    <div class="equipment-code-badge" title="Click để copy mã thiết bị" onclick="copyEquipmentCode()">
+    <?php echo htmlspecialchars($equipment['code']); ?>
+</div>
                     <h1 class="equipment-title">
                         <?php echo htmlspecialchars($equipment['name']); ?>
                     </h1>
@@ -1057,6 +1306,120 @@ require_once '../../includes/header.php';
                     </div>
                 </div>
                 <?php endif; ?>
+<!-- Settings Images -->
+
+<!-- SIMPLE SETTINGS IMAGES DISPLAY -->
+<?php if (!empty($settings_images) && !empty($settings_by_category)): ?>
+
+<div class="info-section">
+    <div class="info-section-header">
+        <i class="fas fa-images section-icon"></i>
+        <h5>Hình ảnh thông số cài đặt</h5>
+        <span class="badge bg-info ms-2"><?php echo count($settings_images); ?></span>
+        <?php if (hasPermission('equipment', 'edit')): ?>
+        <div class="ms-auto">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="showSettingsImageModal()">
+                <i class="fas fa-plus me-1"></i>Thêm ảnh
+            </button>
+        </div>
+        <?php endif; ?>
+    </div>
+    <div class="info-section-body">
+        <?php if (count($settings_images) > 0): ?>
+            <!-- SHOW ALL IMAGES IN ONE GRID -->
+            <div class="settings-images-grid">
+                <?php foreach ($settings_images as $image): ?>
+                    <?php
+                    $relativePath = ltrim($image['image_path'], '/');
+                    $fullPath = BASE_PATH . '/' . $relativePath;
+                    $fileExists = file_exists($fullPath);
+                    $imageUrl = APP_URL . '/' . $relativePath;
+                    ?>
+                    <div class="settings-image-card" data-image-id="<?php echo $image['id']; ?>">
+                        <div class="image-container">
+                            <?php if ($fileExists): ?>
+                                <img src="<?php echo htmlspecialchars($imageUrl); ?>" 
+                                     alt="<?php echo htmlspecialchars($image['title'] ?: 'Settings Image'); ?>"
+                                     onclick="showSettingsImageViewer(<?php echo $image['id']; ?>)"
+                                     loading="lazy">
+                            <?php else: ?>
+                                <div class="image-placeholder">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    <small>File không tìm thấy</small>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <?php if (hasPermission('equipment', 'edit')): ?>
+                            <div class="image-overlay">
+                                <button type="button" class="btn btn-sm btn-light" 
+                                        onclick="editSettingsImage(<?php echo $image['id']; ?>)" title="Chỉnh sửa">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" 
+                                        onclick="deleteSettingsImage(<?php echo $image['id']; ?>)" title="Xóa">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="image-info">
+                            <div class="image-title">
+                                <?php echo htmlspecialchars($image['title'] ?: 'Không có tiêu đề'); ?>
+                            </div>
+                            <?php if (!empty($image['description'])): ?>
+                                <div class="image-description">
+                                    <?php echo htmlspecialchars($image['description']); ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="image-meta">
+                                <small class="text-muted">
+                                    <span class="badge bg-secondary me-2">
+                                        <?php echo $category_names[$image['category']] ?? $image['category'] ?? 'General'; ?>
+                                    </span>
+                                    <i class="fas fa-calendar me-1"></i>
+                                    <?php echo formatDateTime($image['created_at']); ?>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            
+        <?php else: ?>
+            <!-- NO IMAGES -->
+            <div class="text-center py-4">
+                <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Chưa có hình ảnh thông số cài đặt</p>
+                <?php if (hasPermission('equipment', 'edit')): ?>
+                <button type="button" class="btn btn-primary" onclick="showSettingsImageModal()">
+                    <i class="fas fa-plus me-2"></i>Thêm ảnh đầu tiên
+                </button>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php else: ?>
+
+    <?php if (hasPermission('equipment', 'edit')): ?>
+    <div class="info-section">
+        <div class="info-section-header">
+            <i class="fas fa-images section-icon"></i>
+            <h5>Hình ảnh thông số cài đặt</h5>
+        </div>
+        <div class="info-section-body">
+            <div class="text-center py-4">
+                <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Chưa có hình ảnh thông số cài đặt</p>
+                <button type="button" class="btn btn-primary" onclick="showSettingsImageModal()">
+                    <i class="fas fa-plus me-2"></i>Thêm ảnh đầu tiên
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+<?php endif; ?>
 
                 <!-- Maintenance History -->
                 <div class="info-section">
@@ -1163,12 +1526,17 @@ require_once '../../includes/header.php';
                                 <i class="fas fa-edit me-2"></i>Chỉnh sửa thiết bị
                             </a>
                             <?php endif; ?>
-                            
+                            <?php if (hasPermission('equipment', 'edit')): ?>
+<button type="button" class="btn btn-outline-info" onclick="showSettingsImageModal()">
+    <i class="fas fa-images me-2"></i>Thêm ảnh thông số
+</button>
+<?php endif; ?>
                             <button type="button" class="btn btn-outline-success" onclick="createMaintenanceSchedule()">
                                 <i class="fas fa-calendar-plus me-2"></i>Lên lịch bảo trì
                             </button>
                             
                             <?php if (hasPermission('equipment', 'edit')): ?>
+                            
                             <button type="button" class="btn btn-outline-info" onclick="changeStatus()">
                                 <i class="fas fa-exchange-alt me-2"></i>Thay đổi trạng thái
                             </button>
@@ -1492,7 +1860,116 @@ require_once '../../includes/header.php';
         </div>
     </div>
 </div>
+<!-- Settings Image Upload Modal -->
+<div class="modal fade" id="settingsImageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-images me-2"></i>
+                    <span id="settingsModalTitle">Thêm hình ảnh thông số</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsImageForm" enctype="multipart/form-data">
+                    <input type="hidden" id="settingsImageId" name="id">
+                    <input type="hidden" name="equipment_id" value="<?php echo $equipmentId; ?>">
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="settingsTitle" class="form-label">Tiêu đề:</label>
+                                <input type="text" class="form-control" id="settingsTitle" name="title" 
+                                       placeholder="VD: Bảng điều khiển chính">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="settingsCategory" class="form-label">Danh mục:</label>
+                                <select class="form-select" id="settingsCategory" name="category">
+                                    <option value="general">Tổng quát</option>
+                                    <option value="electrical">Điện</option>
+                                    <option value="mechanical">Cơ khí</option>
+                                    <option value="software">Phần mềm</option>
+                                    <option value="safety">An toàn</option>
+                                    <option value="maintenance">Bảo trì</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="settingsDescription" class="form-label">Mô tả:</label>
+                        <textarea class="form-control" id="settingsDescription" name="description" 
+                                  rows="3" placeholder="Mô tả chi tiết về hình ảnh..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3" id="imageUploadSection">
+                        <label class="form-label">Chọn hình ảnh:</label>
+                        <div class="settings-upload-area" onclick="document.getElementById('settingsImageFile').click()">
+                            <input type="file" id="settingsImageFile" name="image" accept="image/*" 
+                                   class="d-none" onchange="previewSettingsImage(this)">
+                            <div class="settings-upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div>
+                                <strong>Click để chọn hình ảnh</strong><br>
+                                hoặc kéo thả file vào đây
+                            </div>
+                            <small class="text-muted mt-2 d-block">
+                                Chấp nhận: JPG, PNG, GIF, WEBP (tối đa 5MB)
+                            </small>
+                        </div>
+                        <div id="settingsImagePreview" class="mt-3 d-none">
+                            <img id="previewImg" src="" alt="Preview" style="max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 0.375rem;">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettingsImage()">
+                    <i class="fas fa-save me-2"></i>
+                    <span id="settingsSaveText">Lưu hình ảnh</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- Settings Image Viewer Modal -->
+<div class="modal fade image-viewer-modal" id="settingsImageViewer" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewerImageTitle">Hình ảnh thông số</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <img id="viewerImage" src="" alt="" class="img-fluid">
+                <div class="mt-3" id="viewerImageInfo">
+                    <div id="viewerImageDescription" class="text-muted"></div>
+                    <div id="viewerImageMeta" class="small text-muted mt-2"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <?php if (hasPermission('equipment', 'edit')): ?>
+                <button type="button" class="btn btn-outline-primary" onclick="editCurrentSettingsImage()">
+                    <i class="fas fa-edit me-2"></i>Chỉnh sửa
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentSettingsImage()">
+                    <i class="fas fa-trash me-2"></i>Xóa
+                </button>
+                <?php endif; ?>
+                <a id="downloadSettingsImage" href="" download class="btn btn-success">
+                    <i class="fas fa-download me-2"></i>Tải xuống
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Include Equipment View JavaScript -->
 <script src="<?php echo APP_URL; ?>/assets/js/equipment-view.js?v=<?php echo time(); ?>"></script>
 
@@ -1522,6 +1999,446 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('EquipmentView not loaded');
     }
+});
+// Settings Images Functions
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existingNotifications = document.querySelectorAll('.toast-notification');
+    existingNotifications.forEach(notification => {
+        notification.remove();
+    });
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `toast-notification alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 1060;
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    
+    const icons = {
+        'success': 'fas fa-check-circle',
+        'error': 'fas fa-exclamation-circle', 
+        'warning': 'fas fa-exclamation-triangle',
+        'info': 'fas fa-info-circle'
+    };
+    
+    notification.innerHTML = `
+        <i class="${icons[type] || icons.info} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 150);
+        }
+    }, 5000);
+}
+
+// Loading overlay functions
+function showLoading(show = true) {
+    let overlay = document.getElementById('pageLoadingOverlay');
+    
+    if (show && !overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pageLoadingOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        `;
+        overlay.innerHTML = `
+            <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    } else if (!show && overlay) {
+        overlay.remove();
+    }
+}
+
+// Error handling function
+function handleApiError(error, defaultMessage = 'Có lỗi xảy ra') {
+    console.error('API Error:', error);
+    
+    let message = defaultMessage;
+    
+    if (error.response) {
+        // Server responded with error status
+        message = `Lỗi ${error.response.status}: ${error.response.statusText}`;
+    } else if (error.message) {
+        // JavaScript error
+        message = error.message;
+    }
+    
+    showNotification(message, 'error');
+}
+
+// Copy to clipboard function
+function copyToClipboard(text, successMessage = 'Đã copy vào clipboard') {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification(successMessage, 'success');
+        }).catch(err => {
+            fallbackCopyTextToClipboard(text, successMessage);
+        });
+    } else {
+        fallbackCopyTextToClipboard(text, successMessage);
+    }
+}
+
+function fallbackCopyTextToClipboard(text, successMessage) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        showNotification(successMessage, 'success');
+    } catch (err) {
+        showNotification('Không thể copy. Vui lòng copy thủ công.', 'warning');
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+// Equipment code copy function
+function copyEquipmentCode() {
+    const code = '<?php echo htmlspecialchars($equipment['code']); ?>';
+    copyToClipboard(code, `Đã copy mã thiết bị: ${code}`);
+}
+
+let currentSettingsImageId = null;
+
+function showSettingsImageModal(imageId = null) {
+    const modal = new bootstrap.Modal(document.getElementById('settingsImageModal'));
+    const form = document.getElementById('settingsImageForm');
+    const title = document.getElementById('settingsModalTitle');
+    const saveText = document.getElementById('settingsSaveText');
+    const imageUploadSection = document.getElementById('imageUploadSection');
+    
+    // Reset form
+    form.reset();
+    document.getElementById('settingsImagePreview').classList.add('d-none');
+    
+    if (imageId) {
+        // Edit mode
+        currentSettingsImageId = imageId;
+        title.textContent = 'Chỉnh sửa hình ảnh thông số';
+        saveText.textContent = 'Cập nhật';
+        imageUploadSection.style.display = 'none';
+        
+        // Load image data
+        loadSettingsImageData(imageId);
+    } else {
+        // Add mode
+        currentSettingsImageId = null;
+        title.textContent = 'Thêm hình ảnh thông số';
+        saveText.textContent = 'Lưu hình ảnh';
+        imageUploadSection.style.display = 'block';
+    }
+    
+    modal.show();
+}
+
+function loadSettingsImageData(imageId) {
+    fetch(`api/settings_images.php?action=get&id=${imageId}`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                const data = result.data;
+                document.getElementById('settingsImageId').value = data.id;
+                document.getElementById('settingsTitle').value = data.title || '';
+                document.getElementById('settingsDescription').value = data.description || '';
+                document.getElementById('settingsCategory').value = data.category || 'general';
+            } else {
+                showNotification(result.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading image data:', error);
+            showNotification('Lỗi khi tải dữ liệu hình ảnh', 'error');
+        });
+}
+
+function previewSettingsImage(input) {
+    const preview = document.getElementById('settingsImagePreview');
+    const previewImg = document.getElementById('previewImg');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.classList.remove('d-none');
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.classList.add('d-none');
+    }
+}
+
+function saveSettingsImage() {
+    const form = document.getElementById('settingsImageForm');
+    const formData = new FormData(form);
+    
+    // Validation
+    const title = document.getElementById('settingsTitle').value.trim();
+    if (!title) {
+        showNotification('Vui lòng nhập tiêu đề cho hình ảnh', 'warning');
+        return;
+    }
+    
+    if (currentSettingsImageId) {
+        formData.append('action', 'update');
+        formData.append('id', currentSettingsImageId);
+    } else {
+        formData.append('action', 'upload');
+        
+        // Validate image upload for new images
+        const imageFile = document.getElementById('settingsImageFile').files[0];
+        if (!imageFile) {
+            showNotification('Vui lòng chọn hình ảnh', 'warning');
+            return;
+        }
+        
+        // Validate file size (5MB)
+        if (imageFile.size > 5 * 1024 * 1024) {
+            showNotification('File quá lớn. Tối đa 5MB', 'warning');
+            return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(imageFile.type)) {
+            showNotification('Loại file không được hỗ trợ. Chỉ chấp nhận: JPG, PNG, GIF, WEBP', 'warning');
+            return;
+        }
+    }
+    
+    // Show loading
+    const saveBtn = document.querySelector('#settingsImageModal .btn-primary');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Đang xử lý...';
+    saveBtn.disabled = true;
+    
+    showLoading(true);
+    
+    fetch('api/settings_images.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(result => {
+        if (result.success) {
+            showNotification(result.message || 'Lưu thành công', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('settingsImageModal')).hide();
+            
+            // Reload page to show new image
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification(result.message || 'Có lỗi xảy ra', 'error');
+        }
+    })
+    .catch(error => {
+        handleApiError(error, 'Lỗi khi lưu hình ảnh');
+    })
+    .finally(() => {
+        // Reset button
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+        showLoading(false);
+    });
+}
+
+function showSettingsImageViewer(imageId) {
+    showLoading(true);
+    
+    fetch(`api/settings_images.php?action=get&id=${imageId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.success) {
+                const data = result.data;
+                
+                // Set image and info
+                document.getElementById('viewerImage').src = data.image_url;
+                document.getElementById('viewerImageTitle').textContent = data.title || 'Hình ảnh thông số';
+                document.getElementById('viewerImageDescription').textContent = data.description || '';
+                document.getElementById('viewerImageMeta').innerHTML = `
+                    <i class="fas fa-folder me-2"></i>${getCategoryName(data.category)}
+                    <span class="ms-3"><i class="fas fa-calendar me-2"></i>${data.created_at_formatted}</span>
+                    ${data.created_by_name ? `<span class="ms-3"><i class="fas fa-user me-2"></i>${data.created_by_name}</span>` : ''}
+                `;
+                
+                // Set download link
+                const downloadLink = document.getElementById('downloadSettingsImage');
+                downloadLink.href = data.image_url;
+                downloadLink.download = (data.title || 'settings_image').replace(/[^a-z0-9]/gi, '_') + '.jpg';
+                
+                // Store current image ID for edit/delete
+                currentSettingsImageId = imageId;
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('settingsImageViewer'));
+                modal.show();
+            } else {
+                showNotification(result.message || 'Không tìm thấy hình ảnh', 'error');
+            }
+        })
+        .catch(error => {
+            handleApiError(error, 'Lỗi khi tải hình ảnh');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function editSettingsImage(imageId) {
+   showSettingsImageModal(imageId);
+}
+
+function editCurrentSettingsImage() {
+   if (currentSettingsImageId) {
+       bootstrap.Modal.getInstance(document.getElementById('settingsImageViewer')).hide();
+       setTimeout(() => {
+           showSettingsImageModal(currentSettingsImageId);
+       }, 300);
+   }
+}
+
+function deleteSettingsImage(imageId) {
+   if (confirm('Bạn có chắc chắn muốn xóa hình ảnh này?\nHành động này không thể hoàn tác.')) {
+       performDeleteSettingsImage(imageId);
+   }
+}
+
+function deleteCurrentSettingsImage() {
+   if (currentSettingsImageId) {
+       deleteSettingsImage(currentSettingsImageId);
+   }
+}
+
+function performDeleteSettingsImage(imageId) {
+    const formData = new FormData();
+    formData.append('action', 'delete');
+    formData.append('id', imageId);
+    
+    showLoading(true);
+    
+    fetch('api/settings_images.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(result => {
+        if (result.success) {
+            showNotification(result.message || 'Xóa thành công', 'success');
+            
+            // Close viewer modal if open
+            const viewerModal = bootstrap.Modal.getInstance(document.getElementById('settingsImageViewer'));
+            if (viewerModal) {
+                viewerModal.hide();
+            }
+            
+            // Reload page
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification(result.message || 'Không thể xóa hình ảnh', 'error');
+        }
+    })
+    .catch(error => {
+        handleApiError(error, 'Lỗi khi xóa hình ảnh');
+    })
+    .finally(() => {
+        showLoading(false);
+    });
+}
+
+function getCategoryName(category) {
+   const categories = {
+       'general': 'Tổng quát',
+       'electrical': 'Điện',
+       'mechanical': 'Cơ khí',
+       'software': 'Phần mềm',
+       'safety': 'An toàn',
+       'maintenance': 'Bảo trì'
+   };
+   return categories[category] || category;
+}
+
+// Drag and drop support
+document.addEventListener('DOMContentLoaded', function() {
+   const uploadArea = document.querySelector('.settings-upload-area');
+   if (uploadArea) {
+       uploadArea.addEventListener('dragover', function(e) {
+           e.preventDefault();
+           this.classList.add('drag-over');
+       });
+       
+       uploadArea.addEventListener('dragleave', function(e) {
+           e.preventDefault();
+           this.classList.remove('drag-over');
+       });
+       
+       uploadArea.addEventListener('drop', function(e) {
+           e.preventDefault();
+           this.classList.remove('drag-over');
+           
+           const files = e.dataTransfer.files;
+           if (files.length > 0) {
+               const fileInput = document.getElementById('settingsImageFile');
+               fileInput.files = files;
+               previewSettingsImage(fileInput);
+           }
+       });
+   }
 });
 </script>
 

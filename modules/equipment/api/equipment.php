@@ -260,11 +260,13 @@ function getEquipmentList() {
         
         // Format image URL
         if ($item['image_path']) {
-            $item['image_url'] = str_replace(BASE_PATH, APP_URL, $item['image_path']);
-        } else {
-            $item['image_url'] = null;
-        }
+        // Đảm bảo đường dẫn bắt đầu từ root
+        $relativePath = ltrim($item['image_path'], '/');
+        $item['image_url'] = APP_URL . '/' . $relativePath;
+    } else {
+        $item['image_url'] = null;
     }
+}
     
     $pagination = [
         'current_page' => $page,

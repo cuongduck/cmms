@@ -52,6 +52,8 @@ require_once '../../includes/header.php';
 // Lấy dữ liệu filter options
 $industries = $db->fetchAll("SELECT id, name, code FROM industries WHERE status = 'active' ORDER BY name");
 $workshops = $db->fetchAll("SELECT id, name, code, industry_id FROM workshops WHERE status = 'active' ORDER BY name");
+$lines = $db->fetchAll("SELECT id, name, code, workshop_id FROM production_lines WHERE status = 'active' ORDER BY name"); // ✅ THÊM MỚI
+$areas = $db->fetchAll("SELECT id, name, code, workshop_id FROM areas WHERE status = 'active' ORDER BY name"); // ✅ THÊM MỚI
 $machineTypes = $db->fetchAll("SELECT id, name, code FROM machine_types WHERE status = 'active' ORDER BY name");
 $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' ORDER BY full_name");
 
@@ -230,6 +232,15 @@ $stats = [
     position: relative;
 }
 
+.equipment-serial {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Courier New', monospace; /* Font đẹp hơn cho số seri */
+    font-size: 0.75rem !important;
+}
+
 .maintenance-indicator::after {
     content: '';
     position: absolute;
@@ -315,72 +326,76 @@ $stats = [
 
     <!-- Filters -->
     <div class="filter-card">
-        <div class="card-body">
-            <form id="filterForm" class="row g-3">
-                <div class="col-md-3">
-                    <div class="form-floating">
-                        <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm...">
-                        <label for="searchInput">Tìm kiếm thiết bị...</label>
-                    </div>
+    <div class="card-body">
+        <form id="filterForm" class="row g-3">
+            <div class="col-md-3">
+                <div class="form-floating">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm...">
+                    <label for="searchInput">Tìm kiếm thiết bị...</label>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="industryFilter">
-                            <option value="">Tất cả ngành</option>
-                            <?php foreach ($industries as $industry): ?>
-                                <option value="<?php echo $industry['id']; ?>">
-                                    <?php echo htmlspecialchars($industry['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="industryFilter">Ngành</label>
-                    </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-floating">
+                    <select class="form-select" id="industryFilter">
+                        <option value="">Tất cả ngành</option>
+                        <?php foreach ($industries as $industry): ?>
+                            <option value="<?php echo $industry['id']; ?>">
+                                <?php echo htmlspecialchars($industry['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="industryFilter">Ngành</label>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="workshopFilter">
-                            <option value="">Tất cả xưởng</option>
-                            <?php foreach ($workshops as $workshop): ?>
-                                <option value="<?php echo $workshop['id']; ?>" data-industry="<?php echo $workshop['industry_id']; ?>">
-                                    <?php echo htmlspecialchars($workshop['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="workshopFilter">Xưởng</label>
-                    </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-floating">
+                    <select class="form-select" id="workshopFilter">
+                        <option value="">Tất cả xưởng</option>
+                        <?php foreach ($workshops as $workshop): ?>
+                            <option value="<?php echo $workshop['id']; ?>" data-industry="<?php echo $workshop['industry_id']; ?>">
+                                <?php echo htmlspecialchars($workshop['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="workshopFilter">Xưởng</label>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="statusFilter">
-                            <option value="">Tất cả trạng thái</option>
-                            <option value="active">Hoạt động</option>
-                            <option value="inactive">Ngưng hoạt động</option>
-                            <option value="maintenance">Bảo trì</option>
-                            <option value="broken">Hỏng</option>
-                        </select>
-                        <label for="statusFilter">Trạng thái</label>
-                    </div>
+            </div>
+            <!-- ✅ THAY ĐỔI: Từ "Trạng thái" sang "Khu vực" -->
+            <div class="col-md-2">
+                <div class="form-floating">
+                    <select class="form-select" id="areaFilter">
+                        <option value="">Tất cả khu vực</option>
+                        <?php foreach ($areas as $area): ?>
+                            <option value="<?php echo $area['id']; ?>" data-workshop="<?php echo $area['workshop_id']; ?>">
+                                <?php echo htmlspecialchars($area['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="areaFilter">Khu vực</label>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        <select class="form-select" id="criticalityFilter">
-                            <option value="">Tất cả mức độ</option>
-                            <option value="Critical">Nghiêm trọng</option>
-                            <option value="High">Cao</option>
-                            <option value="Medium">Trung bình</option>
-                            <option value="Low">Thấp</option>
-                        </select>
-                        <label for="criticalityFilter">Mức độ quan trọng</label>
-                    </div>
+            </div>
+            <!-- ✅ THAY ĐỔI: Từ "Mức độ quan trọng" sang "Dòng máy" -->
+            <div class="col-md-2">
+                <div class="form-floating">
+                    <select class="form-select" id="machineTypeFilter">
+                        <option value="">Tất cả dòng máy</option>
+                        <?php foreach ($machineTypes as $machineType): ?>
+                            <option value="<?php echo $machineType['id']; ?>">
+                                <?php echo htmlspecialchars($machineType['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="machineTypeFilter">Dòng máy</label>
                 </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-outline-secondary w-100 h-100" onclick="resetFilters()" title="Reset bộ lọc">
-                        <i class="fas fa-undo"></i>
-                    </button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-secondary w-100 h-100" onclick="resetFilters()" title="Reset bộ lọc">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 
     <!-- Data Table -->
     <div class="data-table position-relative">
@@ -400,10 +415,10 @@ $stats = [
                         <th style="width: 80px;">Hình ảnh</th>
                         <th style="width: 120px;">Mã thiết bị</th>
                         <th>Tên thiết bị</th>
-                        <th style="width: 200px;">Vị trí</th>
+                        <th style="width: 200px;">Vị trí máy</th>
                         <th style="width: 120px;">Dòng máy</th>
                         <th style="width: 100px;">Người quản lý</th>
-                        <th style="width: 120px;">Mức độ quan trọng</th>
+                        <th style="width: 120px;">Level</th>
                         <th style="width: 100px;">Trạng thái</th>
                         <th style="width: 100px;">Bảo trì tiếp theo</th>
                         <th style="width: 120px;">Thao tác</th>
@@ -529,6 +544,9 @@ function initializeEventListeners() {
         input.addEventListener('change', function() {
             if (this.id === 'industryFilter') {
                 updateWorkshopFilter();
+                updateAreaFilter(); // ✅ THÊM MỚI
+            } else if (this.id === 'workshopFilter') {
+                updateAreaFilter(); // ✅ THÊM MỚI
             }
             currentPage = 1;
             loadData();
@@ -589,7 +607,28 @@ function updateWorkshopFilter() {
         }
     });
 }
-
+function updateAreaFilter() {
+    const workshopSelect = document.getElementById('workshopFilter');
+    const areaSelect = document.getElementById('areaFilter');
+    
+    if (!workshopSelect || !areaSelect) return;
+    
+    const selectedWorkshopId = workshopSelect.value;
+    const areaOptions = areaSelect.querySelectorAll('option[data-workshop]');
+    
+    // Reset area selection
+    areaSelect.value = '';
+    
+    // Show/hide area options based on selected workshop
+    areaOptions.forEach(option => {
+        const workshopId = option.getAttribute('data-workshop');
+        if (!selectedWorkshopId || workshopId === selectedWorkshopId) {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
 // Load data from API
 async function loadData() {
     console.log('Loading equipment data...');
@@ -597,18 +636,18 @@ async function loadData() {
         showLoading(true);
         
         // Get filter values
-        const searchEl = document.getElementById('searchInput');
+          const searchEl = document.getElementById('searchInput');
         const industryEl = document.getElementById('industryFilter');
         const workshopEl = document.getElementById('workshopFilter');
-        const statusEl = document.getElementById('statusFilter');
-        const criticalityEl = document.getElementById('criticalityFilter');
+        const areaEl = document.getElementById('areaFilter'); // ✅ THAY ĐỔI
+        const machineTypeEl = document.getElementById('machineTypeFilter'); // ✅ THAY ĐỔI
         
         currentFilters = {
             search: searchEl ? searchEl.value.trim() : '',
             industry_id: industryEl ? industryEl.value : '',
             workshop_id: workshopEl ? workshopEl.value : '',
-            status: statusEl ? statusEl.value : '',
-            criticality: criticalityEl ? criticalityEl.value : '',
+            area_id: areaEl ? areaEl.value : '', // ✅ THAY ĐỔI
+            machine_type_id: machineTypeEl ? machineTypeEl.value : '', // ✅ THAY ĐỔI
             sort_by: 'name',
             sort_order: 'ASC'
         };
@@ -677,20 +716,20 @@ function renderTable(data) {
                            value="${item.id}" onchange="handleItemSelection(this)">
                 </td>
                 <td>
-                    ${item.image_path ? 
-                        `<img src="${item.image_path}" alt="Equipment Image" class="equipment-image">` : 
-                        `<div class="no-image"><i class="fas fa-image"></i></div>`
-                    }
-                </td>
+    ${item.image_url ? 
+        `<img src="${item.image_url}" alt="Equipment Image" class="equipment-image">` : 
+        `<div class="no-image"><i class="fas fa-image"></i></div>`
+    }
+</td>
                 <td>
                     <span class="equipment-code">${escapeHtml(item.code)}</span>
                 </td>
                 <td>
-                    <div class="fw-semibold">${escapeHtml(item.name)}</div>
-                    <div class="equipment-specs text-muted small" title="${escapeHtml(item.specifications || '')}">
-                        ${item.specifications || 'Chưa có thông số'}
-                    </div>
-                </td>
+    <div class="fw-semibold">${escapeHtml(item.name)}</div>
+    <div class="equipment-serial text-muted small" title="Số seri: ${escapeHtml(item.serial_number || '')}">
+        ${item.serial_number ? `S/N: ${escapeHtml(item.serial_number)}` : 'Chưa có số seri'}
+    </div>
+</td>
                 <td>
                     <div class="equipment-location">
                         <div class="fw-medium">${escapeHtml(item.industry_name || '')}</div>
@@ -704,7 +743,7 @@ function renderTable(data) {
                 </td>
                 <td>
                     <div class="fw-medium">${escapeHtml(item.owner_name || 'Chưa có')}</div>
-                    ${item.backup_owner_name ? `<div class="text-muted small">PB: ${escapeHtml(item.backup_owner_name)}</div>` : ''}
+                    ${item.backup_owner_name ? `<div class="text-muted small">Owner: ${escapeHtml(item.backup_owner_name)}</div>` : ''}
                 </td>
                 <td>
                     <span class="badge ${criticalityClass}">${item.criticality}</span>
@@ -940,10 +979,11 @@ function resetFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('industryFilter').value = '';
     document.getElementById('workshopFilter').value = '';
-    document.getElementById('statusFilter').value = '';
-    document.getElementById('criticalityFilter').value = '';
+    document.getElementById('areaFilter').value = ''; // ✅ THAY ĐỔI
+    document.getElementById('machineTypeFilter').value = ''; // ✅ THAY ĐỔI
     
     updateWorkshopFilter();
+    updateAreaFilter(); // ✅ THÊM MỚI
     currentPage = 1;
     loadData();
 }

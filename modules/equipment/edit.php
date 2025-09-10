@@ -185,16 +185,16 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
     $imageUpload = uploadFile(
         $_FILES['image'],
         ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        'uploads/equipment/images/', // ✅ Sửa
+        'uploads/equipment/images/', // ✅ Đúng đường dẫn
         5 * 1024 * 1024 // 5MB
     );
     
     if ($imageUpload['success']) {
         // Delete old image if exists
-        if ($imagePath && file_exists(BASE_PATH . '/' . $imagePath)) { // ✅ Sửa
-            unlink(BASE_PATH . '/' . $imagePath);
+        if ($imagePath && file_exists(BASE_PATH . '/' . ltrim($imagePath, '/'))) {
+            unlink(BASE_PATH . '/' . ltrim($imagePath, '/'));
         }
-        $imagePath = $imageUpload['relative_path']; // ✅ Sửa
+        $imagePath = $imageUpload['relative_path']; // ✅ Sử dụng relative_path
         
         // Resize image if needed
         if (function_exists('resizeImage')) {
