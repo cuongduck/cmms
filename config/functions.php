@@ -436,16 +436,19 @@ function paginate($totalItems, $currentPage = 1, $perPage = 20, $url = '') {
 /**
  * Build pagination HTML
  */
-function buildPaginationHtml($pagination, $url = '') {
+function buildPaginationHtml($pagination, $baseUrl = '') {
     if ($pagination['total_pages'] <= 1) {
         return '';
     }
+    
+    // Xử lý base URL để tránh ?? 
+    $separator = strpos($baseUrl, '?') !== false ? '&' : '?';
     
     $html = '<nav aria-label="Pagination"><ul class="pagination pagination-sm justify-content-center">';
     
     // Previous
     if ($pagination['has_previous']) {
-        $html .= '<li class="page-item"><a class="page-link" href="' . $url . '?page=' . $pagination['previous_page'] . '">‹</a></li>';
+        $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . $separator . 'page=' . $pagination['previous_page'] . '">‹</a></li>';
     } else {
         $html .= '<li class="page-item disabled"><span class="page-link">‹</span></li>';
     }
@@ -458,13 +461,13 @@ function buildPaginationHtml($pagination, $url = '') {
         if ($i == $pagination['current_page']) {
             $html .= '<li class="page-item active"><span class="page-link">' . $i . '</span></li>';
         } else {
-            $html .= '<li class="page-item"><a class="page-link" href="' . $url . '?page=' . $i . '">' . $i . '</a></li>';
+            $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . $separator . 'page=' . $i . '">' . $i . '</a></li>';
         }
     }
     
     // Next
     if ($pagination['has_next']) {
-        $html .= '<li class="page-item"><a class="page-link" href="' . $url . '?page=' . $pagination['next_page'] . '">›</a></li>';
+        $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . $separator . 'page=' . $pagination['next_page'] . '">›</a></li>';
     } else {
         $html .= '<li class="page-item disabled"><span class="page-link">›</span></li>';
     }
@@ -582,7 +585,7 @@ function createAuditTrail($table, $recordId, $action, $oldData = null, $newData 
  * Format currency VND
  */
 function formatCurrency($amount) {
-    return number_format($amount, 0, ',', '.') . ' VNĐ';
+    return number_format($amount ?? 0, 0, ',', '.') . ' VNĐ';
 }
 
 /**

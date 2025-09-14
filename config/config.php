@@ -54,7 +54,7 @@ $config = [
     
     'security' => [
         'password_min_length' => 6,
-        'session_timeout' => 3600,
+        'session_timeout' => 36000,
         'max_login_attempts' => 5,
         'lockout_duration' => 900 // 15 minutes
     ],

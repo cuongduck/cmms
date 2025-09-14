@@ -1,15 +1,16 @@
 /**
- * Equipment Add Form JavaScript - Complete Implementation
+ * Equipment Add Form JavaScript - Modified Implementation
  * File: /assets/js/equipment-add.js
+ *
+ * Modified to remove all document/manual file handling logic.
  */
 
 const EquipmentAddForm = {
     // Configuration
     config: {
         autoSaveInterval: 30000, // 30 seconds
-        maxFileSize: 5 * 1024 * 1024, // 5MB - will be set from PHP
+        maxFileSize: 5 * 1024 * 1024, // 5MB
         allowedImageTypes: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        allowedDocTypes: ['pdf', 'doc', 'docx'],
         formSelector: '#equipmentForm',
         previewSelector: '#previewContent'
     },
@@ -504,14 +505,9 @@ const EquipmentAddForm = {
     // Initialize Drag and Drop
     initializeDragAndDrop: function() {
         const imageUpload = document.querySelector('[onclick*="imageFile"]');
-        const manualUpload = document.querySelector('[onclick*="manualFile"]');
         
         if (imageUpload) {
             this.setupDragAndDrop(imageUpload, document.getElementById('imageFile'));
-        }
-        
-        if (manualUpload) {
-            this.setupDragAndDrop(manualUpload, document.getElementById('manualFile'));
         }
     },
     
@@ -760,7 +756,7 @@ const EquipmentAddForm = {
                     ` : ''}
                 </div>
                 <div class="col-md-4">
-                    <h6 class="mb-3">Hình ảnh & Tài liệu</h6>
+                    <h6 class="mb-3">Hình ảnh</h6>
                     <div id="previewFiles">
                         ${this.generateFilePreview()}
                     </div>
@@ -781,14 +777,9 @@ const EquipmentAddForm = {
         let html = '';
         
         const imageInput = document.getElementById('imageFile');
-        const manualInput = document.getElementById('manualFile');
         
         if (imageInput?.files.length > 0) {
             html += `<div class="mb-3"><strong>Hình ảnh:</strong> ${imageInput.files[0].name}</div>`;
-        }
-        
-        if (manualInput?.files.length > 0) {
-            html += `<div class="mb-3"><strong>Tài liệu:</strong> ${manualInput.files[0].name}</div>`;
         }
         
         if (!html) {
@@ -802,14 +793,15 @@ const EquipmentAddForm = {
     handleFileSelect: function(input, type) {
         console.log('File selected:', type, input.files[0]);
         
-        if (!input.files || input.files.length === 0) {
+        // Only proceed if type is 'image'
+        if (!input.files || input.files.length === 0 || type !== 'image') {
             this.clearFilePreview(type);
             return;
         }
         
         const file = input.files[0];
-        const maxSize = type === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024; // 5MB for images, 10MB for docs
-        
+        const maxSize = 5 * 1024 * 1024; // 5MB for images
+
         // Validate file size
         if (file.size > maxSize) {
             this.showError(`File quá lớn. Tối đa ${this.formatFileSize(maxSize)}`);
@@ -818,9 +810,7 @@ const EquipmentAddForm = {
         }
         
         // Validate file type
-        const allowedTypes = type === 'image' 
-            ? ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-            : ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         
         if (!allowedTypes.includes(file.type)) {
             this.showError(`Loại file không được phép. Chỉ chấp nhận: ${allowedTypes.join(', ')}`);
@@ -843,39 +833,22 @@ const EquipmentAddForm = {
         
         preview.classList.remove('d-none');
         
-        if (type === 'image') {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                preview.innerHTML = `
-                    <div class="d-flex align-items-center justify-content-between">
-                        <img src="${e.target.result}" class="img-thumbnail" style="max-width: 100px; max-height: 100px;">
-                        <div class="ms-3">
-                            <div class="fw-semibold">${file.name}</div>
-                            <small class="text-muted">${this.formatFileSize(file.size)}</small>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="EquipmentAddForm.clearFilePreview('${type}')">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                `;
-            };
-            reader.readAsDataURL(file);
-        } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
             preview.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-file-pdf fs-2 text-danger me-3"></i>
-                        <div>
-                            <div class="fw-semibold">${file.name}</div>
-                            <small class="text-muted">${this.formatFileSize(file.size)}</small>
-                        </div>
+                    <img src="${e.target.result}" class="img-thumbnail" style="max-width: 100px; max-height: 100px;">
+                    <div class="ms-3">
+                        <div class="fw-semibold">${file.name}</div>
+                        <small class="text-muted">${this.formatFileSize(file.size)}</small>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="EquipmentAddForm.clearFilePreview('${type}')">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             `;
-        }
+        };
+        reader.readAsDataURL(file);
     },
     
     // Clear File Preview
@@ -921,7 +894,6 @@ const EquipmentAddForm = {
             
             // Clear file previews
             this.clearFilePreview('image');
-            this.clearFilePreview('manual');
             
             // Clear auto-save
             localStorage.removeItem('equipment_autosave_new');
@@ -945,10 +917,9 @@ const EquipmentAddForm = {
         const formData = new FormData(form);
         const data = {};
         
-        // Convert FormData to regular object
+        // Convert FormData to regular object, skipping file inputs
         for (let [key, value] of formData.entries()) {
-            // Skip file inputs for JSON storage
-            if (key !== 'image' && key !== 'manual') {
+            if (key !== 'image') {
                 data[key] = value;
             }
         }

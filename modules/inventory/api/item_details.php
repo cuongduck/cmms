@@ -19,7 +19,7 @@ if (empty($itemCode)) {
 }
 
 try {
-    // Get item details
+    // Get item details với logic BOM mới
     $sql = "SELECT 
         o.*,
         p.id as part_id,
@@ -36,7 +36,7 @@ try {
         p.lead_time,
         p.notes as part_notes,
         CASE 
-            WHEN p.id IS NOT NULL THEN 'Trong BOM'
+            WHEN bi.part_id IS NOT NULL THEN 'Trong BOM'
             ELSE 'Ngoài BOM'
         END as bom_status,
         CASE
@@ -47,6 +47,7 @@ try {
         END as stock_status
     FROM onhand o
     LEFT JOIN parts p ON o.ItemCode = p.part_code
+    LEFT JOIN bom_items bi ON p.id = bi.part_id
     WHERE o.ItemCode = ?";
     
     $item = $db->fetch($sql, [$itemCode]);
@@ -55,7 +56,7 @@ try {
         jsonResponse(['success' => false, 'message' => 'Không tìm thấy vật tư'], 404);
     }
     
-    // Get recent transactions
+    // Get recent transactions (10 giao dịch gần nhất)
     $transactionSql = "SELECT * FROM transaction 
                       WHERE ItemCode = ? 
                       ORDER BY TransactionDate DESC 
@@ -92,15 +93,6 @@ try {
         WHERE bi.part_id = ?
         ORDER BY mt.name, mb.bom_name";
         $bomUsage = $db->fetchAll($bomSql, [$item['part_id']]);
-    }
-    
-    // Get suppliers if applicable
-    $suppliers = [];
-    if ($item['part_id']) {
-        $supplierSql = "SELECT * FROM part_suppliers 
-                       WHERE part_id = ? 
-                       ORDER BY is_preferred DESC, unit_price ASC";
-        $suppliers = $db->fetchAll($supplierSql, [$item['part_id']]);
     }
     
     ob_start();
@@ -319,60 +311,6 @@ try {
     </div>
     <?php endif; ?>
     
-    <!-- Suppliers -->
-    <?php if (!empty($suppliers)): ?>
-    <div class="card mb-3">
-        <div class="card-header">
-            <h6 class="mb-0">
-                <i class="fas fa-truck me-2"></i>Nhà cung cấp
-            </h6>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Nhà cung cấp</th>
-                            <th>Mã sản phẩm</th>
-                            <th class="text-end">Đơn giá</th>
-                            <th class="text-end">MOQ</th>
-                            <th>Lead time</th>
-                            <th>Ưu tiên</th>
-                            <th>Liên hệ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($suppliers as $supplier): ?>
-                        <tr>
-                            <td>
-                                <?php echo htmlspecialchars($supplier['supplier_name']); ?>
-                                <?php if ($supplier['is_preferred']): ?>
-                                    <i class="fas fa-star text-warning ms-1" title="Nhà cung cấp ưu tiên"></i>
-                                <?php endif; ?>
-                            </td>
-                            <td><code><?php echo htmlspecialchars($supplier['part_number'] ?? '-'); ?></code></td>
-                            <td class="text-end fw-bold"><?php echo number_format($supplier['unit_price'], 0); ?> đ</td>
-                            <td class="text-end"><?php echo number_format($supplier['min_order_qty'], 0); ?></td>
-                            <td><?php echo $supplier['lead_time']; ?> ngày</td>
-                            <td>
-                                <?php if ($supplier['is_preferred']): ?>
-                                    <span class="badge bg-warning">Ưu tiên</span>
-                                <?php else: ?>
-                                    <span class="badge bg-secondary">Bình thường</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <small class="text-muted"><?php echo htmlspecialchars($supplier['contact_info'] ?? '-'); ?></small>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-    
     <!-- Recent Transactions -->
     <?php if (!empty($recentTransactions)): ?>
     <div class="card">
@@ -381,7 +319,7 @@ try {
                 <i class="fas fa-history me-2"></i>Giao dịch gần đây
             </h6>
             <button type="button" class="btn btn-sm btn-outline-primary" 
-                    onclick="showTransactions('<?php echo $item['ItemCode']; ?>')">
+                    onclick="showItemTransactions('<?php echo $item['ItemCode']; ?>')">
                 Xem tất cả
             </button>
         </div>
@@ -488,3 +426,4 @@ function getTransactionTypeClass($type) {
     ];
     return $classes[$type] ?? 'bg-primary';
 }
+?>

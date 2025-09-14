@@ -1,74 +1,61 @@
 <?php
 /**
- * Transaction History API
- * /modules/inventory/api/transactions.php
+ * Transaction History API - Fixed Version
  */
 
-require_once '../../../config/config.php';
-require_once '../../../config/database.php';
-require_once '../../../config/auth.php';
-
-header('Content-Type: application/json; charset=utf-8');
-
-requirePermission('inventory', 'view');
-
-$type = $_GET['type'] ?? 'all';
-$itemCode = $_GET['item_code'] ?? '';
-$page = intval($_GET['page'] ?? 1);
-$per_page = 20;
-$offset = ($page - 1) * $per_page;
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Tắt hiển thị lỗi để không làm hỏng JSON
 
 try {
-    $sql = "SELECT 
-        t.*,
-        p.part_name,
-        p.category,
-        CASE 
-            WHEN p.id IS NOT NULL THEN 'Trong BOM'
-            ELSE 'Ngoài BOM'
-        END as bom_status
-    FROM transaction t
-    LEFT JOIN parts p ON t.ItemCode = p.part_code
-    WHERE 1=1";
+    require_once '../../../config/config.php';
+    require_once '../../../config/database.php';
+    require_once '../../../config/auth.php';
+    require_once '../../../config/functions.php'; // Thêm để có function paginate()
     
+    header('Content-Type: application/json; charset=utf-8');
+    
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $type = $_GET['type'] ?? 'all';
+    $itemCode = $_GET['item_code'] ?? '';
+    $page = intval($_GET['page'] ?? 1);
+    $per_page = 20;
+    $offset = ($page - 1) * $per_page;
+    
+    $sql = "SELECT * FROM transaction WHERE 1=1";
     $params = [];
-    
-    // Filter by item code if specified
+
     if (!empty($itemCode)) {
-        $sql .= " AND t.ItemCode = ?";
+        $sql .= " AND ItemCode = ?";
         $params[] = $itemCode;
     }
     
-    // Filter by transaction type
-    switch ($type) {
-        case 'in':
-            $sql .= " AND t.TransactedQty > 0";
-            break;
-        case 'out':
-            $sql .= " AND t.TransactedQty < 0";
-            break;
-        case 'item':
-            // Already filtered by item code above
-            break;
-        case 'all':
-        default:
-            // No additional filter
-            break;
+    if ($type == 'in') {
+        $sql .= " AND COALESCE(TransactedQty, 0) > 0";
+    } elseif ($type == 'out') {
+        $sql .= " AND COALESCE(TransactedQty, 0) < 0";
     }
     
     // Get total count
     $countSql = "SELECT COUNT(*) as total FROM (" . $sql . ") as counted";
     $totalResult = $db->fetch($countSql, $params);
-    $total = $totalResult['total'];
+    $total = $totalResult['total'] ?? 0;
     
-    // Add order and limit
-    $sql .= " ORDER BY t.TransactionDate DESC LIMIT ? OFFSET ?";
+    // Add pagination
+    $sql .= " ORDER BY TransactionDate DESC LIMIT ? OFFSET ?";
     $params[] = $per_page;
     $params[] = $offset;
     
     $transactions = $db->fetchAll($sql, $params);
     
-    // Calculate summary
+    // Calculate summary - Fix abs() với null
     $summaryData = [
         'total_in' => 0,
         'total_out' => 0,
@@ -78,16 +65,30 @@ try {
     ];
     
     foreach ($transactions as $trans) {
-        if ($trans['TransactedQty'] > 0) {
-            $summaryData['total_in'] += $trans['TransactedQty'];
-            $summaryData['total_value_in'] += $trans['TotalAmount'] ?? 0;
+        $qty = $trans['TransactedQty'] ?? 0;
+        $amount = $trans['TotalAmount'] ?? 0;
+        
+        if ($qty > 0) {
+            $summaryData['total_in'] += $qty;
+            $summaryData['total_value_in'] += $amount;
         } else {
-            $summaryData['total_out'] += abs($trans['TransactedQty']);
-            $summaryData['total_value_out'] += abs($trans['TotalAmount'] ?? 0);
+            $summaryData['total_out'] += abs($qty); // $qty đã được đảm bảo không null
+            $summaryData['total_value_out'] += abs($amount); // $amount đã được đảm bảo không null
         }
     }
     
-    $pagination = paginate($total, $page, $per_page);
+    // Simple pagination object thay vì dùng function paginate()
+    $totalPages = ceil($total / $per_page);
+    $pagination = [
+        'current_page' => $page,
+        'total_pages' => $totalPages,
+        'total_items' => $total,
+        'per_page' => $per_page,
+        'has_previous' => $page > 1,
+        'has_next' => $page < $totalPages,
+        'previous_page' => $page - 1,
+        'next_page' => $page + 1
+    ];
     
     ob_start();
     ?>
@@ -99,7 +100,7 @@ try {
                 <div class="card-body text-center">
                     <h5 class="card-title">Tổng nhập</h5>
                     <h3><?php echo number_format($summaryData['total_in'], 2); ?></h3>
-                    <small><?php echo formatCurrency($summaryData['total_value_in']); ?></small>
+                    <small><?php echo number_format($summaryData['total_value_in'], 0); ?> đ</small>
                 </div>
             </div>
         </div>
@@ -108,7 +109,7 @@ try {
                 <div class="card-body text-center">
                     <h5 class="card-title">Tổng xuất</h5>
                     <h3><?php echo number_format($summaryData['total_out'], 2); ?></h3>
-                    <small><?php echo formatCurrency($summaryData['total_value_out']); ?></small>
+                    <small><?php echo number_format($summaryData['total_value_out'], 0); ?> đ</small>
                 </div>
             </div>
         </div>
@@ -117,7 +118,7 @@ try {
                 <div class="card-body text-center">
                     <h5 class="card-title">Số giao dịch</h5>
                     <h3><?php echo number_format($total); ?></h3>
-                    <small>Trang <?php echo $page; ?>/<?php echo $pagination['total_pages']; ?></small>
+                    <small>Trang <?php echo $page; ?>/<?php echo $totalPages; ?></small>
                 </div>
             </div>
         </div>
@@ -125,59 +126,52 @@ try {
             <div class="card bg-warning text-white">
                 <div class="card-body text-center">
                     <h5 class="card-title">Giá trị ròng</h5>
-                    <h3><?php echo formatCurrency($summaryData['total_value_in'] - $summaryData['total_value_out']); ?></h3>
+                    <h3><?php echo number_format($summaryData['total_value_in'] - $summaryData['total_value_out'], 0); ?> đ</h3>
                     <small>Chênh lệch nhập/xuất</small>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Filter Tabs -->
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <button class="nav-link <?php echo $type === 'all' ? 'active' : ''; ?>" 
-                    onclick="showTransactionHistory('all', '<?php echo $itemCode; ?>')">
-                <i class="fas fa-list me-1"></i>Tất cả
+    <!-- Filter buttons -->
+    <div class="mb-3">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn <?php echo $type === 'all' ? 'btn-primary' : 'btn-outline-primary'; ?>" 
+                    onclick="filterTransactions('all', '<?php echo $itemCode; ?>')">
+                Tất cả
             </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link <?php echo $type === 'in' ? 'active' : ''; ?>" 
-                    onclick="showTransactionHistory('in', '<?php echo $itemCode; ?>')">
-                <i class="fas fa-plus me-1 text-success"></i>Nhập kho
+            <button type="button" class="btn <?php echo $type === 'in' ? 'btn-success' : 'btn-outline-success'; ?>" 
+                    onclick="filterTransactions('in', '<?php echo $itemCode; ?>')">
+                Nhập kho
             </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link <?php echo $type === 'out' ? 'active' : ''; ?>" 
-                    onclick="showTransactionHistory('out', '<?php echo $itemCode; ?>')">
-                <i class="fas fa-minus me-1 text-danger"></i>Xuất kho
+            <button type="button" class="btn <?php echo $type === 'out' ? 'btn-danger' : 'btn-outline-danger'; ?>" 
+                    onclick="filterTransactions('out', '<?php echo $itemCode; ?>')">
+                Xuất kho
             </button>
-        </li>
-    </ul>
+        </div>
+    </div>
     
     <!-- Transactions Table -->
     <div class="table-responsive">
         <table class="table table-striped table-hover table-sm">
             <thead class="table-light">
                 <tr>
-                    <th>Số chứng từ</th>
                     <th>Ngày giao dịch</th>
-                    <th>Loại giao dịch</th>
                     <th>Mã vật tư</th>
                     <th>Tên vật tư</th>
                     <th class="text-end">Số lượng</th>
                     <th>ĐVT</th>
                     <th class="text-end">Đơn giá</th>
                     <th class="text-end">Thành tiền</th>
-                    <th>Phòng ban</th>
+                    <th>Loại</th>
                     <th>Lý do</th>
-                    <th>Loại vật tư</th>
                     <th>Người yêu cầu</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($transactions)): ?>
                 <tr>
-                    <td colspan="13" class="text-center py-4 text-muted">
+                    <td colspan="10" class="text-center py-4 text-muted">
                         <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                         Không có giao dịch nào
                     </td>
@@ -186,34 +180,19 @@ try {
                 <?php foreach ($transactions as $trans): ?>
                 <tr>
                     <td>
-                        <code class="text-primary"><?php echo htmlspecialchars($trans['Number'] ?? '-'); ?></code>
-                        <?php if ($trans['Status']): ?>
-                            <span class="badge bg-<?php echo getTransactionStatusClass($trans['Status']); ?> ms-1">
-                                <?php echo htmlspecialchars($trans['Status']); ?>
-                            </span>
-                        <?php endif; ?>
+                        <div><?php echo date('d/m/Y', strtotime($trans['TransactionDate'] ?? 'now')); ?></div>
+                        <small class="text-muted"><?php echo date('H:i', strtotime($trans['TransactionDate'] ?? 'now')); ?></small>
                     </td>
                     <td>
-                        <div><?php echo formatDateTime($trans['TransactionDate']); ?></div>
-                        <small class="text-muted"><?php echo date('H:i', strtotime($trans['TransactionDate'])); ?></small>
+                        <code><?php echo htmlspecialchars($trans['ItemCode'] ?? ''); ?></code>
                     </td>
                     <td>
-                        <span class="badge <?php echo getTransactionTypeClass($trans['TransactionType']); ?>">
-                            <?php echo htmlspecialchars($trans['TransactionType'] ?? '-'); ?>
-                        </span>
-                    </td>
-                    <td>
-                        <code><?php echo htmlspecialchars($trans['ItemCode']); ?></code>
-                    </td>
-                    <td>
-                        <div class="fw-medium"><?php echo htmlspecialchars($trans['ItemDesc']); ?></div>
-                        <?php if ($trans['part_name']): ?>
-                            <small class="text-muted">BOM: <?php echo htmlspecialchars($trans['part_name']); ?></small>
-                        <?php endif; ?>
+                        <div class="fw-medium"><?php echo htmlspecialchars($trans['ItemDesc'] ?? ''); ?></div>
                     </td>
                     <td class="text-end">
-                        <span class="fw-bold <?php echo $trans['TransactedQty'] > 0 ? 'text-success' : 'text-danger'; ?>">
-                            <?php echo ($trans['TransactedQty'] > 0 ? '+' : '') . number_format($trans['TransactedQty'], 2); ?>
+                        <?php $qty = $trans['TransactedQty'] ?? 0; ?>
+                        <span class="fw-bold <?php echo $qty > 0 ? 'text-success' : 'text-danger'; ?>">
+                            <?php echo ($qty > 0 ? '+' : '') . number_format($qty, 2); ?>
                         </span>
                     </td>
                     <td>
@@ -223,20 +202,18 @@ try {
                         <?php echo number_format($trans['Price'] ?? 0, 0); ?> đ
                     </td>
                     <td class="text-end fw-bold">
-                        <span class="<?php echo $trans['TransactedQty'] > 0 ? 'text-success' : 'text-danger'; ?>">
-                            <?php echo number_format($trans['TotalAmount'] ?? 0, 0); ?> đ
+                        <?php $amount = $trans['TotalAmount'] ?? 0; ?>
+                        <span class="<?php echo $qty > 0 ? 'text-success' : 'text-danger'; ?>">
+                            <?php echo number_format($amount, 0); ?> đ
                         </span>
                     </td>
                     <td>
-                        <small><?php echo htmlspecialchars($trans['Department'] ?? '-'); ?></small>
-                    </td>
-                    <td>
-                        <span class="badge bg-secondary"><?php echo htmlspecialchars($trans['Reason'] ?? '-'); ?></span>
-                    </td>
-                    <td>
-                        <span class="badge <?php echo $trans['bom_status'] === 'Trong BOM' ? 'bg-primary' : 'bg-secondary'; ?>">
-                            <?php echo $trans['bom_status']; ?>
+                        <span class="badge bg-<?php echo $qty > 0 ? 'success' : 'danger'; ?>">
+                            <?php echo htmlspecialchars($trans['TransactionType'] ?? '-'); ?>
                         </span>
+                    </td>
+                    <td>
+                        <small><?php echo htmlspecialchars($trans['Reason'] ?? '-'); ?></small>
                     </td>
                     <td>
                         <small><?php echo htmlspecialchars($trans['Requester'] ?? '-'); ?></small>
@@ -248,29 +225,18 @@ try {
         </table>
     </div>
     
-    <!-- Pagination -->
-    <?php if ($pagination['total_pages'] > 1): ?>
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <div>
-            <small class="text-muted">
-                Hiển thị <?php echo number_format(($page - 1) * $per_page + 1); ?> - 
-                <?php echo number_format(min($page * $per_page, $total)); ?> 
-                trong tổng số <?php echo number_format($total); ?> giao dịch
-            </small>
-        </div>
+    <!-- Simple Pagination -->
+    <?php if ($totalPages > 1): ?>
+    <div class="d-flex justify-content-center mt-3">
         <nav>
-            <ul class="pagination pagination-sm mb-0">
+            <ul class="pagination pagination-sm">
                 <?php if ($pagination['has_previous']): ?>
                 <li class="page-item">
                     <button class="page-link" onclick="loadTransactionPage(<?php echo $pagination['previous_page']; ?>)">‹</button>
                 </li>
                 <?php endif; ?>
                 
-                <?php
-                $start = max(1, $page - 2);
-                $end = min($pagination['total_pages'], $page + 2);
-                for ($i = $start; $i <= $end; $i++):
-                ?>
+                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
                 <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
                     <button class="page-link" onclick="loadTransactionPage(<?php echo $i; ?>)"><?php echo $i; ?></button>
                 </li>
@@ -284,65 +250,72 @@ try {
             </ul>
         </nav>
     </div>
+    
+    <div class="text-center mt-2">
+        <small class="text-muted">
+            Hiển thị <?php echo number_format(($page - 1) * $per_page + 1); ?> - 
+            <?php echo number_format(min($page * $per_page, $total)); ?> 
+            trong tổng số <?php echo number_format($total); ?> giao dịch
+        </small>
+    </div>
     <?php endif; ?>
     
     <script>
-    function loadTransactionPage(page) {
-        const currentUrl = new URL(window.location.href);
-        const type = '<?php echo $type; ?>';
-        const itemCode = '<?php echo $itemCode; ?>';
-        
-        let url = '../api/transactions.php?type=' + type + '&page=' + page;
+    function filterTransactions(type, itemCode) {
+        let url = 'api/transactions.php?type=' + type;
         if (itemCode) {
             url += '&item_code=' + encodeURIComponent(itemCode);
         }
         
-        CMMS.ajax({
-            url: url,
-            method: 'GET',
-            success: function(data) {
-                document.getElementById('transactionContent').innerHTML = data.html;
-            }
-        });
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('transactionContent').innerHTML = data.html;
+                } else {
+                    alert('Có lỗi: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+    
+    function loadTransactionPage(page) {
+        const type = '<?php echo $type; ?>';
+        const itemCode = '<?php echo $itemCode; ?>';
+        
+        let url = 'api/transactions.php?type=' + type + '&page=' + page;
+        if (itemCode) {
+            url += '&item_code=' + encodeURIComponent(itemCode);
+        }
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('transactionContent').innerHTML = data.html;
+                } else {
+                    alert('Có lỗi: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
     }
     </script>
     
     <?php
     $html = ob_get_clean();
     
-    jsonResponse([
+    echo json_encode([
         'success' => true,
         'html' => $html,
         'summary' => $summaryData,
         'pagination' => $pagination
-    ]);
-    
+    ], JSON_UNESCAPED_UNICODE);
+
 } catch (Exception $e) {
-    error_log("Error in transactions API: " . $e->getMessage());
-    jsonResponse([
+    error_log("Transaction API Error: " . $e->getMessage());
+    echo json_encode([
         'success' => false,
-        'message' => 'Có lỗi xảy ra khi tải dữ liệu giao dịch'
-    ], 500);
+        'message' => 'Lỗi: ' . $e->getMessage()
+    ], JSON_UNESCAPED_UNICODE);
 }
-
-// Helper functions
-function getTransactionTypeClass($type) {
-    $classes = [
-        'Receipt' => 'bg-success',
-        'Issue' => 'bg-danger', 
-        'Transfer' => 'bg-info',
-        'Adjustment' => 'bg-warning',
-        'Return' => 'bg-secondary'
-    ];
-    return $classes[$type] ?? 'bg-primary';
-}
-
-function getTransactionStatusClass($status) {
-    $classes = [
-        'Completed' => 'success',
-        'Pending' => 'warning',
-        'Cancelled' => 'danger',
-        'Draft' => 'secondary'
-    ];
-    return $classes[$status] ?? 'primary';
-}
+?>

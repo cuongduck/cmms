@@ -882,55 +882,35 @@ require_once '../../includes/header.php';
                 </div>
 
                 <!-- Files Upload Section -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <i class="fas fa-upload"></i>
-                        Tài liệu & Hình ảnh
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="fas fa-upload"></i>
+        Hình ảnh
+    </div>
+    <div class="form-section-body">
+        <div class="row g-4">
+            <div class="col-md-12">
+                <label class="form-label fw-semibold">
+                    <i class="fas fa-image me-2"></i>Hình ảnh thiết bị
+                </label>
+                <div class="file-upload-section" onclick="document.getElementById('imageFile').click()">
+                    <input type="file" id="imageFile" name="image" accept="image/*" class="d-none" onchange="handleFileSelect(this, 'image')">
+                    <div class="file-upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
                     </div>
-                    <div class="form-section-body">
-                        <div class="row g-4">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">
-                                    <i class="fas fa-image me-2"></i>Hình ảnh thiết bị
-                                </label>
-                                <div class="file-upload-section" onclick="document.getElementById('imageFile').click()">
-                                    <input type="file" id="imageFile" name="image" accept="image/*" class="d-none" onchange="handleFileSelect(this, 'image')">
-                                    <div class="file-upload-icon">
-                                        <i class="fas fa-cloud-upload-alt"></i>
-                                    </div>
-                                    <div class="file-upload-text">
-                                        <strong>Click để chọn hình ảnh</strong><br>
-                                        hoặc kéo thả file vào đây
-                                    </div>
-                                    <small class="text-muted">
-                                        Chấp nhận: JPG, PNG, GIF, WEBP (tối đa 5MB)
-                                    </small>
-                                    <div id="imagePreview" class="file-preview d-none"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">
-                                    <i class="fas fa-file-pdf me-2"></i>Tài liệu hướng dẫn
-                                </label>
-                                <div class="file-upload-section" onclick="document.getElementById('manualFile').click()">
-                                    <input type="file" id="manualFile" name="manual" accept=".pdf,.doc,.docx" class="d-none" onchange="handleFileSelect(this, 'manual')">
-                                    <div class="file-upload-icon">
-                                        <i class="fas fa-file-upload"></i>
-                                    </div>
-                                    <div class="file-upload-text">
-                                        <strong>Click để chọn tài liệu</strong><br>
-                                        hoặc kéo thả file vào đây
-                                    </div>
-                                    <small class="text-muted">
-                                        Chấp nhận: PDF, DOC, DOCX (tối đa 10MB)
-                                    </small>
-                                    <div id="manualPreview" class="file-preview d-none"></div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="file-upload-text">
+                        <strong>Click để chọn hình ảnh</strong><br>
+                        hoặc kéo thả file vào đây
                     </div>
+                    <small class="text-muted">
+                        Chấp nhận: JPG, PNG, GIF, WEBP (tối đa 5MB)
+                    </small>
+                    <div id="imagePreview" class="file-preview d-none"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
             </div>
 
             <!-- Sidebar: Preview & Actions -->

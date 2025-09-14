@@ -299,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         <!-- Footer -->
         <div class="login-footer">
-            <p>&copy; <?php echo date('Y'); ?> IT Department. All rights reserved.</p>
+            <p>&copy; <?php echo date('Y'); ?> Bảo trì CF. All rights reserved.</p>
         </div>
     </div>
     
