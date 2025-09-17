@@ -63,7 +63,7 @@ $sql = "SELECT
         WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
         WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
         WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-        WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'Fp02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
+        WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
         WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
         ELSE 'Khác'
     END as nganh_hang,
@@ -95,7 +95,7 @@ if (!empty($nganh_hang)) {
             WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
             WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
             WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'Fp02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
+            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
             WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
             ELSE 'Khác'
         END
@@ -148,7 +148,7 @@ if (!empty($nganh_hang)) {
             WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
             WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
             WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'Fp02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
+            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
             WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
             ELSE 'Khác'
         END
@@ -210,7 +210,7 @@ try {
                 WHEN Locator LIKE 'A%' OR Locator LIKE 'B%' OR Locator = 'FP09' OR Locator = 'MA01' THEN 'Mắm'
                 WHEN Locator LIKE 'G%' OR Locator = 'FE17' THEN 'CSD'
                 WHEN Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-                WHEN Locator LIKE 'C%' OR Locator LIKE 'H%' OR Locator LIKE 'F%' OR Locator = 'Fp02' OR Locator = 'FP05' OR Locator = 'M501' THEN 'CF'
+                WHEN Locator LIKE 'C%' OR Locator LIKE 'H%' OR Locator LIKE 'E%' OR Locator LIKE 'F%' OR Locator = 'FP02' OR Locator = 'FP05' OR Locator = 'M501' THEN 'CF'
                 WHEN Locator LIKE 'D%' OR Locator = 'FE01' THEN 'Chung'
                 ELSE 'Khác'
             END as nganh_hang

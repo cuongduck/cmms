@@ -59,7 +59,55 @@ $currentUser = getCurrentUser();
                 </ul>
             </div>
         </li>
-        
+        <!-- Thêm vào phần Spare Parts menu -->
+<?php if (hasPermission('spare_parts', 'view')): ?>
+<li class="nav-item">
+    <a class="nav-link <?php echo ($currentModule === 'spare_parts') ? 'active' : ''; ?>" 
+       href="#" data-bs-toggle="collapse" data-bs-target="#sparePartsSubmenu" aria-expanded="false">
+        <i class="fas fa-tools"></i>
+        Quản lý Spare Parts
+        <i class="fas fa-chevron-down ms-auto"></i>
+    </a>
+    <div class="collapse" id="sparePartsSubmenu">
+        <ul class="nav flex-column ms-3">
+            <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/spare_parts/">
+                    <i class="fas fa-list"></i>
+                    Danh sách Spare Parts
+                </a>
+            </li>
+            <?php if (hasPermission('spare_parts', 'create')): ?>
+            <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/spare_parts/add.php">
+                    <i class="fas fa-plus"></i>
+                    Thêm Spare Part
+                </a>
+            </li>
+            <?php endif; ?>
+            <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/spare_parts/purchase_request.php">
+                    <i class="fas fa-shopping-cart"></i>
+                    Đề xuất mua hàng
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/spare_parts/reports/stock_shortage.php">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Báo cáo thiếu hàng
+                </a>
+            </li>
+            <?php if (hasPermission('spare_parts', 'edit')): ?>
+            <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/spare_parts/category_keywords.php">
+                    <i class="fas fa-tags"></i>
+                    Quản lý từ khóa
+                </a>
+            </li>
+            <?php endif; ?>
+        </ul>
+    </div>
+</li>
+<?php endif; ?>
         <!-- Settings -->
         <?php if ($currentUser['role'] === 'Admin'): ?>
         <li class="nav-item">

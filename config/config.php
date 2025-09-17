@@ -90,6 +90,11 @@ $config = [
             'icon' => 'fas fa-warehouse',
             'url' => '/modules/inventory/'
         ],
+        'spare_parts' => [
+            'name' => 'Quản lý Spare Parts',
+            'icon' => 'fas fa-tools',
+            'url' => '/modules/spare_parts/'
+        ],
         'workorder' => [
             'name' => 'Quản lý công việc',
             'icon' => 'fas fa-tasks',
