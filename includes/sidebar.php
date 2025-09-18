@@ -108,38 +108,16 @@ $currentUser = getCurrentUser();
     </div>
 </li>
 <?php endif; ?>
-        <!-- Settings -->
-        <?php if ($currentUser['role'] === 'Admin'): ?>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#settingsSubmenu" aria-expanded="false">
-                <i class="fas fa-cog"></i>
-                Cài đặt
-                <i class="fas fa-chevron-down ms-auto"></i>
-            </a>
-            <div class="collapse" id="settingsSubmenu">
-                <ul class="nav flex-column ms-3">
-                    <li class="nav-item">
-                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/system.php">
-                            <i class="fas fa-circle"></i>
-                            Cài đặt hệ thống
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/backup.php">
-                            <i class="fas fa-circle"></i>
-                            Sao lưu dữ liệu
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2" href="<?php echo APP_URL; ?>/settings/logs.php">
-                            <i class="fas fa-circle"></i>
-                            Nhật ký hệ thống
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </li>
-        <?php endif; ?>
+<!-- Thêm vào phần menu chính -->
+<?php if (hasPermission('inventory', 'view')): ?>
+<li class="nav-item">
+    <a class="nav-link <?php echo ($currentModule === 'transactions') ? 'active' : ''; ?>" 
+       href="/modules/transactions/">
+        <i class="fas fa-exchange-alt"></i>
+        Giao dịch xuất kho
+    </a>
+</li>
+<?php endif; ?>
     </ul>
     
     <!-- Quick Actions -->
