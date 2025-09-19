@@ -16,6 +16,7 @@ $brandy = $_GET['brandy'] ?? '';
 $requester = $_GET['requester'] ?? '';
 $month = $_GET['month'] ?? date('Y-m');
 $view_type = $_GET['view_type'] ?? 'month';
+$search_all = isset($_GET['search_all']) ? true : false;
 
 function getBrandyName($brandy) {
     $brands = [
@@ -41,44 +42,50 @@ try {
         $dateParams = [$month];
     }
 
-    $sql = "SELECT 
-        t.Number as 'Số phiếu',
-        DATE_FORMAT(t.TransactionDate, '%d/%m/%Y %H:%i') as 'Ngày giao dịch',
-        t.ItemCode as 'Mã vật tư',
-        t.ItemDesc as 'Tên vật tư',
-        t.TransactedQty as 'Số lượng xuất',
-        t.UOM as 'Đơn vị tính',
-        FORMAT(t.Price, 0) as 'Đơn giá (VNĐ)',
-        FORMAT(t.TotalAmount, 0) as 'Tổng tiền (VNĐ)',
-        CASE 
-            WHEN t.Brandy = 'IN0000' THEN 'Mì'
-            WHEN t.Brandy = 'ID0000' THEN 'CSD'
-            WHEN t.Brandy = 'FS0000' THEN 'Mắm'
-            WHEN t.Brandy = 'WPBB20' THEN 'PET'
-            WHEN t.Brandy = 'WPNA30' THEN 'Nêm'
-            WHEN t.Brandy = 'RB0000' THEN 'Phở'
-            WHEN t.Brandy = '0' THEN 'Bảo trì chung'
-            ELSE 'Khác'
-        END as 'Ngành hàng',
-        t.Locator as 'Kho',
-        t.Department as 'Bộ phận',
-        t.Requester as 'Người yêu cầu',
-        t.Reason as 'Lý do xuất',
-        t.Comment as 'Ghi chú',
-        t.Status as 'Trạng thái'
-    FROM transaction t 
-    WHERE t.TransactionType = 'Issue' 
-    AND t.Status IN ('Posted', 'Approved') 
-    AND $dateFilter";
-    
-    $params = $dateParams;
-    
-    // Apply filters
-    if (!empty($search)) {
-        $sql .= " AND (t.ItemCode LIKE ? OR t.ItemDesc LIKE ?)";
-        $searchTerm = '%' . $search . '%';
-        $params = array_merge($params, [$searchTerm, $searchTerm]);
-    }
+// Sửa lại phần build query
+$sql = "SELECT 
+    t.Number as 'Số phiếu',
+    DATE_FORMAT(t.TransactionDate, '%d/%m/%Y %H:%i') as 'Ngày giao dịch',
+    t.ItemCode as 'Mã vật tư',
+    t.ItemDesc as 'Tên vật tư',
+    t.TransactedQty as 'Số lượng xuất',
+    t.UOM as 'Đơn vị tính',
+    FORMAT(t.Price, 0) as 'Đơn giá (VNĐ)',
+    FORMAT(t.TotalAmount, 0) as 'Tổng tiền (VNĐ)',
+    CASE 
+        WHEN t.Brandy = 'IN0000' THEN 'Mì'
+        WHEN t.Brandy = 'ID0000' THEN 'CSD'
+        WHEN t.Brandy = 'FS0000' THEN 'Mắm'
+        WHEN t.Brandy = 'WPBB20' THEN 'PET'
+        WHEN t.Brandy = 'WPNA30' THEN 'Nêm'
+        WHEN t.Brandy = 'RB0000' THEN 'Phở'
+        WHEN t.Brandy = '0' THEN 'BT chung'
+        ELSE 'Khác'
+    END as 'Ngành hàng',
+    t.Locator as 'Kho',
+    t.Department as 'Bộ phận',
+    t.Requester as 'Người yêu cầu',
+    t.Reason as 'Lý do xuất',
+    t.Comment as 'Ghi chú',
+    t.Status as 'Trạng thái'
+FROM transaction t 
+WHERE t.TransactionType = 'Issue' 
+AND t.Status IN ('Posted', 'Approved')";
+
+$params = [];
+
+// THÊM LOGIC SEARCH_ALL VÀO EXPORT
+if (!$search_all || empty($search)) {
+    $sql .= " AND $dateFilter";
+    $params = array_merge($params, $dateParams);
+}
+
+// Apply filters
+if (!empty($search)) {
+    $sql .= " AND (t.ItemCode LIKE ? OR t.ItemDesc LIKE ?)";
+    $searchTerm = '%' . $search . '%';
+    $params = array_merge($params, [$searchTerm, $searchTerm]);
+}
     
     if (!empty($brandy)) {
         $sql .= " AND t.Brandy = ?";
@@ -116,28 +123,38 @@ try {
 
 function exportToExcel($data, $month, $view_type) {
     $period = $view_type === 'year' ? "Nam_$month" : "Thang_" . str_replace('-', '_', $month);
-    $filename = "giao_dich_xuat_kho_$period.xlsx";
+    $filename = "giao_dich_xuat_kho_$period.xls"; // ĐỔI THÀNH .xls
     
-    header('Content-Type: application/vnd.ms-excel');
+    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: max-age=0');
     
-    echo '<html><head><meta charset="UTF-8"></head><body>';
+    // Output BOM for UTF-8
+    echo chr(0xEF) . chr(0xBB) . chr(0xBF);
+    
+    echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    echo '<head>';
+    echo '<meta charset="UTF-8">';
+    echo '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">';
+    echo '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    echo '</head>';
+    echo '<body>';
+    
     echo '<table border="1">';
     
     // Title
-    echo '<tr><td colspan="' . count(array_keys($data[0])) . '" style="text-align: center; font-weight: bold; font-size: 16px;">';
+    echo '<tr><td colspan="' . count(array_keys($data[0])) . '" style="text-align: center; font-weight: bold; font-size: 16px; background-color: #4472C4; color: white;">';
     echo 'BÁO CÁO GIAO DỊCH XUẤT KHO - ' . strtoupper($period);
     echo '</td></tr>';
-    echo '<tr><td colspan="' . count(array_keys($data[0])) . '" style="text-align: center;">';
+    echo '<tr><td colspan="' . count(array_keys($data[0])) . '" style="text-align: center; background-color: #D9E1F2;">';
     echo 'Ngày xuất: ' . date('d/m/Y H:i:s');
     echo '</td></tr>';
     echo '<tr><td colspan="' . count(array_keys($data[0])) . '"></td></tr>';
     
     // Headers
-    echo '<tr style="background-color: #f0f0f0; font-weight: bold;">';
+    echo '<tr>';
     foreach (array_keys($data[0]) as $header) {
-        echo '<td>' . htmlspecialchars($header) . '</td>';
+        echo '<td style="background-color: #4472C4; color: white; font-weight: bold; text-align: center;">' . htmlspecialchars($header) . '</td>';
     }
     echo '</tr>';
     
@@ -150,7 +167,8 @@ function exportToExcel($data, $month, $view_type) {
         echo '</tr>';
     }
     
-    echo '</table></body></html>';
+    echo '</table>';
+    echo '</body></html>';
     exit;
 }
 

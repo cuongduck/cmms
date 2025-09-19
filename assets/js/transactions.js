@@ -76,10 +76,33 @@ function setupFormEvents() {
     }
     
     // Format currency inputs
-    const budgetInputs = document.querySelectorAll('[name^="budget["]');
+    const budgetInputs = document.querySelectorAll('.budget-input');
     budgetInputs.forEach(input => {
+        // Format khi nhập
         input.addEventListener('input', function() {
             formatCurrencyInput(this);
+        });
+        
+        // Focus - hiển thị số thô
+        input.addEventListener('focus', function() {
+            if (this.dataset.realValue) {
+                this.value = this.dataset.realValue;
+            }
+            this.style.borderColor = '';
+        });
+        
+        // Blur - format lại
+        input.addEventListener('blur', function() {
+            formatCurrencyInput(this);
+        });
+        
+        // Ngăn paste nội dung không hợp lệ
+        input.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                let value = this.value.replace(/[^\d,]/g, '');
+                this.value = value;
+                formatCurrencyInput(this);
+            }, 10);
         });
     });
 }
@@ -151,7 +174,6 @@ function showBudgetModal() {
 function saveBudget() {
     const formData = new FormData(document.getElementById('budgetForm'));
     
-    // Show loading
     showLoading();
     
     fetch('api/save_budget.php', {
@@ -171,8 +193,7 @@ function saveBudget() {
     })
     .catch(error => {
         hideLoading();
-        console.error('Error:', error);
-        showToast('Có lỗi xảy ra khi lưu ngân sách', 'error');
+        showToast('Có lỗi xảy ra', 'error');
     });
 }
 
@@ -189,9 +210,43 @@ function exportData(format) {
 
 function formatCurrencyInput(input) {
     let value = input.value.replace(/[^\d]/g, '');
-    if (value) {
-        input.value = parseInt(value).toLocaleString('vi-VN');
+    
+    // Giới hạn tối đa 13 chữ số (DECIMAL(15,2))
+    if (value.length > 13) {
+        value = value.substring(0, 13);
+        showToast('Giá trị tối đa là 9,999,999,999,999 VNĐ', 'warning');
     }
+    
+    if (value) {
+        // Lưu giá trị thực
+        input.dataset.realValue = value;
+        // Hiển thị có định dạng
+        input.value = parseInt(value).toLocaleString('vi-VN');
+    } else {
+        input.dataset.realValue = '';
+        input.value = '';
+    }
+}
+function validateBudgetAmount(amount) {
+    const maxAmount = 9999999999999; // 13 chữ số
+    const numAmount = parseFloat(amount);
+    
+    if (isNaN(numAmount)) {
+        return { valid: false, message: 'Vui lòng nhập số hợp lệ' };
+    }
+    
+    if (numAmount < 0) {
+        return { valid: false, message: 'Ngân sách không thể âm' };
+    }
+    
+    if (numAmount > maxAmount) {
+        return { 
+            valid: false, 
+            message: 'Ngân sách tối đa là 9,999,999,999,999 VNĐ' 
+        };
+    }
+    
+    return { valid: true };
 }
 
 function sortTable(column) {

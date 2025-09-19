@@ -21,7 +21,7 @@ function getBrandyName($brandy) {
         'WPBB20' => 'PET',
         'WPNA30' => 'Nêm',
         'RB0000' => 'Phở',
-        '0' => 'Bảo trì chung'
+        '0' => 'BT chung'
     ];
     return $brands[$brandy] ?? 'Khác';
 }
@@ -176,19 +176,34 @@ if (!empty($requester)) {
 
 $total = $db->fetch($countSql, $countParams)['total'] ?? 0;
 
-    // Get budget data
-    $budgetSql = "SELECT * FROM monthly_budgets WHERE month = ?";
-    $budgets = $db->fetchAll($budgetSql, [$month]);
-    $budgetData = [];
-    foreach ($budgets as $budget) {
-        $budgetData[$budget['brandy']] = $budget;
-    }
+// THÊM ĐOẠN CODE NÀY - Thực thi query chính để lấy transactions
+$sql .= " ORDER BY t.TransactionDate DESC, t.ID DESC LIMIT ? OFFSET ?";
+$params[] = $per_page;
+$params[] = $offset;
+
+$transactions = $db->fetchAll($sql, $params);
+
+// Get distinct requesters for filter - SỬA LẠI
+$requesters = $db->fetchAll("
+    SELECT DISTINCT Requester 
+    FROM transaction 
+    WHERE TransactionType = 'Issue' 
+    AND Status IN ('Posted', 'Approved')
+    AND Requester IS NOT NULL AND Requester != '' 
+    ORDER BY Requester
+");
+$budgetSql = "SELECT * FROM monthly_budgets WHERE month = ?";
+$budgets = $db->fetchAll($budgetSql, [$month]);
+$budgetData = [];
+foreach ($budgets as $budget) {
+    $budgetData[$budget['brandy']] = $budget;
+}
 
 } catch (Exception $e) {
     echo "<div class='alert alert-danger'>Lỗi: " . $e->getMessage() . "</div>";
     $stats = [];
     $totalStats = ['total_transactions' => 0, 'total_qty' => 0, 'total_amount' => 0];
-    $transactions = [];
+    $transactions = [];  // ĐẢM BẢO có khởi tạo này
     $requesters = [];
     $total = 0;
     $budgetData = [];
@@ -356,7 +371,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                     <option value="WPBB20" <?php echo $brandy === 'WPBB20' ? 'selected' : ''; ?>>PET</option>
                     <option value="WPNA30" <?php echo $brandy === 'WPNA30' ? 'selected' : ''; ?>>Nêm</option>
                     <option value="RB0000" <?php echo $brandy === 'RB0000' ? 'selected' : ''; ?>>Phở</option>
-                    <option value="0" <?php echo $brandy === '0' ? 'selected' : ''; ?>>Bảo trì chung</option>
+                    <option value="0" <?php echo $brandy === '0' ? 'selected' : ''; ?>>BT chung</option>
                 </select>
             </div>
             
@@ -523,21 +538,33 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                             'WPBB20' => 'PET',
                             'WPNA30' => 'Nêm',
                             'RB0000' => 'Phở',
-                            '0' => 'Bảo trì chung'
+                            '0' => 'BT chung'
                         ];
                         ?>
                         <?php foreach ($brandies as $brandyCode => $brandyName): ?>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <span class="badge <?php echo getBrandyClass($brandyCode); ?> me-2"><?php echo $brandyName; ?></span>
-                                Ngân sách (VNĐ)
-                            </label>
-                            <input type="number" class="form-control" 
-                                   name="budget[<?php echo $brandyCode; ?>]" 
-                                   value="<?php echo $budgetData[$brandyCode]['budget_amount'] ?? ''; ?>"
-                                   placeholder="Nhập ngân sách..."
-                                   min="0" step="1000">
-                        </div>
+                    <!-- Trong modal budget -->
+<!-- Sửa lại form trong modal -->
+<div class="col-md-6 mb-3">
+    <label class="form-label">
+        <span class="badge <?php echo getBrandyClass($brandyCode); ?> me-2"><?php echo $brandyName; ?></span>
+        Ngân sách
+    </label>
+    <div class="input-group">
+        <input type="number" 
+               class="form-control" 
+               name="budget_value[<?php echo $brandyCode; ?>]" 
+               value="<?php echo isset($budgetData[$brandyCode]['budget_amount']) ? $budgetData[$brandyCode]['budget_amount'] / 1000000 : ''; ?>"
+               placeholder="450"
+               min="0"
+               step="0.01">
+        <select class="form-select" name="budget_unit[<?php echo $brandyCode; ?>]" style="max-width: 100px;">
+            <option value="1000000" selected>Triệu</option>
+            <option value="1000">Nghìn</option>
+            <option value="1">VNĐ</option>
+        </select>
+    </div>
+    <small class="text-muted">VD: 450 triệu = 450,000,000 VNĐ</small>
+</div>
                         <?php endforeach; ?>
                     </div>
                     

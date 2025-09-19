@@ -5,7 +5,7 @@
  */
 
 class Database {
-    private $host = '10';
+    private $host = '100';
     private $dbname = 'cmms';
     private $username = 'cf';
     private $password = '123';

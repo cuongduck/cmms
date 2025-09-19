@@ -14,7 +14,7 @@ ini_set('display_errors', 1);
 // Application constants
 define('APP_NAME', 'CMMS - Hệ thống quản lý thiết bị');
 define('APP_VERSION', '1.0.0');
-define('APP_URL', 'https://baotricf.iot-mmb.site');
+define('APP_URL', 'https://baotricf.io.vn');
 define('BASE_PATH', dirname(__DIR__));
 define('UPLOAD_PATH', BASE_PATH . '/assets/uploads/');
 define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
