@@ -706,5 +706,73 @@ function resizeImage($source, $destination, $maxWidth = 800, $maxHeight = 600, $
     
     return $result;
 }
+function formatCurrencyTy($amount, $showUnit = true) {
+    $amount = floatval($amount);
+    
+    if ($amount == 0) {
+        return '0' . ($showUnit ? ' đ' : '');
+    }
+    
+    if ($amount >= 1000000000) { // >= 1 tỷ
+        $value = $amount / 1000000000;
+        $formatted = number_format($value, 2, ',', '.');
+        // Loại bỏ .0 nếu là số nguyên
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' tỷ' : '');
+    } elseif ($amount >= 1000000) { // >= 1 triệu
+        $value = $amount / 1000000;
+        $formatted = number_format($value, 2, ',', '.');
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' triệu' : '');
+    } elseif ($amount >= 1000) { // >= 1 nghìn
+        $value = $amount / 1000;
+        $formatted = number_format($value, 2, ',', '.');
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' nghìn' : '');
+    } else {
+        return number_format($amount, 0, ',', '.') . ($showUnit ? ' đ' : '');
+    }
+}
 
+/**
+ * Format số lượng thông minh
+ */
+function formatQuantityTy($quantity, $showUnit = false) {
+    $quantity = floatval($quantity);
+    
+    if ($quantity == 0) {
+        return '0';
+    }
+    
+    if ($quantity >= 1000000000) {
+        $value = $quantity / 1000000000;
+        $formatted = number_format($value, 2, ',', '.');
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' tỷ' : 'T');
+    } elseif ($quantity >= 1000000) {
+        $value = $quantity / 1000000;
+        $formatted = number_format($value, 2, ',', '.');
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' triệu' : 'M');
+    } elseif ($quantity >= 1000) {
+        $value = $quantity / 1000;
+        $formatted = number_format($value, 2, ',', '.');
+        if (substr($formatted, -2) === ',0') {
+            $formatted = substr($formatted, 0, -2);
+        }
+        return $formatted . ($showUnit ? ' nghìn' : 'K');
+    } else {
+        return number_format($quantity, 0, ',', '.');
+    }
+}
 ?>

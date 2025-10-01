@@ -806,4 +806,4 @@ document.addEventListener('submit', function(e) {
 // Console welcome message
 console.log('%cCMMS System', 'color: #1e3a8a; font-size: 20px; font-weight: bold;');
 console.log('%cEquipment Management System v' + (window.APP_VERSION || '1.0.0'), 'color: #64748b;');
-console.log('%cDeveloped by IT Department', 'color: #64748b;');
+console.log('%cDeveloped by Cuongduck', 'color: #64748b;');

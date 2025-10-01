@@ -14,11 +14,11 @@ requirePermission('inventory', 'view');
 
 // Helper function để format số an toàn
 function safeNumberFormat($number, $decimals = 0) {
-    return number_format($number ?? 0, $decimals);
+    return formatQuantityTy($number ?? 0);
 }
 
 function safeCurrencyFormat($amount) {
-    return number_format($amount ?? 0, 0) . ' đ';
+    return formatCurrencyTy($amount ?? 0);
 }
 
 // Get filter parameters
@@ -30,8 +30,56 @@ $page = intval($_GET['page'] ?? 1);
 $per_page = 20;
 $offset = ($page - 1) * $per_page;
 
-// Build SQL query
-// Build SQL query - Thêm cột ngành hàng
+// Build base filter conditions for reuse
+$baseFilterSql = "";
+$baseFilterParams = [];
+
+if (!empty($search)) {
+    $baseFilterSql .= " AND (oh.ItemCode LIKE ? OR oh.Itemname LIKE ? OR p.part_name LIKE ?)";
+    $searchTerm = '%' . $search . '%';
+    $baseFilterParams = array_merge($baseFilterParams, [$searchTerm, $searchTerm, $searchTerm]);
+}
+
+if (!empty($nganh_hang)) {
+    $baseFilterSql .= " AND (
+        CASE 
+            WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
+            WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
+            WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
+            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
+            WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
+            ELSE 'Khác'
+        END
+    ) = ?";
+    $baseFilterParams[] = $nganh_hang;
+}
+
+if (!empty($status)) {
+    switch ($status) {
+        case 'out_of_stock':
+            $baseFilterSql .= " AND COALESCE(oh.Onhand, 0) <= 0";
+            break;
+        case 'low_stock':
+            $baseFilterSql .= " AND p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0";
+            break;
+        case 'excess_stock':
+            $baseFilterSql .= " AND p.max_stock > 0 AND COALESCE(oh.Onhand, 0) > p.max_stock";
+            break;
+        case 'normal':
+            $baseFilterSql .= " AND COALESCE(oh.Onhand, 0) > 0 AND (p.min_stock <= 0 OR COALESCE(oh.Onhand, 0) >= p.min_stock) AND (p.max_stock <= 0 OR COALESCE(oh.Onhand, 0) <= p.max_stock)";
+            break;
+    }
+}
+
+if (!empty($bom_status)) {
+    if ($bom_status === 'in_bom') {
+        $baseFilterSql .= " AND bi.part_id IS NOT NULL";
+    } else {
+        $baseFilterSql .= " AND bi.part_id IS NULL";
+    }
+}
+
+// Build main SQL query
 $sql = "SELECT 
     oh.ID,
     oh.ItemCode,
@@ -79,122 +127,28 @@ $sql = "SELECT
 FROM onhand oh
 LEFT JOIN parts p ON oh.ItemCode = p.part_code
 LEFT JOIN bom_items bi ON p.id = bi.part_id
-WHERE 1=1";
+WHERE 1=1" . $baseFilterSql;
 
-$params = [];
-
-if (!empty($search)) {
-    $sql .= " AND (oh.ItemCode LIKE ? OR oh.Itemname LIKE ? OR p.part_name LIKE ?)";
-    $searchTerm = '%' . $search . '%';
-    $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
-}
-
-if (!empty($nganh_hang)) {
-    $sql .= " AND (
-        CASE 
-            WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
-            WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
-            WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
-            WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
-            ELSE 'Khác'
-        END
-    ) = ?";
-    $params[] = $nganh_hang;
-}
-
-if (!empty($status)) {
-    switch ($status) {
-        case 'out_of_stock':
-            $sql .= " AND COALESCE(oh.Onhand, 0) <= 0";
-            break;
-        case 'low_stock':
-            $sql .= " AND p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0";
-            break;
-        case 'excess_stock':
-            $sql .= " AND p.max_stock > 0 AND COALESCE(oh.Onhand, 0) > p.max_stock";
-            break;
-        case 'normal':
-            $sql .= " AND COALESCE(oh.Onhand, 0) > 0 AND (p.min_stock <= 0 OR COALESCE(oh.Onhand, 0) >= p.min_stock) AND (p.max_stock <= 0 OR COALESCE(oh.Onhand, 0) <= p.max_stock)";
-            break;
-    }
-}
-
-if (!empty($bom_status)) {
-    if ($bom_status === 'in_bom') {
-        $sql .= " AND bi.part_id IS NOT NULL";
-    } else {
-        $sql .= " AND bi.part_id IS NULL";
-    }
-}
-
-// Get total count
+// Get total count with same filters
 $countSql = "SELECT COUNT(DISTINCT oh.ItemCode) as total 
              FROM onhand oh
              LEFT JOIN parts p ON oh.ItemCode = p.part_code
              LEFT JOIN bom_items bi ON p.id = bi.part_id
-             WHERE 1=1";
-
-$countParams = [];
-if (!empty($search)) {
-    $countSql .= " AND (oh.ItemCode LIKE ? OR oh.Itemname LIKE ? OR p.part_name LIKE ?)";
-    $searchTerm = '%' . $search . '%';
-    $countParams = array_merge($countParams, [$searchTerm, $searchTerm, $searchTerm]);
-}
-
-if (!empty($nganh_hang)) {
-    $countSql .= " AND (
-        CASE 
-            WHEN oh.Locator LIKE 'A%' OR oh.Locator LIKE 'B%' OR oh.Locator = 'FP09' OR oh.Locator = 'MA01' THEN 'Mắm'
-            WHEN oh.Locator LIKE 'G%' OR oh.Locator = 'FE17' THEN 'CSD'
-            WHEN oh.Locator IN ('H300_TE0', 'HC01_TE0', 'HC02_TE0', 'HR02_TE0') THEN 'Khác'
-            WHEN oh.Locator LIKE 'C%' OR oh.Locator LIKE 'H%' OR oh.Locator LIKE 'E%' OR oh.Locator LIKE 'F%' OR oh.Locator = 'FP02' OR oh.Locator = 'FP05' OR oh.Locator = 'M501' THEN 'CF'
-            WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
-            ELSE 'Khác'
-        END
-    ) = ?";
-    $countParams[] = $nganh_hang;
-}
-
-if (!empty($status)) {
-    switch ($status) {
-        case 'out_of_stock':
-            $countSql .= " AND COALESCE(oh.Onhand, 0) <= 0";
-            break;
-        case 'low_stock':
-            $countSql .= " AND p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0";
-            break;
-        case 'excess_stock':
-            $countSql .= " AND p.max_stock > 0 AND COALESCE(oh.Onhand, 0) > p.max_stock";
-            break;
-        case 'normal':
-            $countSql .= " AND COALESCE(oh.Onhand, 0) > 0 AND (p.min_stock <= 0 OR COALESCE(oh.Onhand, 0) >= p.min_stock) AND (p.max_stock <= 0 OR COALESCE(oh.Onhand, 0) <= p.max_stock)";
-            break;
-    }
-}
-
-if (!empty($bom_status)) {
-    if ($bom_status === 'in_bom') {
-        $countSql .= " AND bi.part_id IS NOT NULL";
-    } else {
-        $countSql .= " AND bi.part_id IS NULL";
-    }
-}
+             WHERE 1=1" . $baseFilterSql;
 
 try {
-    $totalResult = $db->fetch($countSql, $countParams);
+    $totalResult = $db->fetch($countSql, $baseFilterParams);
     $total = $totalResult['total'] ?? 0;
 } catch (Exception $e) {
     echo "<div class='alert alert-danger'>Lỗi count query: " . $e->getMessage() . "</div>";
     $total = 0;
 }
 
-
 $sql .= " GROUP BY oh.ItemCode 
           ORDER BY ngay_nhap_kho DESC, oh.Itemname ASC 
           LIMIT ? OFFSET ?";
-$params[] = $per_page;
-$params[] = $offset;
+$params = array_merge($baseFilterParams, [$per_page, $offset]);
+
 try {
     $inventory = $db->fetchAll($sql, $params);
 } catch (Exception $e) {
@@ -221,28 +175,32 @@ try {
 } catch (Exception $e) {
     $nganh_hangs = [];
 }
-// Get statistics với COALESCE
+
+// Get statistics với filter áp dụng
 try {
+    $statsBaseSql = "FROM onhand oh
+                     LEFT JOIN parts p ON oh.ItemCode = p.part_code
+                     LEFT JOIN bom_items bi ON p.id = bi.part_id
+                     WHERE 1=1" . $baseFilterSql;
+
+    // Tính các thống kê với filter
     $stats = [
-        'total_items' => $db->fetch("SELECT COUNT(*) as count FROM onhand")['count'] ?? 0,
-        'in_bom_items' => $db->fetch("
-            SELECT COUNT(DISTINCT oh.ItemCode) as count 
-            FROM onhand oh 
-            JOIN parts p ON oh.ItemCode = p.part_code 
-            JOIN bom_items bi ON p.id = bi.part_id
-        ")['count'] ?? 0,
-        'out_of_stock' => $db->fetch("SELECT COUNT(*) as count FROM onhand WHERE COALESCE(Onhand, 0) <= 0")['count'] ?? 0,
-        'low_stock' => $db->fetch("
-            SELECT COUNT(*) as count 
-            FROM onhand oh 
-            LEFT JOIN parts p ON oh.ItemCode = p.part_code 
-            WHERE p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0
-        ")['count'] ?? 0,
-        'total_value' => $db->fetch("SELECT SUM(COALESCE(OH_Value, 0)) as total FROM onhand")['total'] ?? 0
+        'total_items' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql, $baseFilterParams)['count'] ?? 0,
+        
+        'in_bom_items' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND bi.part_id IS NOT NULL", $baseFilterParams)['count'] ?? 0,
+        
+        'out_of_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND COALESCE(oh.Onhand, 0) <= 0", $baseFilterParams)['count'] ?? 0,
+        
+        'low_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0", $baseFilterParams)['count'] ?? 0,
+        
+        'total_value' => $db->fetch("SELECT SUM(COALESCE(oh.OH_Value, 0)) as total " . $statsBaseSql, $baseFilterParams)['total'] ?? 0,
+        
+        'excess_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND p.max_stock > 0 AND COALESCE(oh.Onhand, 0) > p.max_stock", $baseFilterParams)['count'] ?? 0
     ];
+    
 } catch (Exception $e) {
     echo "<div class='alert alert-warning'>Không thể tải thống kê: " . $e->getMessage() . "</div>";
-    $stats = ['total_items' => 0, 'in_bom_items' => 0, 'out_of_stock' => 0, 'low_stock' => 0, 'total_value' => 0];
+    $stats = ['total_items' => 0, 'in_bom_items' => 0, 'out_of_stock' => 0, 'low_stock' => 0, 'total_value' => 0, 'excess_stock' => 0];
 }
 
 $pagination = paginate($total, $page, $per_page, 'index.php');
@@ -259,7 +217,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                     </div>
                     <div>
                         <div class="stat-number"><?php echo safeNumberFormat($stats['total_items']); ?></div>
-                        <div class="stat-label">Tổng mặt hàng</div>
+                        <div class="stat-label">Item</div>
                     </div>
                 </div>
             </div>
@@ -292,6 +250,9 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                     <div>
                         <div class="stat-number"><?php echo safeNumberFormat($stats['low_stock'] + $stats['out_of_stock']); ?></div>
                         <div class="stat-label">Cảnh báo tồn kho</div>
+                        <small class="opacity-75">
+                            <?php echo safeNumberFormat($stats['out_of_stock']); ?> hết | <?php echo safeNumberFormat($stats['low_stock']); ?> thiếu
+                        </small>
                     </div>
                 </div>
             </div>
@@ -306,14 +267,39 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div>
-                        <div class="stat-number"><?php echo formatCurrency($stats['total_value']); ?></div>
-                        <div class="stat-label">Tổng giá trị</div>
-                    </div>
+                        <div class="stat-number"><?php echo safeCurrencyFormat($stats['total_value']); ?></div>
+                        <div class="stat-label">VND</div>
+                                            </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Thông báo khi có filter -->
+<?php if (!empty($search) || !empty($nganh_hang) || !empty($status) || !empty($bom_status)): ?>
+<div class="alert alert-info alert-dismissible fade show">
+    <i class="fas fa-filter me-2"></i>
+    <strong>Bộ lọc đang áp dụng:</strong>
+    <?php
+    $filters = [];
+    if (!empty($search)) $filters[] = "Tìm kiếm: \"$search\"";
+    if (!empty($nganh_hang)) $filters[] = "Ngành hàng: $nganh_hang";
+    if (!empty($status)) {
+        $statusLabels = [
+            'out_of_stock' => 'Hết hàng',
+            'low_stock' => 'Thiếu hàng', 
+            'excess_stock' => 'Dư thừa',
+            'normal' => 'Bình thường'
+        ];
+        $filters[] = "Trạng thái: " . ($statusLabels[$status] ?? $status);
+    }
+    if (!empty($bom_status)) $filters[] = "Loại: " . ($bom_status === 'in_bom' ? 'Trong BOM' : 'Ngoài BOM');
+    echo implode(', ', $filters);
+    ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
 
 <!-- Quick Search -->
 <div class="card mb-4">
@@ -432,7 +418,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         <th>Tên vật tư</th>
                         <th style="width: 80px;">Vị trí</th>
                         <th style="width: 80px;">Lot</th>
-                                <th style="width: 90px;">Ngày nhập</th>
+                        <th style="width: 90px;">Ngày nhập</th>
                         <th style="width: 100px;" class="text-end">Tồn kho</th>
                         <th style="width: 60px;">ĐVT</th>
                         <th style="width: 100px;" class="text-end">Đơn giá</th>
@@ -459,7 +445,6 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         </td>
                         <td>
                             <div class="fw-medium"><?php echo htmlspecialchars($item['Itemname']); ?></div>
- 
                         </td>
                         <td>
                             <small class="text-muted"><?php echo htmlspecialchars($item['Locator'] ?? '-'); ?></small>
@@ -467,28 +452,28 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         <td>
                             <small class="text-muted"><?php echo htmlspecialchars($item['Lotnumber'] ?? '-'); ?></small>
                         </td>
-                           <td>
-        <?php 
-        $ngayNhap = formatNgayNhapKho($item['ngay_nhap_kho']);
-        $soNgay = tinhSoNgayTuNgayNhap($item['ngay_nhap_kho']);
-        ?>
-        <div class="text-center">
-            <small class="fw-medium"><?php echo $ngayNhap; ?></small>
-            <?php if ($soNgay !== null): ?>
-                <br><small class="text-muted"><?php echo $soNgay; ?> ngày</small>
-            <?php endif; ?>
-        </div>
-    </td>
+                        <td>
+                            <?php 
+                            $ngayNhap = formatNgayNhapKho($item['ngay_nhap_kho']);
+                            $soNgay = tinhSoNgayTuNgayNhap($item['ngay_nhap_kho']);
+                            ?>
+                            <div class="text-center">
+                                <small class="fw-medium"><?php echo $ngayNhap; ?></small>
+                                <?php if ($soNgay !== null): ?>
+                                    <br><small class="text-muted"><?php echo $soNgay; ?> ngày</small>
+                                <?php endif; ?>
+                            </div>
+                        </td>
                         <td class="text-end">
                             <span class="fw-bold <?php echo getStockQuantityClass($item); ?>">
-                                <?php echo safeNumberFormat($item['Onhand'], 2); ?>
+                                <?php echo number_format($item['Onhand'], 2); ?>
                             </span>
                         </td>
                         <td>
                             <span class="badge bg-light text-dark"><?php echo htmlspecialchars($item['UOM'] ?? ''); ?></span>
                         </td>
                         <td class="text-end">
-                            <?php echo safeCurrencyFormat($item['Price']); ?>
+                            <?php echo number_format($item['Price'] ?? 0, 0); ?> đ
                         </td>
                         <td class="text-end fw-bold">
                             <?php echo safeCurrencyFormat($item['OH_Value']); ?>
@@ -499,10 +484,10 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                             </span>
                         </td>
                         <td>
-        <span class="badge <?php echo getNganhHangClass($item['nganh_hang']); ?>">
-            <?php echo htmlspecialchars($item['nganh_hang']); ?>
-        </span>
-    </td>    
+                            <span class="badge <?php echo getNganhHangClass($item['nganh_hang']); ?>">
+                                <?php echo htmlspecialchars($item['nganh_hang']); ?>
+                            </span>
+                        </td>    
                         <td>
                             <span class="badge <?php echo getStockStatusClass($item['stock_status']); ?>">
                                 <?php echo $item['stock_status']; ?>
@@ -575,6 +560,7 @@ function getStockQuantityClass($item) {
     if (!empty($item['min_stock']) && $onhand < $item['min_stock']) return 'text-warning';
     return 'text-success';
 }
+
 // Helper function cho màu ngành hàng
 function getNganhHangClass($nganh_hang) {
     switch ($nganh_hang) {
@@ -585,6 +571,7 @@ function getNganhHangClass($nganh_hang) {
         default: return 'bg-secondary';
     }
 }
+
 function getStockStatusClass($status) {
     switch ($status) {
         case 'Hết hàng': return 'bg-danger';
@@ -593,6 +580,7 @@ function getStockStatusClass($status) {
         default: return 'bg-success';
     }
 }
+
 // Helper function để parse ngày từ Lotnumber
 function parseNgayNhapKho($lotnumber) {
     if (empty($lotnumber) || strlen($lotnumber) < 6) {
@@ -647,57 +635,65 @@ function tinhSoNgayTuNgayNhap($ngayNhapKho) {
 }
 ?>
 
+
+
 <script>
 function viewItemDetails(itemCode) {
+    // Show loading
+    const loadingHtml = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-2">Đang tải chi tiết vật tư...</p>
+        </div>
+    `;
+    
+    document.getElementById('itemDetailsContent').innerHTML = loadingHtml;
+    const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
+    modal.show();
+    
+    // Fetch data
     fetch(`api/item_details.php?item_code=${encodeURIComponent(itemCode)}`)
-        .then(response => response.json())
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server trả về dữ liệu không phải JSON');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 document.getElementById('itemDetailsContent').innerHTML = data.html;
-                new bootstrap.Modal(document.getElementById('itemDetailsModal')).show();
             } else {
-                alert('Không thể tải chi tiết: ' + data.message);
+                document.getElementById('itemDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message}
+                    </div>
+                `;
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Có lỗi xảy ra');
+            document.getElementById('itemDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Có lỗi xảy ra: ${error.message}
+                </div>
+            `;
         });
 }
 
-
 function showItemTransactions(itemCode) {
-    fetch(`api/transactions.php?type=item&item_code=${encodeURIComponent(itemCode)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('transactionContent').innerHTML = data.html;
-                new bootstrap.Modal(document.getElementById('transactionModal')).show();
-            } else {
-                alert('Không thể tải giao dịch: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Có lỗi xảy ra');
-        });
+    // Chuyển hướng đến trang transactions với search
+    const url = `/modules/transactions/?search=${encodeURIComponent(itemCode)}&search_all=1`;
+    window.open(url, '_blank');
 }
 
 function showAllTransactions() {
-    fetch('api/transactions.php?type=all')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('transactionContent').innerHTML = data.html;
-                new bootstrap.Modal(document.getElementById('transactionModal')).show();
-            } else {
-                alert('Không thể tải giao dịch: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Có lỗi xảy ra');
-        });
+    // Chuyển hướng đến trang transactions
+    window.open('/modules/transactions/', '_blank');
 }
 
 function filterByBomStatus(status) {
@@ -718,12 +714,177 @@ function performQuickSearch() {
     }
 }
 
-// Enter key support
-document.getElementById('quickSearch').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        performQuickSearch();
+// Quick search với suggestions
+let searchTimeout;
+document.addEventListener('DOMContentLoaded', function() {
+    const quickSearch = document.getElementById('quickSearch');
+    const suggestions = document.getElementById('searchSuggestions');
+    
+    if (quickSearch) {
+        // Input event cho suggestions
+        quickSearch.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                suggestions.style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                fetchSearchSuggestions(query);
+            }, 300);
+        });
+
+        // Enter key support
+        quickSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                suggestions.style.display = 'none';
+                performQuickSearch();
+            }
+        });
+
+        // Click outside để ẩn suggestions
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#quickSearch') && !e.target.closest('#searchSuggestions')) {
+                suggestions.style.display = 'none';
+            }
+        });
     }
 });
+
+async function fetchSearchSuggestions(query) {
+    try {
+        const response = await fetch(`api/search_suggestions.php?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        const suggestions = document.getElementById('searchSuggestions');
+        if (!data.suggestions || data.suggestions.length === 0) {
+            suggestions.style.display = 'none';
+            return;
+        }
+
+        let html = '';
+        data.suggestions.forEach(item => {
+            html += `
+                <a href="#" class="dropdown-item suggestion-item" data-value="${item.value}">
+                    <div class="fw-medium">${highlightMatch(item.label, query)}</div>
+                    <small class="text-muted">${item.type}</small>
+                </a>
+            `;
+        });
+
+        suggestions.innerHTML = html;
+        suggestions.style.display = 'block';
+
+        // Bind click events
+        suggestions.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('quickSearch').value = this.dataset.value;
+                suggestions.style.display = 'none';
+                performQuickSearch();
+            });
+        });
+
+    } catch (error) {
+        console.error('Error fetching suggestions:', error);
+    }
+}
+
+function highlightMatch(text, query) {
+    if (!query) return text;
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+}
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Counter animation cho số liệu
+function animateValue(element, targetText, duration) {
+    const originalText = targetText;
+    let startValue = 0;
+    
+    // Parse số từ text đã format
+    let endValue = 0;
+    if (targetText.includes('tỷ')) {
+        endValue = parseFloat(targetText.replace(/[^\d.,]/g, '').replace(',', '.')) * 1000000000;
+    } else if (targetText.includes('triệu')) {
+        endValue = parseFloat(targetText.replace(/[^\d.,]/g, '').replace(',', '.')) * 1000000;
+    } else if (targetText.includes('nghìn')) {
+        endValue = parseFloat(targetText.replace(/[^\d.,]/g, '').replace(',', '.')) * 1000;
+    } else {
+        endValue = parseFloat(targetText.replace(/[^\d]/g, '')) || 0;
+    }
+    
+    if (endValue === 0) {
+        element.textContent = originalText;
+        return;
+    }
+    
+    const startTime = Date.now();
+    const step = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const currentValue = startValue + ((endValue - startValue) * progress);
+        
+        // Format current value theo cùng cách với PHP
+        let displayText;
+        if (currentValue >= 1000000000) {
+            const value = currentValue / 1000000000;
+            displayText = value.toFixed(2).replace('.0', '') + ' tỷ';
+        } else if (currentValue >= 1000000) {
+            const value = currentValue / 1000000;
+            displayText = value.toFixed(2).replace('.0', '') + ' triệu';
+        } else if (currentValue >= 1000) {
+            const value = currentValue / 1000;
+            displayText = value.toFixed(2).replace('.0', '') + ' nghìn';
+        } else {
+            displayText = Math.floor(currentValue).toLocaleString('vi-VN');
+        }
+        
+        element.textContent = displayText;
+        
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        } else {
+            // Đảm bảo hiển thị chính xác text cuối
+            element.textContent = originalText;
+        }
+    };
+    requestAnimationFrame(step);
+}
+
+
+function formatNumber(num) {
+    if (num >= 1000000000) {
+        return (num / 1000000000).toFixed(2) + 'T';
+    } else if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + 'M';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(2) + 'K';
+    }
+    return num.toString();
+}
+
+// Initialize animations khi trang load
+// Initialize animations khi trang load - FIXED VERSION
+window.addEventListener('load', function() {
+    document.querySelectorAll('.stat-number').forEach(element => {
+        const originalText = element.textContent;
+        
+        // Chỉ animate nếu có số
+        if (originalText && originalText !== '0') {
+            element.textContent = '0';
+            setTimeout(() => {
+                animateValue(element, originalText, 500);
+            }, 200);
+        }
+    });
+});
+
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

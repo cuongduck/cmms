@@ -98,7 +98,7 @@ try {
         <div class="col-md-3">
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
-                    <h5 class="card-title">Tổng nhập</h5>
+                    <h5 class="card-title">Tổng Xuất</h5>
                     <h3><?php echo number_format($summaryData['total_in'], 2); ?></h3>
                     <small><?php echo number_format($summaryData['total_value_in'], 0); ?> đ</small>
                 </div>
@@ -107,7 +107,7 @@ try {
         <div class="col-md-3">
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
-                    <h5 class="card-title">Tổng xuất</h5>
+                    <h5 class="card-title">Tổng Nhập</h5>
                     <h3><?php echo number_format($summaryData['total_out'], 2); ?></h3>
                     <small><?php echo number_format($summaryData['total_value_out'], 0); ?> đ</small>
                 </div>
