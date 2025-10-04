@@ -23,7 +23,6 @@ $sql = "SELECT sp.*,
         FROM spare_parts sp
         LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
         WHERE sp.id = ? AND sp.is_active = 1";
-
 $part = $db->fetch($sql, [$id]);
 if (!$part) {
     header('Location: index.php');
@@ -212,52 +211,40 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                 </div>
                 
                 <!-- Management & Supplier -->
-                <div class="form-section">
-                    <h5 class="form-section-title">
-                        <i class="fas fa-users"></i>
-                        Quản lý & Nhà cung cấp
-                    </h5>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="manager_user_id" class="form-label">Người quản lý chính</label>
-                            <select id="manager_user_id" name="manager_user_id" class="form-select">
-                                <option value="">-- Chọn người quản lý --</option>
-                                <?php foreach ($users as $user): ?>
-                                    <option value="<?php echo $user['id']; ?>" <?php echo ($part['manager_user_id'] == $user['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($user['full_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="backup_manager_user_id" class="form-label">Người quản lý dự phòng</label>
-                            <select id="backup_manager_user_id" name="backup_manager_user_id" class="form-select">
-                                <option value="">-- Chọn người dự phòng --</option>
-                                <?php foreach ($users as $user): ?>
-                                    <option value="<?php echo $user['id']; ?>" <?php echo ($part['backup_manager_user_id'] == $user['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($user['full_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
-                            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
-                                   value="<?php echo htmlspecialchars($part['supplier_code']); ?>">
-                        </div>
-                        
-                        <div class="col-md-8 mb-3">
-                            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
-                            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
-                                   value="<?php echo htmlspecialchars($part['supplier_name']); ?>">
-                        </div>
-                    </div>
-                </div>
+<div class="form-section">
+    <h5 class="form-section-title">
+        <i class="fas fa-users"></i>
+        Quản lý & Nhà cung cấp
+    </h5>
+    
+    <div class="row">
+        <div class="col-md-12 mb-3">
+            <label for="manager_user_id" class="form-label">Người quản lý</label>
+            <select id="manager_user_id" name="manager_user_id" class="form-select">
+                <option value="">-- Chọn người quản lý --</option>
+                <?php foreach ($users as $user): ?>
+                    <option value="<?php echo $user['id']; ?>" <?php echo ($part['manager_user_id'] == $user['id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($user['full_name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
+            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
+                   value="<?php echo htmlspecialchars($part['supplier_code']); ?>">
+        </div>
+        
+        <div class="col-md-8 mb-3">
+            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
+            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
+                   value="<?php echo htmlspecialchars($part['supplier_name']); ?>">
+        </div>
+    </div>
+</div>
                 
                 <!-- Notes -->
                 <div class="form-section">

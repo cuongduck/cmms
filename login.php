@@ -5,6 +5,9 @@ require_once 'config/auth.php';
 
 session_start();
 
+// Kiểm tra remember token trước khi hiển thị form login
+$auth->checkRememberToken();
+
 // Nếu đã đăng nhập, chuyển về trang chủ
 if (isLoggedIn()) {
     redirect(APP_URL);
@@ -17,11 +20,12 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = sanitizeInput($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $remember = isset($_POST['remember']); // Kiểm tra checkbox ghi nhớ
     
     if (empty($username) || empty($password)) {
         $error = 'Vui lòng nhập đầy đủ thông tin đăng nhập';
     } else {
-        $result = $auth->login($username, $password);
+        $result = $auth->login($username, $password, $remember);
         
         if ($result['success']) {
             $success = $result['message'];
@@ -85,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
             padding: 2rem;
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             position: relative;
             z-index: 1;
         }
@@ -94,56 +98,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 80px;
             height: 80px;
             background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-            color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
             margin: 0 auto 1.5rem;
             box-shadow: 0 10px 25px rgba(30, 58, 138, 0.3);
         }
         
-        .form-floating .form-control {
-            background-color: rgba(248, 250, 252, 0.8);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            border-radius: 0.75rem;
-            backdrop-filter: blur(10px);
-        }
-        
-        .form-floating .form-control:focus {
-            background-color: rgba(255, 255, 255, 0.9);
-            border-color: #1e3a8a;
-            box-shadow: 0 0 0 0.2rem rgba(30, 58, 138, 0.25);
+        .login-logo i {
+            font-size: 2rem;
+            color: white;
         }
         
         .form-floating > label {
             color: #64748b;
-            font-weight: 500;
+        }
+        
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.15);
         }
         
         .btn-login {
             background: linear-gradient(135deg, #1e3a8a, #3b82f6);
             border: none;
-            border-radius: 0.75rem;
-            padding: 0.875rem 2rem;
-            font-weight: 600;
-            text-transform: uppercase;
+            padding: 0.75rem;
+            font-weight: 500;
             letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(30, 58, 138, 0.3);
+            transition: all 0.3s;
         }
         
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(30, 58, 138, 0.4);
+            box-shadow: 0 10px 25px rgba(30, 58, 138, 0.3);
         }
         
         .company-info {
             text-align: center;
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(226, 232, 240, 0.5);
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e5e7eb;
         }
         
         .company-info h5 {
@@ -154,65 +149,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         .company-info p {
             color: #64748b;
-            font-size: 0.875rem;
-            margin-bottom: 0;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
         }
         
         .login-footer {
-            position: absolute;
+            position: fixed;
             bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.8);
+            left: 0;
+            right: 0;
             text-align: center;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 0.875rem;
+            z-index: 1;
         }
         
         .alert {
-            border-radius: 0.75rem;
+            border-radius: 0.5rem;
             border: none;
-            backdrop-filter: blur(10px);
         }
         
-        .alert-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-        
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            border: 1px solid rgba(16, 185, 129, 0.2);
+        .form-check-input:checked {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
         }
         
         .loading-overlay {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.7);
             display: none;
             align-items: center;
             justify-content: center;
-            border-radius: 1rem;
-            z-index: 10;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+        </div>
+        
         <div class="container">
             <div class="row justify-content-center">
-                <div class="col-md-6 col-lg-5 col-xl-4">
+                <div class="col-md-6 col-lg-5">
                     <div class="login-card">
-                        <div class="loading-overlay" id="loadingOverlay">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Đang đăng nhập...</span>
-                            </div>
-                        </div>
-                        
                         <!-- Logo -->
                         <div class="login-logo">
                             <i class="fas fa-industry"></i>
@@ -274,9 +273,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <input class="form-check-input" 
                                        type="checkbox" 
                                        id="remember" 
-                                       name="remember">
+                                       name="remember"
+                                       value="1">
                                 <label class="form-check-label text-muted" for="remember">
-                                    Ghi nhớ đăng nhập
+                                    Ghi nhớ đăng nhập (30 ngày)
                                 </label>
                             </div>
                             
@@ -336,14 +336,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Demo accounts info (remove in production)
-        console.log('Demo accounts:');
+        console.log('%cDemo accounts:', 'color: #3b82f6; font-weight: bold;');
         console.log('Admin: admin / password');
         console.log('Supervisor: supervisor1 / password');
         console.log('Manager: manager1 / password');
         console.log('User: user1 / password');
         
-        // Add demo account buttons (remove in production)
-        if (window.location.hostname === 'localhost') {
+        // Add demo account buttons (for localhost only)
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             const demoAccounts = [
                 { username: 'admin', password: 'password', role: 'Admin' },
                 { username: 'supervisor1', password: 'password', role: 'Supervisor' },
@@ -380,40 +380,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Auto-hide alerts after 5 seconds
         const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => {
-            setTimeout(() => {
+        alerts.forEach(function(alert) {
+            setTimeout(function() {
+                alert.style.transition = 'opacity 0.5s';
                 alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    alert.style.display = 'none';
-                }, 300);
+                setTimeout(function() {
+                    alert.remove();
+                }, 500);
             }, 5000);
-        });
-        
-        // Password visibility toggle
-        const togglePassword = document.createElement('button');
-        togglePassword.type = 'button';
-        togglePassword.className = 'btn btn-outline-secondary position-absolute top-50 end-0 translate-middle-y me-2';
-        togglePassword.style.border = 'none';
-        togglePassword.style.background = 'transparent';
-        togglePassword.style.zIndex = '10';
-        togglePassword.innerHTML = '<i class="fas fa-eye"></i>';
-        
-        const passwordContainer = document.querySelector('.form-floating:has(#password)');
-        passwordContainer.style.position = 'relative';
-        passwordContainer.appendChild(togglePassword);
-        
-        togglePassword.addEventListener('click', function() {
-            const passwordField = document.getElementById('password');
-            const icon = this.querySelector('i');
-            
-            if (passwordField.type === 'password') {
-                passwordField.type = 'text';
-                icon.className = 'fas fa-eye-slash';
-            } else {
-                passwordField.type = 'password';
-                icon.className = 'fas fa-eye';
-            }
         });
     });
     </script>

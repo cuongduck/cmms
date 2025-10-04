@@ -5,10 +5,10 @@
  */
 
 class Database {
-    private $host = '1030';
-    private $dbname = 's';
+    private $host = '1';
+    private $dbname = 'cmms';
     private $username = 'cf';
-    private $password = '23';
+    private $password = '123';
     private $charset = 'utf8mb4';
     private static $instance = null;
     private $pdo;

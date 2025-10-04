@@ -56,7 +56,9 @@ try {
         case 'reclassify':
             handleReclassify();
             break;
-    
+       case 'search_item_mmb':
+            handleSearchItemMMB();
+            break;
         default:
             throw new Exception('Invalid action: ' . $action);
     }
@@ -64,7 +66,25 @@ try {
     error_log("Spare Parts API Error: " . $e->getMessage());
     errorResponse($e->getMessage());
 }
-
+function handleSearchItemMMB() {
+    global $db;
+    
+    $itemCode = trim($_GET['item_code'] ?? '');
+    if (empty($itemCode)) {
+        successResponse([]);
+        return;
+    }
+    
+    $sql = "SELECT ITEM_CODE, ITEM_NAME, UOM, UNIT_PRICE, VENDOR_ID, VENDOR_NAME
+            FROM item_mmb
+            WHERE ITEM_CODE LIKE ?
+            ORDER BY ITEM_CODE
+            LIMIT 10";
+    
+    $items = $db->fetchAll($sql, [$itemCode . '%']);
+    
+    successResponse($items);
+}
 function handleList() {
     $filters = [
         'category' => $_GET['category'] ?? '',
@@ -115,8 +135,7 @@ function handleGetDetails() {
             FROM spare_parts sp
             LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
             LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-            LEFT JOIN users u2 ON sp.backup_manager_user_id = u2.id
-            WHERE sp.id = ?";
+                        WHERE sp.id = ?";
     
     $part = $db->fetch($sql, [$id]);
     
@@ -134,14 +153,13 @@ function handleSave() {
     $data = [
         'item_code' => strtoupper(trim($_POST['item_code'] ?? '')),
         'item_name' => trim($_POST['item_name'] ?? ''),
-        'category' => autoDetectCategory(trim($_POST['item_name'] ?? '')),
+        'category' => trim($_POST['category'] ?? ''),
         'unit' => trim($_POST['unit'] ?? 'Cái'),
-        'min_stock' => floatval($_POST['min_stock'] ?? 0),
-        'max_stock' => floatval($_POST['max_stock'] ?? 0),
-        'reorder_point' => floatval($_POST['reorder_point'] ?? 0),
+        'min_stock' => intval($_POST['min_stock'] ?? 0),
+        'max_stock' => intval($_POST['max_stock'] ?? 0),
+        'reorder_point' => intval($_POST['reorder_point'] ?? 0),
         'standard_cost' => floatval($_POST['standard_cost'] ?? 0),
         'manager_user_id' => !empty($_POST['manager_user_id']) ? intval($_POST['manager_user_id']) : null,
-        'backup_manager_user_id' => !empty($_POST['backup_manager_user_id']) ? intval($_POST['backup_manager_user_id']) : null,
         'supplier_code' => trim($_POST['supplier_code'] ?? ''),
         'supplier_name' => trim($_POST['supplier_name'] ?? ''),
         'lead_time_days' => intval($_POST['lead_time_days'] ?? 0),
@@ -160,10 +178,14 @@ function handleSave() {
     if (empty($data['item_name'])) {
         throw new Exception('Tên vật tư không được để trống');
     }
-        error_log("Auto-detected category for '{$data['item_name']}': {$data['category']}");
-
+    
     if ($data['min_stock'] <= 0) {
         throw new Exception('Mức tồn tối thiểu phải lớn hơn 0');
+    }
+    
+    // Auto-set category if empty
+    if (empty($data['category'])) {
+        $data['category'] = autoDetectCategory($data['item_name']);
     }
     
     // Auto-set reorder_point if not provided
@@ -176,25 +198,20 @@ function handleSave() {
     if ($existing) {
         throw new Exception('Mã vật tư đã tồn tại');
     }
-    if (empty($data['category'])) {
-    $data['category'] = autoDetectCategory($data['item_name']);
-}
-
-
     
     $db->beginTransaction();
     
     try {
         $sql = "INSERT INTO spare_parts 
                 (item_code, item_name, category, unit, min_stock, max_stock, reorder_point, 
-                 standard_cost, manager_user_id, backup_manager_user_id, supplier_code, supplier_name,
+                 standard_cost, manager_user_id, supplier_code, supplier_name,
                  lead_time_days, storage_location, description, specifications, notes, is_critical, created_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         $params = [
             $data['item_code'], $data['item_name'], $data['category'], $data['unit'],
             $data['min_stock'], $data['max_stock'], $data['reorder_point'], $data['standard_cost'],
-            $data['manager_user_id'], $data['backup_manager_user_id'], $data['supplier_code'], $data['supplier_name'],
+            $data['manager_user_id'], $data['supplier_code'], $data['supplier_name'],
             $data['lead_time_days'], $data['storage_location'], $data['description'], $data['specifications'],
             $data['notes'], $data['is_critical'], getCurrentUser()['id']
         ];
@@ -223,18 +240,17 @@ function handleUpdate() {
     if (!$id) {
         throw new Exception('ID is required');
     }
-        $currentData = $db->fetch("SELECT item_name, category FROM spare_parts WHERE id = ?", [$id]);
-
+    
     $data = [
         'item_code' => strtoupper(trim($_POST['item_code'] ?? '')),
         'item_name' => trim($_POST['item_name'] ?? ''),
+        'category' => trim($_POST['category'] ?? ''),
         'unit' => trim($_POST['unit'] ?? 'Cái'),
-        'min_stock' => floatval($_POST['min_stock'] ?? 0),
-        'max_stock' => floatval($_POST['max_stock'] ?? 0),
-        'reorder_point' => floatval($_POST['reorder_point'] ?? 0),
+        'min_stock' => intval($_POST['min_stock'] ?? 0),
+        'max_stock' => intval($_POST['max_stock'] ?? 0),
+        'reorder_point' => intval($_POST['reorder_point'] ?? 0),
         'standard_cost' => floatval($_POST['standard_cost'] ?? 0),
         'manager_user_id' => !empty($_POST['manager_user_id']) ? intval($_POST['manager_user_id']) : null,
-        'backup_manager_user_id' => !empty($_POST['backup_manager_user_id']) ? intval($_POST['backup_manager_user_id']) : null,
         'supplier_code' => trim($_POST['supplier_code'] ?? ''),
         'supplier_name' => trim($_POST['supplier_name'] ?? ''),
         'lead_time_days' => intval($_POST['lead_time_days'] ?? 0),
@@ -244,26 +260,10 @@ function handleUpdate() {
         'notes' => trim($_POST['notes'] ?? ''),
         'is_critical' => isset($_POST['is_critical']) ? 1 : 0
     ];
-    // Tự động phân loại lại nếu tên thay đổi hoặc được yêu cầu
-    $forceReclassify = isset($_POST['force_reclassify']) && $_POST['force_reclassify'] == '1';
-    if ($forceReclassify || $data['item_name'] !== $currentData['item_name']) {
+    
+    // Auto-set category if empty
+    if (empty($data['category'])) {
         $data['category'] = autoDetectCategory($data['item_name']);
-        error_log("Re-classified category for '{$data['item_name']}': {$data['category']}");
-    } else {
-        // Giữ category hiện tại nếu tên không đổi
-        $data['category'] = $currentData['category'];
-    }
-    // Validation
-    if (empty($data['item_code'])) {
-        throw new Exception('Mã vật tư không được để trống');
-    }
-    
-    if (empty($data['item_name'])) {
-        throw new Exception('Tên vật tư không được để trống');
-    }
-    
-    if ($data['min_stock'] <= 0) {
-        throw new Exception('Mức tồn tối thiểu phải lớn hơn 0');
     }
     
     // Auto-set reorder_point if not provided
@@ -271,22 +271,12 @@ function handleUpdate() {
         $data['reorder_point'] = $data['min_stock'];
     }
     
-    // Check duplicate item_code (exclude current record)
-    $existing = $db->fetch("SELECT id FROM spare_parts WHERE item_code = ? AND id != ?", [$data['item_code'], $id]);
-    if ($existing) {
-        throw new Exception('Mã vật tư đã tồn tại');
-    }
-    // Trong function handleUpdate(), tương tự:
-    if (empty($data['category'])) {
-    $data['category'] = autoDetectCategory($data['item_name']);
-}
-    
     $db->beginTransaction();
     
     try {
-       $sql = "UPDATE spare_parts SET 
+        $sql = "UPDATE spare_parts SET 
                 item_code = ?, item_name = ?, category = ?, unit = ?, min_stock = ?, max_stock = ?, 
-                reorder_point = ?, standard_cost = ?, manager_user_id = ?, backup_manager_user_id = ?, 
+                reorder_point = ?, standard_cost = ?, manager_user_id = ?, 
                 supplier_code = ?, supplier_name = ?, lead_time_days = ?, storage_location = ?, 
                 description = ?, specifications = ?, notes = ?, is_critical = ?, updated_at = NOW()
                 WHERE id = ?";
@@ -294,7 +284,7 @@ function handleUpdate() {
         $params = [
             $data['item_code'], $data['item_name'], $data['category'], $data['unit'],
             $data['min_stock'], $data['max_stock'], $data['reorder_point'], $data['standard_cost'],
-            $data['manager_user_id'], $data['backup_manager_user_id'], $data['supplier_code'], $data['supplier_name'],
+            $data['manager_user_id'], $data['supplier_code'], $data['supplier_name'],
             $data['lead_time_days'], $data['storage_location'], $data['description'], $data['specifications'],
             $data['notes'], $data['is_critical'], $id
         ];

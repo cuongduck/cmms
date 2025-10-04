@@ -17,7 +17,7 @@ class Auth {
     /**
      * Đăng nhập user
      */
-    public function login($username, $password) {
+    public function login($username, $password, $remember = false) {
         try {
             $sql = "SELECT id, username, password, full_name, email, role, status 
                    FROM users WHERE username = ? AND status = 'active'";
@@ -35,6 +35,28 @@ class Auth {
             // Khởi tạo session
             $this->startSession($user);
             
+            // XỬ LÝ GHI NHỚ MẬT KHẨU
+            if ($remember) {
+                $token = bin2hex(random_bytes(32));
+                $hashedToken = hash('sha256', $token);
+                $expiry = time() + (30 * 24 * 60 * 60); // 30 ngày
+                
+                // Lưu token vào DB
+                $sqlToken = "INSERT INTO remember_tokens (user_id, token, expires_at) 
+                            VALUES (?, ?, FROM_UNIXTIME(?))
+                            ON DUPLICATE KEY UPDATE token = VALUES(token), expires_at = VALUES(expires_at)";
+                $this->db->execute($sqlToken, [$user['id'], $hashedToken, $expiry]);
+                
+                // Set cookie
+                setcookie('remember_token', $token, [
+                    'expires' => $expiry,
+                    'path' => '/',
+                    'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
+            }
+            
             // Cập nhật thời gian đăng nhập cuối
             $this->updateLastLogin($user['id']);
             
@@ -46,6 +68,74 @@ class Auth {
     }
     
     /**
+     * Kiểm tra và tự động đăng nhập từ cookie
+     */
+    public function checkRememberToken() {
+        // Nếu đã login rồi thì không cần check
+        if ($this->isLoggedIn()) {
+            return true;
+        }
+        
+        // Kiểm tra cookie remember_token
+        if (!isset($_COOKIE['remember_token'])) {
+            return false;
+        }
+        
+        try {
+            $token = $_COOKIE['remember_token'];
+            $hashedToken = hash('sha256', $token);
+            
+            // Tìm token trong DB
+            $sql = "SELECT rt.*, u.id, u.username, u.full_name, u.email, u.role, u.status
+                   FROM remember_tokens rt
+                   JOIN users u ON rt.user_id = u.id
+                   WHERE rt.token = ? AND rt.expires_at > NOW() AND u.status = 'active'";
+            
+            $result = $this->db->fetch($sql, [$hashedToken]);
+            
+            if (!$result) {
+                // Token không hợp lệ, xóa cookie
+                $this->clearRememberCookie();
+                return false;
+            }
+            
+            // Token hợp lệ, tạo session
+            $user = [
+                'id' => $result['id'],
+                'username' => $result['username'],
+                'full_name' => $result['full_name'],
+                'email' => $result['email'],
+                'role' => $result['role']
+            ];
+            
+            $this->startSession($user);
+            $this->updateLastLogin($user['id']);
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log("Remember token error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Xóa remember cookie
+     */
+    private function clearRememberCookie() {
+        if (isset($_COOKIE['remember_token'])) {
+            setcookie('remember_token', '', [
+                'expires' => time() - 3600,
+                'path' => '/',
+                'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+            unset($_COOKIE['remember_token']);
+        }
+    }
+    
+    /**
      * Đăng xuất
      */
     public function logout() {
@@ -53,6 +143,20 @@ class Auth {
             session_start();
         }
         
+        // Xóa remember token trong DB nếu có
+        if (isset($_SESSION['user_id'])) {
+            try {
+                $sql = "DELETE FROM remember_tokens WHERE user_id = ?";
+                $this->db->execute($sql, [$_SESSION['user_id']]);
+            } catch (Exception $e) {
+                error_log("Error deleting remember token: " . $e->getMessage());
+            }
+        }
+        
+        // Xóa cookie
+        $this->clearRememberCookie();
+        
+        // Xóa session
         $_SESSION = [];
         session_destroy();
         
@@ -293,7 +397,6 @@ class Auth {
      * Ghi log đăng nhập thất bại
      */
     private function logFailedLogin($username) {
-        // Có thể implement log vào file hoặc database
         error_log("Failed login attempt for username: $username from IP: " . $_SERVER['REMOTE_ADDR']);
     }
     

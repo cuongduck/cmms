@@ -386,3 +386,60 @@ window.reclassifyPart = function(partId) {
 window.autoDetectCategory = function(itemName, callback) {
     return CMMS.SpareParts.autoDetectCategory(itemName, callback);
 };
+/**
+ * Delete spare part
+ */
+function deleteSparePart(id, itemCode) {
+    if (!confirm(`Xóa spare part: ${itemCode}?`)) {
+        return false;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'delete');
+    formData.append('id', id);
+    
+    // Tìm row cần xóa
+    const row = event.target.closest('tr');
+    
+    fetch('api/spare_parts.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Nếu ở trang view, chuyển về index
+            if (window.location.pathname.includes('view.php')) {
+                window.location.href = 'index.php';
+                return;
+            }
+            
+            // Nếu ở trang index, xóa row khỏi table
+            if (row) {
+                row.style.opacity = '0';
+                row.style.transition = 'opacity 0.5s';
+                setTimeout(() => {
+                    row.remove();
+                    CMMS.showToast('Đã xóa thành công', 'success');
+                    
+                    // Check nếu không còn row nào, reload trang
+                    const tbody = document.querySelector('tbody');
+                    if (!tbody || tbody.querySelectorAll('tr').length === 0) {
+                        window.location.reload();
+                    }
+                }, 500);
+            } else {
+                // Fallback: reload trang
+                window.location.reload();
+            }
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Có lỗi xảy ra');
+    });
+    
+    return false;
+}

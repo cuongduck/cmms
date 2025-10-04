@@ -150,7 +150,6 @@ function getSpareParts($filters = []) {
                    COALESCE(oh.OH_Value, 0) as stock_value,
                    COALESCE(oh.Price, sp.standard_cost) as current_price,
                    u1.full_name as manager_name,
-                   u2.full_name as backup_manager_name,
                    CASE 
                        WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point THEN 'Reorder'
                        WHEN COALESCE(oh.Onhand, 0) < sp.min_stock THEN 'Low'
@@ -164,7 +163,6 @@ function getSpareParts($filters = []) {
             FROM spare_parts sp
             LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
             LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-            LEFT JOIN users u2 ON sp.backup_manager_user_id = u2.id
             WHERE sp.is_active = 1";
     
     $params = [];
@@ -175,8 +173,8 @@ function getSpareParts($filters = []) {
     }
     
     if (!empty($filters['manager'])) {
-        $sql .= " AND (sp.manager_user_id = ? OR sp.backup_manager_user_id = ?)";
-        $params = array_merge($params, [$filters['manager'], $filters['manager']]);
+        $sql .= " AND sp.manager_user_id = ?";
+        $params[] = $filters['manager'];
     }
     
     if (!empty($filters['stock_status'])) {
@@ -228,7 +226,15 @@ function getReorderList() {
     
     return $db->fetchAll($sql);
 }
-
+/**
+ * Format VND currency
+ */
+function formatVND($amount) {
+    if ($amount === null || $amount === '') {
+        return '0 VNĐ';
+    }
+    return number_format(floatval($amount), 0, ',', '.') . ' VNĐ';
+}
 /**
  * Tạo mã đề xuất mua hàng
  */

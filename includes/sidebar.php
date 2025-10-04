@@ -90,6 +90,12 @@ $currentUser = getCurrentUser();
                     Đề xuất mua hàng
                 </a>
             </li>
+                        <li class="nav-item">
+                <a class="nav-link py-2" href="/modules/item_mmb/index.php">
+                    <i class="fas fa-shopping-cart"></i>
+                    Item MMB
+                </a>
+            </li>
             <li class="nav-item">
                 <a class="nav-link py-2" href="/modules/spare_parts/reports/stock_shortage.php">
                     <i class="fas fa-exclamation-triangle"></i>

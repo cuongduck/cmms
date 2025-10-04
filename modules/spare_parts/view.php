@@ -22,7 +22,6 @@ $sql = "SELECT sp.*,
                COALESCE(oh.OH_Value, 0) as stock_value,
                COALESCE(oh.Price, sp.standard_cost) as current_price,
                u1.full_name as manager_name,
-               u2.full_name as backup_manager_name,
                CASE 
                    WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point THEN 'Reorder'
                    WHEN COALESCE(oh.Onhand, 0) < sp.min_stock THEN 'Low'
@@ -36,7 +35,6 @@ $sql = "SELECT sp.*,
         FROM spare_parts sp
         LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
         LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-        LEFT JOIN users u2 ON sp.backup_manager_user_id = u2.id
         WHERE sp.id = ? AND sp.is_active = 1";
 
 $part = $db->fetch($sql, [$id]);
@@ -61,6 +59,12 @@ if (hasPermission('spare_parts', 'edit')) {
     $pageActions .= '<a href="edit.php?id=' . $id . '" class="btn btn-warning">
         <i class="fas fa-edit me-2"></i>Chỉnh sửa
     </a> ';
+}
+
+if (hasPermission('spare_parts', 'delete')) {
+    $pageActions .= '<button onclick="deleteSparePart(' . $id . ', \'' . htmlspecialchars($part['item_code']) . '\')" class="btn btn-danger">
+        <i class="fas fa-trash me-2"></i>Xóa
+    </button> ';
 }
 
 $pageActions .= '<div class="btn-group">
@@ -249,18 +253,14 @@ $purchaseRequests = $db->fetchAll(
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-6">
-                        <h6>Người quản lý</h6>
-                        <?php if ($part['manager_name']): ?>
-                            <p><strong>Chính:</strong> <?php echo htmlspecialchars($part['manager_name']); ?></p>
-                        <?php endif; ?>
-                        <?php if ($part['backup_manager_name']): ?>
-                            <p><strong>Dự phòng:</strong> <?php echo htmlspecialchars($part['backup_manager_name']); ?></p>
-                        <?php endif; ?>
-                        <?php if (!$part['manager_name'] && !$part['backup_manager_name']): ?>
-                            <p class="text-muted">Chưa được phân công</p>
-                        <?php endif; ?>
-                    </div>
+             <div class="col-md-6">
+    <h6>Người quản lý</h6>
+    <?php if ($part['manager_name']): ?>
+        <p><strong><?php echo htmlspecialchars($part['manager_name']); ?></strong></p>
+    <?php else: ?>
+        <p class="text-muted">Chưa được phân công</p>
+    <?php endif; ?>
+</div>
                     
                     <div class="col-md-6">
                         <h6>Nhà cung cấp chính</h6>

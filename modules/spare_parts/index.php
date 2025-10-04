@@ -6,7 +6,7 @@
 
 $pageTitle = 'Quản lý Spare Parts';
 $currentModule = 'spare_parts';
-$moduleCSS = 'bom'; // Tái sử dụng CSS của BOM
+$moduleCSS = 'bom';
 $moduleJS = 'spare-parts';
 require_once 'config.php';
 
@@ -60,7 +60,39 @@ $stats = [
 
 // Get categories và managers for filters
 $categories = $db->fetchAll("SELECT DISTINCT category FROM spare_parts WHERE category IS NOT NULL ORDER BY category");
-$managers = $db->fetchAll("SELECT DISTINCT u.id, u.full_name FROM users u JOIN spare_parts sp ON (u.id = sp.manager_user_id OR u.id = sp.backup_manager_user_id) ORDER BY u.full_name");
+$managers = $db->fetchAll("
+    SELECT DISTINCT u.id, u.full_name 
+    FROM users u 
+    JOIN spare_parts sp ON u.id = sp.manager_user_id 
+    WHERE sp.is_active = 1
+    ORDER BY u.full_name
+");
+
+// Helper function để lấy badge class cho category
+function getCategoryBadgeClass($category) {
+    $categoryClasses = [
+        'Biến tần' => 'bg-primary',
+        'Servo' => 'bg-info',
+        'Vật tư điện' => 'bg-warning text-dark',
+        'PLC' => 'bg-success',
+        'Van điện từ' => 'bg-danger',
+        'Băng tải' => 'bg-secondary',
+        'Dao lược' => 'bg-dark',
+        'Điện trở' => 'bg-light text-dark',
+        'Dây belt' => 'bg-primary',
+        'Bạc đạn' => 'bg-info',
+        'Ống' => 'bg-warning text-dark',
+        'Xilanh' => 'bg-success',
+        'Cảm biến' => 'bg-danger',
+        'Motor' => 'bg-secondary',
+        'Dao thớt' => 'bg-dark',
+        'Nhông xích' => 'bg-primary',
+        'Đồng hồ' => 'bg-info',
+        'Vật tư khác' => 'bg-secondary'
+    ];
+    
+    return $categoryClasses[$category] ?? 'bg-secondary';
+}
 ?>
 
 <!-- Statistics Cards -->
@@ -184,7 +216,9 @@ $managers = $db->fetchAll("SELECT DISTINCT u.id, u.full_name FROM users u JOIN s
             <i class="fas fa-cubes me-2"></i>
             Danh sách Spare Parts
         </h5>
-        <?php echo $pageActions; ?>
+        <div>
+            <?php echo $pageActions; ?>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -227,20 +261,21 @@ $managers = $db->fetchAll("SELECT DISTINCT u.id, u.full_name FROM users u JOIN s
                             <small class="d-block text-muted"><?php echo htmlspecialchars(substr($part['description'], 0, 50)); ?>...</small>
                             <?php endif; ?>
                         </td>
-<td>
-    <div class="d-flex align-items-center gap-2">
-        <span class="badge <?php echo getCategoryBadgeClass($part['category']); ?>">
-            <?php echo htmlspecialchars($part['category'] ?? 'Vật tư khác'); ?>
-        </span>
-        <?php if ($part['category'] === 'Vật tư khác'): ?>
-            <button onclick="reclassifyPart(<?php echo $part['id']; ?>)" 
-                    class="btn btn-sm btn-outline-secondary" 
-                    title="Phân loại lại">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-        <?php endif; ?>
-    </div>
-</td>                        <td class="text-center">
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge <?php echo getCategoryBadgeClass($part['category']); ?>">
+                                    <?php echo htmlspecialchars($part['category'] ?? 'Vật tư khác'); ?>
+                                </span>
+                                <?php if ($part['category'] === 'Vật tư khác'): ?>
+                                    <button onclick="reclassifyPart(<?php echo $part['id']; ?>)" 
+                                            class="btn btn-sm btn-outline-secondary" 
+                                            title="Phân loại lại">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="text-center">
                             <strong><?php echo number_format($part['current_stock'], 2); ?></strong>
                             <small class="d-block text-muted"><?php echo htmlspecialchars($part['stock_unit']); ?></small>
                         </td>
@@ -263,17 +298,23 @@ $managers = $db->fetchAll("SELECT DISTINCT u.id, u.full_name FROM users u JOIN s
                             <?php endif; ?>
                         </td>
                         <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="view.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <?php if (hasPermission('spare_parts', 'edit')): ?>
-                                <a href="edit.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-warning btn-sm">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <?php endif; ?>
-                            </div>
-                        </td>
+    <div class="btn-group btn-group-sm">
+        <a href="view.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
+            <i class="fas fa-eye"></i>
+        </a>
+        <?php if (hasPermission('spare_parts', 'edit')): ?>
+        <a href="edit.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-warning btn-sm" title="Chỉnh sửa">
+            <i class="fas fa-edit"></i>
+        </a>
+        <?php endif; ?>
+        <?php if (hasPermission('spare_parts', 'delete')): ?>
+        <button onclick="deleteSparePart(<?php echo $part['id']; ?>, '<?php echo htmlspecialchars($part['item_code']); ?>')" 
+                class="btn btn-outline-danger btn-sm" title="Xóa">
+            <i class="fas fa-trash"></i>
+        </button>
+        <?php endif; ?>
+    </div>
+</td>
                     </tr>
                     <?php endforeach; ?>
                     <?php endif; ?>

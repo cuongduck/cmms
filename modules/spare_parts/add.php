@@ -38,60 +38,52 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                         Thông tin cơ bản
                     </h5>
                     
-<!-- Thay thế section category trong add.php -->
-<div class="row">
-    <div class="col-md-4 mb-3">
-        <label for="item_code" class="form-label">
-            Mã vật tư <span class="text-danger">*</span>
-        </label>
-        <input type="text" id="item_code" name="item_code" class="form-control" required
-               placeholder="VD: SP001" style="text-transform: uppercase;">
-        <div class="invalid-feedback">
-            Vui lòng nhập mã vật tư
-        </div>
-        <div class="form-text">
-            Mã phải khớp với ItemCode trong bảng onhand
-        </div>
-    </div>
-    
-    <div class="col-md-8 mb-3">
-        <label for="item_name" class="form-label">
-            Tên vật tư <span class="text-danger">*</span>
-        </label>
-        <input type="text" id="item_name" name="item_name" class="form-control" required
-               placeholder="Nhập tên vật tư...">
-        <div class="invalid-feedback">
-            Vui lòng nhập tên vật tư
-        </div>
-    </div>
-</div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="item_code" class="form-label">
+                                Mã vật tư <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="item_code" name="item_code" class="form-control" required
+                                   placeholder="VD: SP001" style="text-transform: uppercase;" autocomplete="off">
+                            <div class="invalid-feedback">
+                                Vui lòng nhập mã vật tư
+                            </div>
+                            <div id="item_code_suggestions" class="list-group position-absolute" style="z-index: 1000; max-height: 200px; overflow-y: auto; display: none;"></div>
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="item_name" class="form-label">
+                                Tên vật tư <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="item_name" name="item_name" class="form-control" required readonly
+                                   placeholder="Tên sẽ tự động load..." style="background-color: #e9ecef;">
+                            <div class="invalid-feedback">
+                                Vui lòng nhập tên vật tư
+                            </div>
+                        </div>
+                    </div>
 
-<!-- Hiển thị category được phân loại tự động -->
-<div class="row">
-    <div class="col-md-6 mb-3">
-        <label class="form-label">Danh mục (tự động phân loại)</label>
-        <div class="form-control bg-light" id="auto_category_display" style="min-height: 38px;">
-            <span class="text-muted">Nhập tên vật tư để tự động phân loại</span>
-        </div>
-        <input type="hidden" id="category" name="category" value="">
-        <div id="category_confidence" class="form-text"></div>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <label for="unit" class="form-label">Đơn vị tính</label>
-        <select id="unit" name="unit" class="form-select">
-            <?php foreach ($units as $unit): ?>
-                <option value="<?php echo $unit; ?>"><?php echo $unit; ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <label for="standard_cost" class="form-label">Giá chuẩn (VNĐ)</label>
-        <input type="number" id="standard_cost" name="standard_cost" class="form-control" 
-               min="0" step="0.01" placeholder="0">
-    </div>
-</div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Danh mục (tự động phân loại)</label>
+                            <div class="form-control bg-light" id="auto_category_display" style="min-height: 38px;">
+                                <span class="text-muted">Nhập mã vật tư để tự động phân loại</span>
+                            </div>
+                            <input type="hidden" id="category" name="category" value="">
+                            <div id="category_confidence" class="form-text"></div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="unit" class="form-label">Đơn vị tính</label>
+                            <input type="text" id="unit" name="unit" class="form-control" readonly style="background-color: #e9ecef;">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="standard_cost" class="form-label">Giá (VNĐ)</label>
+                            <input type="number" id="standard_cost" name="standard_cost" class="form-control" 
+                                   min="0" step="0.01" readonly style="background-color: #e9ecef;">
+                        </div>
+                    </div>
                     
                     <div class="mb-3">
                         <label for="description" class="form-label">Mô tả</label>
@@ -117,7 +109,7 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                         <div class="col-md-4 mb-3">
                             <label for="min_stock" class="form-label">Mức tồn tối thiểu <span class="text-danger">*</span></label>
                             <input type="number" id="min_stock" name="min_stock" class="form-control" 
-                                   min="0" step="0.1" placeholder="0" required>
+                                   min="0" step="1" placeholder="0" required>
                             <div class="invalid-feedback">
                                 Vui lòng nhập mức tồn tối thiểu
                             </div>
@@ -126,13 +118,13 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                         <div class="col-md-4 mb-3">
                             <label for="max_stock" class="form-label">Mức tồn tối đa</label>
                             <input type="number" id="max_stock" name="max_stock" class="form-control" 
-                                   min="0" step="0.1" placeholder="0">
+                                   min="0" step="1" placeholder="0">
                         </div>
                         
                         <div class="col-md-4 mb-3">
                             <label for="reorder_point" class="form-label">Điểm đặt hàng lại</label>
                             <input type="number" id="reorder_point" name="reorder_point" class="form-control" 
-                                   min="0" step="0.1" placeholder="0">
+                                   min="0" step="1" placeholder="0">
                             <div class="form-text">Tự động = min_stock nếu để trống</div>
                         </div>
                     </div>
@@ -162,48 +154,37 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                 </div>
                 
                 <!-- Management & Supplier -->
-                <div class="form-section">
-                    <h5 class="form-section-title">
-                        <i class="fas fa-users"></i>
-                        Quản lý & Nhà cung cấp
-                    </h5>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="manager_user_id" class="form-label">Người quản lý chính</label>
-                            <select id="manager_user_id" name="manager_user_id" class="form-select">
-                                <option value="">-- Chọn người quản lý --</option>
-                                <?php foreach ($users as $user): ?>
-                                    <option value="<?php echo $user['id']; ?>"><?php echo htmlspecialchars($user['full_name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="backup_manager_user_id" class="form-label">Người quản lý dự phòng</label>
-                            <select id="backup_manager_user_id" name="backup_manager_user_id" class="form-select">
-                                <option value="">-- Chọn người dự phòng --</option>
-                                <?php foreach ($users as $user): ?>
-                                    <option value="<?php echo $user['id']; ?>"><?php echo htmlspecialchars($user['full_name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
-                            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
-                                   placeholder="Mã NCC">
-                        </div>
-                        
-                        <div class="col-md-8 mb-3">
-                            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
-                            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
-                                   placeholder="Tên NCC">
-                        </div>
-                    </div>
-                </div>
+<div class="form-section">
+    <h5 class="form-section-title">
+        <i class="fas fa-users"></i>
+        Quản lý & Nhà cung cấp
+    </h5>
+    
+    <div class="row">
+        <div class="col-md-12 mb-3">
+            <label for="manager_user_id" class="form-label">Người quản lý</label>
+            <input type="text" class="form-control" readonly 
+                   value="<?php echo htmlspecialchars(getCurrentUser()['full_name']); ?>" 
+                   style="background-color: #e9ecef;">
+            <input type="hidden" id="manager_user_id" name="manager_user_id" 
+                   value="<?php echo getCurrentUser()['id']; ?>">
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
+            <input type="text" id="supplier_code" name="supplier_code" class="form-control" readonly
+                   style="background-color: #e9ecef;">
+        </div>
+        
+        <div class="col-md-8 mb-3">
+            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
+            <input type="text" id="supplier_name" name="supplier_name" class="form-control" readonly
+                   style="background-color: #e9ecef;">
+        </div>
+    </div>
+</div>
                 
                 <!-- Notes -->
                 <div class="form-section">
@@ -246,7 +227,7 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                     <div id="sparePartPreview">
                         <div class="text-muted text-center">
                             <i class="fas fa-cube fa-3x mb-2"></i>
-                            <p>Nhập thông tin để xem trước</p>
+                            <p>Nhập mã vật tư để xem trước</p>
                         </div>
                     </div>
                 </div>
@@ -274,22 +255,142 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
 </form>
 
 <script>
-// Auto-fill reorder point
-document.getElementById('min_stock').addEventListener('input', function() {
-    const reorderPoint = document.getElementById('reorder_point');
-    if (!reorderPoint.value) {
-        reorderPoint.value = this.value;
+// Auto-complete và load dữ liệu từ item_mmb
+let searchTimeout;
+document.getElementById('item_code').addEventListener('input', function() {
+    const itemCode = this.value.trim().toUpperCase();
+    this.value = itemCode;
+    
+    clearTimeout(searchTimeout);
+    
+    if (itemCode.length < 2) {
+        document.getElementById('item_code_suggestions').style.display = 'none';
+        return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+        searchItemMMB(itemCode);
+    }, 300);
+});
+
+function searchItemMMB(itemCode) {
+    CMMS.ajax({
+        url: 'api/spare_parts.php?action=search_item_mmb&item_code=' + encodeURIComponent(itemCode),
+        method: 'GET',
+        success: (data) => {
+            if (data.success && data.data && data.data.length > 0) {
+                displaySuggestions(data.data);
+            } else {
+                document.getElementById('item_code_suggestions').style.display = 'none';
+            }
+        }
+    });
+}
+
+function displaySuggestions(items) {
+    const suggestionsDiv = document.getElementById('item_code_suggestions');
+    suggestionsDiv.innerHTML = '';
+    
+    items.forEach(item => {
+        const div = document.createElement('a');
+        div.href = '#';
+        div.className = 'list-group-item list-group-item-action';
+        div.innerHTML = `
+            <strong>${item.ITEM_CODE}</strong><br>
+            <small>${item.ITEM_NAME}</small>
+        `;
+        div.onclick = (e) => {
+            e.preventDefault();
+            selectItem(item);
+        };
+        suggestionsDiv.appendChild(div);
+    });
+    
+    suggestionsDiv.style.display = 'block';
+}
+
+function selectItem(item) {
+    // Fill form fields
+    document.getElementById('item_code').value = item.ITEM_CODE;
+    document.getElementById('item_name').value = item.ITEM_NAME;
+    document.getElementById('unit').value = item.UOM || 'Cái';
+    document.getElementById('standard_cost').value = item.UNIT_PRICE || 0;
+    document.getElementById('supplier_code').value = item.VENDOR_ID || '';
+    document.getElementById('supplier_name').value = item.VENDOR_NAME || '';
+    
+    // Auto detect category
+    autoDetectAndDisplayCategory(item.ITEM_NAME);
+    
+    // Check stock
+    checkStock(item.ITEM_CODE);
+    
+    // Hide suggestions
+    document.getElementById('item_code_suggestions').style.display = 'none';
+    
+    // Update preview
+    updatePreview();
+    
+    // Focus on min_stock
+    document.getElementById('min_stock').focus();
+}
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#item_code') && !e.target.closest('#item_code_suggestions')) {
+        document.getElementById('item_code_suggestions').style.display = 'none';
     }
 });
 
-// Check stock when item_code changes
-document.getElementById('item_code').addEventListener('blur', function() {
-    checkStock(this.value);
-});
+// Auto-categorization khi nhập tên vật tư
+function autoDetectAndDisplayCategory(itemName) {
+    if (!itemName || itemName.length < 3) {
+        document.getElementById('auto_category_display').innerHTML = '<span class="text-muted">Nhập tên vật tư để tự động phân loại</span>';
+        return;
+    }
+    
+    document.getElementById('auto_category_display').innerHTML = '<span class="text-info"><i class="fas fa-spinner fa-spin me-1"></i>Đang phân loại...</span>';
+    
+    CMMS.ajax({
+        url: 'api/spare_parts.php?action=detect_category&item_name=' + encodeURIComponent(itemName),
+        method: 'GET',
+        success: (data) => {
+            if (data.success && data.data.category) {
+                displayDetectedCategory(data.data);
+            } else {
+                displayDefaultCategory();
+            }
+        },
+        error: () => {
+            displayDefaultCategory();
+        }
+    });
+}
+
+function displayDetectedCategory(categoryData) {
+    const category = categoryData.category;
+    const confidence = categoryData.confidence;
+    
+    document.getElementById('category').value = category;
+    
+    let confidenceClass = confidence >= 70 ? 'success' : confidence >= 40 ? 'warning' : 'danger';
+    
+    document.getElementById('auto_category_display').innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="badge bg-${confidenceClass} fs-6">${category}</span>
+            <small class="text-${confidenceClass}">${confidence}% tin cậy</small>
+        </div>
+    `;
+    
+    document.getElementById('category_confidence').innerHTML = 
+        `<i class="fas fa-info-circle me-1"></i>Độ tin cậy: <strong>${confidence}%</strong>`;
+}
+
+function displayDefaultCategory() {
+    document.getElementById('auto_category_display').innerHTML = '<span class="badge bg-secondary">Vật tư khác</span>';
+    document.getElementById('category').value = 'Vật tư khác';
+}
 
 // Update preview
-document.addEventListener('input', updatePreview);
-
 function updatePreview() {
     const itemCode = document.getElementById('item_code').value;
     const itemName = document.getElementById('item_name').value;
@@ -304,7 +405,7 @@ function updatePreview() {
         preview.innerHTML = `
             <div class="text-muted text-center">
                 <i class="fas fa-cube fa-3x mb-2"></i>
-                <p>Nhập thông tin để xem trước</p>
+                <p>Nhập mã vật tư để xem trước</p>
             </div>
         `;
         return;
@@ -338,15 +439,7 @@ function updatePreview() {
 }
 
 function checkStock(itemCode) {
-    if (!itemCode) {
-        document.getElementById('stockCheckResult').innerHTML = `
-            <div class="text-muted text-center">
-                <i class="fas fa-search fa-2x mb-2"></i>
-                <p>Nhập mã vật tư để kiểm tra tồn kho</p>
-            </div>
-        `;
-        return;
-    }
+    if (!itemCode) return;
     
     CMMS.ajax({
         url: 'api/spare_parts.php?action=check_stock&item_code=' + encodeURIComponent(itemCode),
@@ -382,6 +475,18 @@ function checkStock(itemCode) {
     });
 }
 
+// Auto-fill reorder point
+document.getElementById('min_stock').addEventListener('input', function() {
+    const reorderPoint = document.getElementById('reorder_point');
+    if (!reorderPoint.value) {
+        reorderPoint.value = this.value;
+    }
+    updatePreview();
+});
+
+// Event listeners
+document.addEventListener('input', updatePreview);
+
 function saveAndAddNew() {
     const form = document.getElementById('sparePartsForm');
     const input = document.createElement('input');
@@ -389,7 +494,6 @@ function saveAndAddNew() {
     input.name = 'save_and_new';
     input.value = '1';
     form.appendChild(input);
-    
     submitForm();
 }
 
@@ -427,7 +531,6 @@ function submitForm() {
     });
 }
 
-// Form submit handler
 document.getElementById('sparePartsForm').addEventListener('submit', function(e) {
     e.preventDefault();
     submitForm();
@@ -440,148 +543,6 @@ function formatVND(amount) {
         minimumFractionDigits: 0
     }).format(amount);
 }
-
-// Event listener cho auto-categorization khi nhập tên vật tư
-document.getElementById('item_name').addEventListener('input', CMMS.utils.debounce(function() {
-    autoDetectAndDisplayCategory(this.value);
-}, 500));
-
-// Function chính để detect và hiển thị category
-function autoDetectAndDisplayCategory(itemName) {
-    const categoryDisplay = document.getElementById('auto_category_display');
-    const categoryInput = document.getElementById('category');
-    const confidenceDiv = document.getElementById('category_confidence');
-    
-    // Nếu tên quá ngắn hoặc rỗng
-    if (!itemName || itemName.length < 3) {
-        categoryDisplay.innerHTML = '<span class="text-muted">Nhập tên vật tư để tự động phân loại</span>';
-        categoryInput.value = '';
-        confidenceDiv.innerHTML = '';
-        return;
-    }
-    
-    // Hiển thị loading state
-    categoryDisplay.innerHTML = '<span class="text-info"><i class="fas fa-spinner fa-spin me-1"></i>Đang phân loại...</span>';
-    confidenceDiv.innerHTML = '';
-    
-    // Gọi API để detect category
-    CMMS.ajax({
-        url: 'api/spare_parts.php?action=detect_category&item_name=' + encodeURIComponent(itemName),
-        method: 'GET',
-        success: (data) => {
-            if (data.success && data.data.category) {
-                displayDetectedCategory(data.data);
-            } else {
-                displayDefaultCategory();
-            }
-        },
-        error: () => {
-            displayErrorCategory();
-        }
-    });
-}
-
-// Function hiển thị category đã detect được
-function displayDetectedCategory(categoryData) {
-    const category = categoryData.category;
-    const confidence = categoryData.confidence;
-    const suggestions = categoryData.suggestions || [];
-    
-    const categoryDisplay = document.getElementById('auto_category_display');
-    const categoryInput = document.getElementById('category');
-    const confidenceDiv = document.getElementById('category_confidence');
-    
-    // Cập nhật hidden input
-    categoryInput.value = category;
-    
-    // Xác định màu sắc dựa trên confidence
-    let confidenceClass = 'success';
-    let confidenceIcon = 'check-circle';
-    
-    if (confidence < 70) {
-        confidenceClass = 'warning';
-        confidenceIcon = 'exclamation-triangle';
-    }
-    if (confidence < 40) {
-        confidenceClass = 'danger';
-        confidenceIcon = 'exclamation-circle';
-    }
-    
-    // Hiển thị category với confidence
-    categoryDisplay.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <span class="badge bg-${confidenceClass} fs-6">
-                <i class="fas fa-${confidenceIcon} me-1"></i>${category}
-            </span>
-            <small class="text-${confidenceClass} fw-bold">${confidence}% tin cậy</small>
-        </div>
-    `;
-    
-    // Hiển thị thông tin chi tiết
-    let confidenceInfo = `<i class="fas fa-info-circle me-1"></i>Độ tin cậy: <strong>${confidence}%</strong>`;
-    
-    if (suggestions.length > 1) {
-        confidenceInfo += ` | Gợi ý khác: <em>${suggestions.slice(1, 3).join(', ')}</em>`;
-    }
-    
-    // Thêm gợi ý cải thiện nếu confidence thấp
-    if (confidence < 50) {
-        confidenceInfo += ' | <span class="text-warning">Nên kiểm tra lại hoặc bổ sung từ khóa</span>';
-    }
-    
-    confidenceDiv.innerHTML = confidenceInfo;
-    
-    // Trigger preview update nếu có
-    if (typeof updatePreview === 'function') {
-        updatePreview();
-    }
-    
-    // Hiệu ứng nhấp nháy nhẹ để thu hút chú ý
-    categoryDisplay.style.animation = 'pulse 0.5s ease-in-out';
-    setTimeout(() => {
-        categoryDisplay.style.animation = '';
-    }, 500);
-}
-
-// Function hiển thị category mặc định
-function displayDefaultCategory() {
-    const categoryDisplay = document.getElementById('auto_category_display');
-    const categoryInput = document.getElementById('category');
-    const confidenceDiv = document.getElementById('category_confidence');
-    
-    categoryDisplay.innerHTML = '<span class="badge bg-secondary">Vật tư khác</span>';
-    categoryInput.value = 'Vật tư khác';
-    confidenceDiv.innerHTML = '<i class="fas fa-info-circle me-1"></i>Không tìm thấy danh mục phù hợp';
-}
-
-// Function hiển thị lỗi
-function displayErrorCategory() {
-    const categoryDisplay = document.getElementById('auto_category_display');
-    const confidenceDiv = document.getElementById('category_confidence');
-    
-    categoryDisplay.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Lỗi phân loại</span>';
-    confidenceDiv.innerHTML = '<span class="text-danger">Có lỗi xảy ra khi phân loại. Vui lòng thử lại.</span>';
-}
-
-// Cập nhật function updatePreview để sử dụng auto category
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND',
-        minimumFractionDigits: 0
-    }).format(amount);
-}
-
-// CSS animation cho pulse effect
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-`;
-document.head.appendChild(style);
 
 // Focus on first input
 document.getElementById('item_code').focus();
