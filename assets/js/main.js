@@ -17,35 +17,43 @@ Object.assign(window.CMMS, {
         return div.innerHTML;
     },    
     // Show toast notification
-    showToast: function(message, type = 'info') {
-        const toast = document.getElementById('liveToast');
-        const toastBody = toast.querySelector('.toast-body');
-        const toastHeader = toast.querySelector('.toast-header');
-        const icon = toastHeader.querySelector('i');
-        
-        // Update content
+    // Show toast notification
+showToast: function(message, type = 'info') {
+    const toast = document.getElementById('liveToast');
+    const toastBody = toast.querySelector('.toast-body');
+    const toastHeader = toast.querySelector('.toast-header');
+    const icon = toastHeader.querySelector('i');
+    
+    // Update content - cho phép HTML
+    if (typeof message === 'string' && message.includes('<')) {
+        toastBody.innerHTML = message;
+    } else {
         toastBody.textContent = message;
-        
-        // Update icon and color based on type
-        icon.className = 'me-2';
-        switch(type) {
-            case 'success':
-                icon.classList.add('fas', 'fa-check-circle', 'text-success');
-                break;
-            case 'error':
-                icon.classList.add('fas', 'fa-exclamation-circle', 'text-danger');
-                break;
-            case 'warning':
-                icon.classList.add('fas', 'fa-exclamation-triangle', 'text-warning');
-                break;
-            default:
-                icon.classList.add('fas', 'fa-info-circle', 'text-primary');
-        }
-        
-        // Show toast
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    },
+    }
+    
+    // Update icon and color based on type
+    icon.className = 'me-2';
+    switch(type) {
+        case 'success':
+            icon.classList.add('fas', 'fa-check-circle', 'text-success');
+            break;
+        case 'error':
+            icon.classList.add('fas', 'fa-exclamation-circle', 'text-danger');
+            break;
+        case 'warning':
+            icon.classList.add('fas', 'fa-exclamation-triangle', 'text-warning');
+            break;
+        default:
+            icon.classList.add('fas', 'fa-info-circle', 'text-primary');
+    }
+    
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast, {
+        delay: type === 'error' ? 5000 : 3000 // Lỗi hiển thị lâu hơn
+    });
+    bsToast.show();
+},
+
     
     // Show loading overlay
     showLoading: function() {
@@ -65,6 +73,7 @@ Object.assign(window.CMMS, {
     },
     
     // AJAX helper
+// AJAX helper
 ajax: function(options) {
     const defaults = {
         method: 'POST',
@@ -84,27 +93,60 @@ ajax: function(options) {
     this.showLoading();
     
     fetch(options.url, options)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+        .then(async response => {
+            // Parse JSON trước khi check status
+            let data;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                data = await response.text();
             }
-            return response.json();
+            
+            this.hideLoading();
+            
+            // Nếu response không OK (4xx, 5xx)
+            if (!response.ok) {
+                // Throw error với data đi kèm
+                const error = new Error(`HTTP error! Status: ${response.status}`);
+                error.status = response.status;
+                error.data = data;
+                throw error;
+            }
+            
+            return data;
         })
         .then(data => {
-            this.hideLoading();
+            // Success callback
             if (options.success) {
                 options.success(data);
             }
         })
         .catch(error => {
             this.hideLoading();
+            
             console.error('Ajax error:', error, 'URL:', options.url);
-            this.showToast(`Có lỗi xảy ra: ${error.message}`, 'error');
+            
+            // Nếu có error callback, gọi nó với error và data
             if (options.error) {
-                options.error(error);
+                options.error(error, error.data);
+            } else {
+                // Hiển thị thông báo lỗi mặc định
+                let errorMessage = 'Có lỗi xảy ra';
+                
+                // Nếu có JSON response với message
+                if (error.data && typeof error.data === 'object' && error.data.message) {
+                    errorMessage = error.data.message;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                this.showToast(errorMessage, 'error');
             }
         });
-},   
+}, 
+
     // Format number
     formatNumber: function(number, decimals = 0) {
         return new Intl.NumberFormat('vi-VN', {

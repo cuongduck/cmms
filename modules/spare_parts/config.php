@@ -144,12 +144,73 @@ $sparePartsConfig = [
 function getSpareParts($filters = []) {
     global $db;
     
+    $whereConditions = ["sp.is_active = 1"];
+    $params = [];
+    
+    // Search
+    if (!empty($filters['search'])) {
+        $whereConditions[] = "(sp.item_code LIKE ? OR sp.item_name LIKE ? OR sp.description LIKE ?)";
+        $searchTerm = '%' . $filters['search'] . '%';
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+    }
+    
+    // Category filter - SỬA PHẦN NÀY
+    if (!empty($filters['category'])) {
+        // Lấy keywords của category này
+        $keywords = $db->fetchAll(
+            "SELECT keyword FROM category_keywords WHERE category = ?",
+            [$filters['category']]
+        );
+        
+        if (!empty($keywords)) {
+            $keywordConditions = [];
+            foreach ($keywords as $kw) {
+                $keywordConditions[] = "sp.item_name LIKE ?";
+                $params[] = '%' . $kw['keyword'] . '%';
+            }
+            $whereConditions[] = "(" . implode(" OR ", $keywordConditions) . ")";
+        }
+    }
+    
+    // Manager filter
+    if (!empty($filters['manager'])) {
+        $whereConditions[] = "sp.manager_user_id = ?";
+        $params[] = $filters['manager'];
+    }
+    
+    // Stock status filter
+    if (!empty($filters['stock_status'])) {
+        switch ($filters['stock_status']) {
+            case 'out_of_stock':
+                $whereConditions[] = "COALESCE(oh.Onhand, 0) = 0";
+                break;
+            case 'low':
+                $whereConditions[] = "COALESCE(oh.Onhand, 0) < sp.min_stock AND COALESCE(oh.Onhand, 0) > 0";
+                break;
+            case 'reorder':
+                $whereConditions[] = "COALESCE(oh.Onhand, 0) <= sp.reorder_point AND COALESCE(oh.Onhand, 0) > 0";
+                break;
+        }
+    }
+    
+    $whereClause = !empty($whereConditions) ? "WHERE " . implode(" AND ", $whereConditions) : "";
+    
+    // QUERY MỚI - Tính category động
     $sql = "SELECT sp.*, 
                    COALESCE(oh.Onhand, 0) as current_stock,
                    COALESCE(oh.UOM, sp.unit) as stock_unit,
                    COALESCE(oh.OH_Value, 0) as stock_value,
                    COALESCE(oh.Price, sp.standard_cost) as current_price,
                    u1.full_name as manager_name,
+                   (
+                       SELECT ck.category 
+                       FROM category_keywords ck 
+                       WHERE sp.item_name LIKE CONCAT('%', ck.keyword, '%')
+                       ORDER BY LENGTH(ck.keyword) DESC 
+                       LIMIT 1
+                   ) as auto_category,
                    CASE 
                        WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point THEN 'Reorder'
                        WHEN COALESCE(oh.Onhand, 0) < sp.min_stock THEN 'Low'
@@ -157,48 +218,20 @@ function getSpareParts($filters = []) {
                        ELSE 'OK'
                    END as stock_status,
                    CASE 
-                       WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point THEN GREATEST(sp.max_stock - COALESCE(oh.Onhand, 0), sp.min_stock)
+                       WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point 
+                       THEN GREATEST(sp.max_stock - COALESCE(oh.Onhand, 0), sp.min_stock)
                        ELSE 0
-                   END as suggested_order_qty
+                   END as suggested_order_qty,
+                   CASE 
+                       WHEN sp.estimated_annual_usage > 0 AND COALESCE(oh.Onhand, 0) > 0 
+                       THEN ROUND((COALESCE(oh.Onhand, 0) / sp.estimated_annual_usage) * 12, 1)
+                       ELSE NULL
+                   END as months_remaining
             FROM spare_parts sp
             LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
             LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-            WHERE sp.is_active = 1";
-    
-    $params = [];
-    
-    if (!empty($filters['category'])) {
-        $sql .= " AND sp.category = ?";
-        $params[] = $filters['category'];
-    }
-    
-    if (!empty($filters['manager'])) {
-        $sql .= " AND sp.manager_user_id = ?";
-        $params[] = $filters['manager'];
-    }
-    
-    if (!empty($filters['stock_status'])) {
-        if ($filters['stock_status'] === 'low') {
-            $sql .= " HAVING stock_status IN ('Low', 'Out of Stock')";
-        } elseif ($filters['stock_status'] === 'reorder') {
-            $sql .= " HAVING stock_status = 'Reorder'";
-        }
-    }
-    
-    if (!empty($filters['search'])) {
-        $sql .= " AND (sp.item_code LIKE ? OR sp.item_name LIKE ? OR sp.description LIKE ?)";
-        $search = '%' . $filters['search'] . '%';
-        $params = array_merge($params, [$search, $search, $search]);
-    }
-    
-    $sql .= " ORDER BY 
-               CASE stock_status 
-                   WHEN 'Out of Stock' THEN 1 
-                   WHEN 'Reorder' THEN 2 
-                   WHEN 'Low' THEN 3 
-                   ELSE 4 
-               END, 
-               sp.is_critical DESC, sp.item_code";
+            {$whereClause}
+            ORDER BY sp.created_at DESC";
     
     return $db->fetchAll($sql, $params);
 }
@@ -218,7 +251,7 @@ function getReorderList() {
             FROM spare_parts sp
             LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
             LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-            WHERE sp.is_active = 1 
+            WHERE 1=1 
             AND COALESCE(oh.Onhand, 0) <= sp.reorder_point
             ORDER BY sp.is_critical DESC, 
                      CASE WHEN COALESCE(oh.Onhand, 0) = 0 THEN 1 ELSE 2 END,
@@ -360,7 +393,15 @@ function updateCategoryKeywords($category, $keywords) {
         return ['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()];
     }
 }
-
+function getActiveCategories() {
+    global $db;
+    
+    return $db->fetchAll("
+        SELECT DISTINCT category 
+        FROM category_keywords 
+        ORDER BY category ASC
+    ");
+}
 /**
  * Load từ khóa từ database (override config)
  */

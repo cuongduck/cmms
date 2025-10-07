@@ -5,9 +5,9 @@
  */
 
 class Database {
-    private $host = '1';
+    private $host = '10';
     private $dbname = 'cmms';
-    private $username = 'cf';
+    private $username = 'f';
     private $password = '123';
     private $charset = 'utf8mb4';
     private static $instance = null;

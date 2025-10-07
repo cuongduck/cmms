@@ -19,7 +19,6 @@ CMMS.SpareParts = {
     // Initialize module
     init: function() {
         this.bindEvents();
-        this.loadPartsList();
         console.log('Spare Parts Module initialized');
     },
     
@@ -34,7 +33,7 @@ CMMS.SpareParts = {
         }
         
         // Filter changes
-        const filterSelects = document.querySelectorAll('select[name^="filter"], select[name="category"], select[name="manager"], select[name="stock_status"]');
+        const filterSelects = document.querySelectorAll('select[name="category"], select[name="manager"], select[name="stock_status"]');
         filterSelects.forEach(select => {
             select.addEventListener('change', () => {
                 this.applyFilters();
@@ -51,32 +50,6 @@ CMMS.SpareParts = {
         });
     },
     
-    // Load parts list
-    loadPartsList: function(filters = {}) {
-        const params = new URLSearchParams({
-            action: 'list',
-            page: this.config.currentPage,
-            ...this.getFilters(),
-            ...filters
-        });
-        
-        CMMS.ajax({
-            url: this.config.apiUrl + '?' + params,
-            method: 'GET',
-            success: (data) => {
-                if (data.success) {
-                    this.renderPartsList(data.data.parts || []);
-                    this.renderPagination(data.data.pagination);
-                } else {
-                    CMMS.showToast(data.message, 'error');
-                }
-            },
-            error: () => {
-                CMMS.showToast('Lỗi khi tải danh sách spare parts', 'error');
-            }
-        });
-    },
-    
     // Get current filter values
     getFilters: function() {
         return {
@@ -89,14 +62,18 @@ CMMS.SpareParts = {
     
     // Perform search
     performSearch: function() {
-        this.config.currentPage = 1;
-        this.loadPartsList();
+        const form = document.querySelector('form');
+        if (form) {
+            form.submit();
+        }
     },
     
     // Apply filters
     applyFilters: function() {
-        this.config.currentPage = 1;
-        this.loadPartsList();
+        const form = document.querySelector('form');
+        if (form) {
+            form.submit();
+        }
     },
     
     // Handle form submit
@@ -119,13 +96,11 @@ CMMS.SpareParts = {
                     CMMS.showToast(data.message, 'success');
                     
                     if (formData.has('save_and_new')) {
-                        // Reset form for new entry
                         form.reset();
                         form.classList.remove('was-validated');
                         const firstInput = form.querySelector('input[type="text"]');
                         if (firstInput) firstInput.focus();
                     } else {
-                        // Redirect to view page
                         setTimeout(() => {
                             const id = isEdit ? formData.get('id') : data.data.id;
                             window.location.href = 'view.php?id=' + id;
@@ -134,136 +109,58 @@ CMMS.SpareParts = {
                 } else {
                     CMMS.showToast(data.message, 'error');
                 }
+            },
+            error: (error, response) => {
+                if (response && response.message) {
+                    CMMS.showToast(response.message, 'error');
+                }
             }
         });
     },
     
-    // Delete spare part
-    deletePart: function(id) {
-        CMMS.confirm('Bạn có chắc chắn muốn xóa spare part này?', () => {
-            CMMS.ajax({
-                url: this.config.apiUrl,
-                method: 'POST',
-                body: `action=delete&id=${id}`,
-                success: (data) => {
-                    if (data.success) {
-                        CMMS.showToast(data.message, 'success');
-                        this.loadPartsList();
-                    } else {
-                        CMMS.showToast(data.message, 'error');
-                    }
-                }
-            });
-        });
-    },
-    
-    // Render parts list (for AJAX loading)
-    renderPartsList: function(parts) {
-        const tbody = document.querySelector('#sparePartsTable tbody');
-        if (!tbody) return;
-        
-        if (parts.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center py-4">
-                        <i class="fas fa-cube fa-3x mb-2 d-block text-muted"></i>
-                        Không tìm thấy spare part nào
-                    </td>
-                </tr>
-            `;
+    // Auto detect category
+    autoDetectCategory: function(itemName, callback) {
+        if (!itemName || itemName.length < 3) {
+            if (callback) callback(null);
             return;
         }
         
-        tbody.innerHTML = parts.map(part => `
-            <tr class="${part.is_critical ? 'table-warning' : ''}">
-                <td>
-                    <span class="part-code">${CMMS.escapeHtml(part.item_code)}</span>
-                    ${part.is_critical ? '<span class="badge badge-warning ms-1">Critical</span>' : ''}
-                </td>
-                <td>
-                    <strong>${CMMS.escapeHtml(part.item_name)}</strong>
-                    ${part.description ? `<small class="d-block text-muted">${CMMS.escapeHtml(part.description.substr(0, 50))}...</small>` : ''}
-                </td>
-                <td>${part.category ? CMMS.escapeHtml(part.category) : '-'}</td>
-                <td class="text-center">
-                    <strong>${this.formatNumber(part.current_stock, 2)}</strong>
-                    <small class="d-block text-muted">${CMMS.escapeHtml(part.stock_unit)}</small>
-                </td>
-                <td class="text-center">
-                    <small>${this.formatNumber(part.min_stock, 0)} / ${this.formatNumber(part.max_stock, 0)}</small>
-                    ${part.suggested_order_qty > 0 ? `<small class="d-block text-info">Đề xuất: ${this.formatNumber(part.suggested_order_qty, 0)}</small>` : ''}
-                </td>
-                <td>
-                    <span class="badge ${this.getStockStatusClass(part.stock_status)}">
-                        ${this.getStockStatusText(part.stock_status)}
-                    </span>
-                </td>
-                <td>
-                    ${part.manager_name ? `<small>${CMMS.escapeHtml(part.manager_name)}</small>` : '<small class="text-muted">Chưa phân công</small>'}
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <a href="view.php?id=${part.id}" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="edit.php?id=${part.id}" class="btn btn-outline-warning btn-sm">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        CMMS.ajax({
+            url: this.config.apiUrl + '?action=detect_category&item_name=' + encodeURIComponent(itemName),
+            method: 'GET',
+            success: (data) => {
+                if (data.success && callback) {
+                    callback(data.data);
+                } else if (callback) {
+                    callback(null);
+                }
+            },
+            error: () => {
+                if (callback) callback(null);
+            }
+        });
     },
     
-    // Render pagination
-    renderPagination: function(pagination) {
-        const container = document.getElementById('sparePartsPagination');
-        if (!container || !pagination || pagination.total_pages <= 1) return;
+    // Display category result
+    displayCategoryResult: function(elementId, categoryData) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
         
-        let html = '<nav><ul class="pagination pagination-sm justify-content-center">';
-        
-        // Previous
-        if (pagination.current_page > 1) {
-            html += `<li class="page-item">
-                <a class="page-link" href="#" data-page="${pagination.current_page - 1}">‹</a>
-            </li>`;
+        if (!categoryData) {
+            element.innerHTML = '<span class="badge bg-secondary">Vật tư khác</span>';
+            return;
         }
         
-        // Pages
-        const start = Math.max(1, pagination.current_page - 2);
-        const end = Math.min(pagination.total_pages, pagination.current_page + 2);
+        const { category, confidence } = categoryData;
+        let badgeClass = 'bg-success';
         
-        for (let i = start; i <= end; i++) {
-            if (i === pagination.current_page) {
-                html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
-            } else {
-                html += `<li class="page-item">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>`;
-            }
-        }
+        if (confidence < 70) badgeClass = 'bg-warning text-dark';
+        if (confidence < 40) badgeClass = 'bg-danger';
         
-        // Next
-        if (pagination.current_page < pagination.total_pages) {
-            html += `<li class="page-item">
-                <a class="page-link" href="#" data-page="${pagination.current_page + 1}">›</a>
-            </li>`;
-        }
-        
-        html += '</ul></nav>';
-        container.innerHTML = html;
-        
-        // Bind pagination events
-        container.querySelectorAll('a.page-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = parseInt(e.target.dataset.page);
-                if (page) {
-                    this.config.currentPage = page;
-                    this.loadPartsList();
-                }
-            });
-        });
+        element.innerHTML = `
+            <span class="badge ${badgeClass}">${category}</span>
+            <small class="ms-2 text-muted">(${confidence}%)</small>
+        `;
     },
     
     // Helper functions
@@ -292,80 +189,6 @@ CMMS.SpareParts = {
             'Out of Stock': 'Hết hàng'
         };
         return texts[status] || status;
-    },
-
-    autoDetectCategory: function(itemName, callback) {
-        if (!itemName || itemName.length < 3) {
-            if (callback) callback(null);
-            return;
-        }
-        
-        CMMS.ajax({
-            url: this.config.apiUrl + '?action=detect_category&item_name=' + encodeURIComponent(itemName),
-            method: 'GET',
-            success: (data) => {
-                if (data.success && callback) {
-                    callback(data.data);
-                } else if (callback) {
-                    callback(null);
-                }
-            },
-            error: () => {
-                if (callback) callback(null);
-            }
-        });
-    },
-    
-    // Function để hiển thị category detection result
-    displayCategoryResult: function(elementId, categoryData) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-        
-        if (!categoryData) {
-            element.innerHTML = '<span class="badge bg-secondary">Vật tư khác</span>';
-            return;
-        }
-        
-        const { category, confidence } = categoryData;
-        let badgeClass = 'bg-success';
-        
-        if (confidence < 70) badgeClass = 'bg-warning text-dark';
-        if (confidence < 40) badgeClass = 'bg-danger';
-        
-        element.innerHTML = `
-            <span class="badge ${badgeClass}">${category}</span>
-            <small class="ms-2 text-muted">(${confidence}%)</small>
-        `;
-    },
-    
-    // Function để batch reclassify
-    batchReclassify: function(partIds) {
-        if (!partIds || partIds.length === 0) {
-            CMMS.showToast('Không có spare part nào được chọn', 'warning');
-            return;
-        }
-        
-        CMMS.confirm(`Bạn có muốn phân loại lại ${partIds.length} spare parts?`, () => {
-            CMMS.ajax({
-                url: this.config.apiUrl,
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'batch_reclassify',
-                    part_ids: partIds
-                }),
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                success: (data) => {
-                    if (data.success) {
-                        CMMS.showToast(data.message, 'success');
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        CMMS.showToast(data.message, 'error');
-                    }
-                }
-            });
-        });
     }
 };
 
@@ -376,70 +199,102 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Global functions
-window.deleteSparePart = (id) => CMMS.SpareParts.deletePart(id);
-
-window.reclassifyPart = function(partId) {
-    CMMS.SpareParts.batchReclassify([partId]);
-};
-
-window.autoDetectCategory = function(itemName, callback) {
-    return CMMS.SpareParts.autoDetectCategory(itemName, callback);
-};
 /**
- * Delete spare part
+ * Delete spare part - Global function
  */
-function deleteSparePart(id, itemCode) {
-    if (!confirm(`Xóa spare part: ${itemCode}?`)) {
+window.deleteSparePart = function(id, itemCode) {
+    if (!confirm(`⚠️ CẢNH BÁO: Xóa vĩnh viễn "${itemCode}"?\n\nDữ liệu sẽ BỊ XÓA HOÀN TOÀN và KHÔNG THỂ KHÔI PHỤC!`)) {
         return false;
     }
     
-    const formData = new FormData();
-    formData.append('action', 'delete');
-    formData.append('id', id);
+    // Double confirm
+    if (!confirm(`Xác nhận lần cuối: Xóa "${itemCode}"?`)) {
+        return false;
+    }
     
-    // Tìm row cần xóa
-    const row = event.target.closest('tr');
+    CMMS.showLoading();
     
     fetch('api/spare_parts.php', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+            action: 'delete',
+            id: id
+        })
     })
     .then(response => response.json())
     .then(data => {
+        CMMS.hideLoading();
+        
         if (data.success) {
-            // Nếu ở trang view, chuyển về index
-            if (window.location.pathname.includes('view.php')) {
-                window.location.href = 'index.php';
-                return;
-            }
+            CMMS.showToast(data.message || 'Đã xóa thành công', 'success');
             
-            // Nếu ở trang index, xóa row khỏi table
-            if (row) {
-                row.style.opacity = '0';
-                row.style.transition = 'opacity 0.5s';
-                setTimeout(() => {
-                    row.remove();
-                    CMMS.showToast('Đã xóa thành công', 'success');
-                    
-                    // Check nếu không còn row nào, reload trang
-                    const tbody = document.querySelector('tbody');
-                    if (!tbody || tbody.querySelectorAll('tr').length === 0) {
-                        window.location.reload();
-                    }
-                }, 500);
-            } else {
-                // Fallback: reload trang
-                window.location.reload();
-            }
+            // Reload trang sau 1 giây
+            setTimeout(() => {
+                window.location.href = window.location.pathname;
+            }, 1000);
         } else {
-            alert(data.message);
+            CMMS.showToast(data.message || 'Có lỗi xảy ra', 'error');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        alert('Có lỗi xảy ra');
+        CMMS.hideLoading();
+        console.error('Delete error:', error);
+        CMMS.showToast('Lỗi kết nối: ' + error.message, 'error');
     });
     
     return false;
-}
+};
+
+/**
+ * Reclassify spare part - Global function
+ */
+window.reclassifyPart = function(partId) {
+    if (!confirm('Bạn có muốn phân loại lại vật tư này?')) {
+        return false;
+    }
+    
+    CMMS.showLoading();
+    
+    fetch('api/spare_parts.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+            action: 'reclassify',
+            id: partId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        CMMS.hideLoading();
+        
+        if (data.success) {
+            const message = data.message + (data.data ? `\nDanh mục mới: ${data.data.new_category}` : '');
+            CMMS.showToast(message, 'success');
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            CMMS.showToast(data.message || 'Có lỗi xảy ra', 'error');
+        }
+    })
+    .catch(error => {
+        CMMS.hideLoading();
+        console.error('Reclassify error:', error);
+        CMMS.showToast('Lỗi kết nối', 'error');
+    });
+    
+    return false;
+};
+
+/**
+ * Auto detect category - Global function
+ */
+window.autoDetectCategory = function(itemName, callback) {
+    return CMMS.SpareParts.autoDetectCategory(itemName, callback);
+};

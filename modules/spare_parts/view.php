@@ -15,7 +15,7 @@ require_once 'config.php';
 // Check permission
 requirePermission('spare_parts', 'view');
 
-// Get spare part details
+// Get spare part details with annual usage calculation
 $sql = "SELECT sp.*, 
                COALESCE(oh.Onhand, 0) as current_stock,
                COALESCE(oh.UOM, sp.unit) as stock_unit,
@@ -29,13 +29,19 @@ $sql = "SELECT sp.*,
                    ELSE 'OK'
                END as stock_status,
                CASE 
-                   WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point THEN GREATEST(sp.max_stock - COALESCE(oh.Onhand, 0), sp.min_stock)
+                   WHEN COALESCE(oh.Onhand, 0) <= sp.reorder_point 
+                   THEN GREATEST(sp.max_stock - COALESCE(oh.Onhand, 0), sp.min_stock)
                    ELSE 0
-               END as suggested_order_qty
+               END as suggested_order_qty,
+               CASE 
+                   WHEN sp.estimated_annual_usage > 0 AND COALESCE(oh.Onhand, 0) > 0 
+                   THEN ROUND((COALESCE(oh.Onhand, 0) / sp.estimated_annual_usage) * 12, 1)
+                   ELSE NULL
+               END as months_remaining
         FROM spare_parts sp
         LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
         LEFT JOIN users u1 ON sp.manager_user_id = u1.id
-        WHERE sp.id = ? AND sp.is_active = 1";
+        WHERE sp.id = ?";
 
 $part = $db->fetch($sql, [$id]);
 if (!$part) {
@@ -46,6 +52,7 @@ if (!$part) {
 $pageTitle = 'Chi tiết: ' . htmlspecialchars($part['item_name']);
 $currentModule = 'spare_parts';
 $moduleCSS = 'bom';
+$moduleJS = 'spare-parts';
 
 // Breadcrumb
 $breadcrumb = [
@@ -55,28 +62,30 @@ $breadcrumb = [
 
 // Page actions
 $pageActions = '';
-if (hasPermission('spare_parts', 'edit')) {
+// Check quyền edit/delete
+$canEdit = false;
+$canDelete = false;
+
+if ($_SESSION['role'] === 'Admin') {
+    $canEdit = true;
+    $canDelete = true;
+} elseif ($part['manager_user_id'] == $_SESSION['user_id']) {
+    $canEdit = true;
+    $canDelete = true;
+}
+
+// Hiển thị nút
+if ($canEdit) {
     $pageActions .= '<a href="edit.php?id=' . $id . '" class="btn btn-warning">
         <i class="fas fa-edit me-2"></i>Chỉnh sửa
     </a> ';
 }
 
-if (hasPermission('spare_parts', 'delete')) {
+if ($canDelete) {
     $pageActions .= '<button onclick="deleteSparePart(' . $id . ', \'' . htmlspecialchars($part['item_code']) . '\')" class="btn btn-danger">
         <i class="fas fa-trash me-2"></i>Xóa
-    </button> ';
+    </button>';
 }
-
-$pageActions .= '<div class="btn-group">
-    <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="fas fa-download me-2"></i>Xuất dữ liệu
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#" onclick="exportSparePart(' . $id . ', \'pdf\')">
-            <i class="fas fa-file-pdf me-2"></i>PDF
-        </a></li>
-    </ul>
-</div>';
 
 require_once '../../includes/header.php';
 
@@ -97,33 +106,66 @@ $purchaseRequests = $db->fetchAll(
      LIMIT 5",
     [$part['item_code']]
 );
+
+// Calculate monthly usage
+$monthlyUsage = $part['estimated_annual_usage'] > 0 ? $part['estimated_annual_usage'] / 12 : 0;
+$weeklyUsage = $part['estimated_annual_usage'] > 0 ? $part['estimated_annual_usage'] / 52 : 0;
 ?>
 
+<style>
+.info-card {
+    border-left: 4px solid #0d6efd;
+    transition: transform 0.2s;
+}
+.info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.stat-box {
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+.stat-box h4 {
+    margin: 0.5rem 0;
+    color: #0d6efd;
+}
+.progress-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+}
+</style>
+
 <!-- Part Header -->
-<div class="bom-summary">
+<div class="bom-summary mb-4">
     <div class="container-fluid">
         <div class="row">
             <div class="col-lg-8">
                 <div class="d-flex align-items-center gap-3 mb-3">
-                    <h3><?php echo htmlspecialchars($part['item_name']); ?></h3>
+                    <h3 class="mb-0"><?php echo htmlspecialchars($part['item_name']); ?></h3>
                     <?php if ($part['is_critical']): ?>
-                    <span class="badge bg-warning">CRITICAL</span>
+                    <span class="badge bg-warning text-dark">CRITICAL</span>
                     <?php endif; ?>
+                    <span class="badge <?php echo getStockStatusClass($part['stock_status']); ?>">
+                        <?php echo getStockStatusText($part['stock_status']); ?>
+                    </span>
                 </div>
                 
                 <div class="d-flex flex-wrap gap-3 mb-3">
                     <div>
                         <i class="fas fa-barcode me-1"></i>
-                        <strong>Mã vật tư:</strong> 
+                        <strong>Mã:</strong> 
                         <span class="part-code"><?php echo htmlspecialchars($part['item_code']); ?></span>
                     </div>
-                    <?php if ($part['category']): ?>
                     <div>
                         <i class="fas fa-tag me-1"></i>
                         <strong>Danh mục:</strong> 
-                        <?php echo htmlspecialchars($part['category']); ?>
+                        <?php echo htmlspecialchars($part['category'] ?? 'Chưa phân loại'); ?>
                     </div>
-                    <?php endif; ?>
                     <div>
                         <i class="fas fa-balance-scale me-1"></i>
                         <strong>Đơn vị:</strong> 
@@ -139,20 +181,14 @@ $purchaseRequests = $db->fetchAll(
                 </div>
                 
                 <?php if ($part['description']): ?>
-                <p class="mb-2 opacity-90">
+                <p class="mb-2">
                     <strong>Mô tả:</strong> <?php echo nl2br(htmlspecialchars($part['description'])); ?>
-                </p>
-                <?php endif; ?>
-                
-                <?php if ($part['specifications']): ?>
-                <p class="mb-2 opacity-90">
-                    <strong>Thông số kỹ thuật:</strong> <?php echo nl2br(htmlspecialchars($part['specifications'])); ?>
                 </p>
                 <?php endif; ?>
             </div>
             
             <div class="col-lg-4">
-                <div class="d-flex justify-content-end gap-2">
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
                     <?php echo $pageActions; ?>
                 </div>
             </div>
@@ -161,115 +197,181 @@ $purchaseRequests = $db->fetchAll(
 </div>
 
 <!-- Main Content -->
-<div class="row mt-4">
+<div class="row">
     <div class="col-lg-8">
-        <!-- Stock Information -->
+        <!-- Stock Overview Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="stat-box">
+                    <small class="text-muted">Tồn kho hiện tại</small>
+                    <h4><?php echo number_format($part['current_stock'], 2); ?></h4>
+                    <small><?php echo htmlspecialchars($part['stock_unit']); ?></small>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-box">
+                    <small class="text-muted">Giá trị tồn</small>
+                    <h4><?php echo formatVND($part['stock_value']); ?></h4>
+                    <small>Đơn giá: <?php echo formatVND($part['current_price']); ?></small>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-box <?php echo $part['suggested_order_qty'] > 0 ? 'border-warning' : ''; ?>">
+                    <small class="text-muted">Đề xuất đặt hàng</small>
+                    <?php if ($part['suggested_order_qty'] > 0): ?>
+                        <h4 class="text-warning"><?php echo number_format($part['suggested_order_qty'], 0); ?></h4>
+                        <small><?php echo htmlspecialchars($part['unit']); ?></small>
+                    <?php else: ?>
+                        <h4 class="text-success">-</h4>
+                        <small>Đủ hàng</small>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-box">
+                    <small class="text-muted">Thời gian còn lại</small>
+                    <?php if ($part['months_remaining']): ?>
+                        <h4 class="<?php echo $part['months_remaining'] < 3 ? 'text-danger' : ($part['months_remaining'] < 6 ? 'text-warning' : 'text-success'); ?>">
+                            <?php echo number_format($part['months_remaining'], 1); ?>
+                        </h4>
+                        <small>tháng</small>
+                    <?php else: ?>
+                        <h4 class="text-muted">-</h4>
+                        <small>N/A</small>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Level Progress -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-warehouse me-2"></i>
-                    Thông tin tồn kho
-                </h5>
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Mức tồn kho
+                </h6>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <div class="border rounded p-3 h-100 text-center">
-                            <small class="text-muted">Tồn kho hiện tại</small>
-                            <h4 class="mb-1"><?php echo number_format($part['current_stock'], 2); ?></h4>
-                            <small><?php echo htmlspecialchars($part['stock_unit']); ?></small>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <div class="border rounded p-3 h-100 text-center">
-                            <small class="text-muted">Trạng thái</small>
-                            <div class="mb-2">
-                                <span class="badge <?php echo getStockStatusClass($part['stock_status']); ?> fs-6">
-                                    <?php echo getStockStatusText($part['stock_status']); ?>
-                                </span>
-                            </div>
-                            <small>Min: <?php echo number_format($part['min_stock'], 0); ?></small>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <div class="border rounded p-3 h-100 text-center">
-                            <small class="text-muted">Giá trị tồn kho</small>
-                            <h4 class="mb-1"><?php echo formatVND($part['stock_value']); ?></h4>
-                            <small>Đơn giá: <?php echo formatVND($part['current_price']); ?></small>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <div class="border rounded p-3 h-100 text-center">
-                            <small class="text-muted">Đề xuất đặt hàng</small>
-                            <?php if ($part['suggested_order_qty'] > 0): ?>
-                                <h4 class="mb-1 text-warning"><?php echo number_format($part['suggested_order_qty'], 0); ?></h4>
-                                <small><?php echo htmlspecialchars($part['unit']); ?></small>
-                            <?php else: ?>
-                                <h4 class="mb-1 text-muted">-</h4>
-                                <small>Không cần</small>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Hiện tại: <strong><?php echo number_format($part['current_stock'], 2); ?></strong></span>
+                    <span>Tối đa: <strong><?php echo number_format($part['max_stock'], 0); ?></strong></span>
                 </div>
-                
-                <!-- Stock Level Progress -->
-                <div class="mt-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <small>Mức tồn kho</small>
-                        <small><?php echo number_format($part['current_stock'], 2); ?> / <?php echo number_format($part['max_stock'], 0); ?></small>
-                    </div>
-                    <div class="progress" style="height: 10px;">
+                <div class="position-relative">
+                    <div class="progress" style="height: 25px;">
                         <?php 
                         $percentage = $part['max_stock'] > 0 ? ($part['current_stock'] / $part['max_stock']) * 100 : 0;
                         $progressClass = 'bg-success';
                         if ($part['current_stock'] <= $part['reorder_point']) $progressClass = 'bg-danger';
                         elseif ($part['current_stock'] < $part['min_stock']) $progressClass = 'bg-warning';
                         ?>
-                        <div class="progress-bar <?php echo $progressClass; ?>" style="width: <?php echo min(100, $percentage); ?>%"></div>
-                        <!-- Markers for min and reorder points -->
-                        <div class="position-absolute" style="left: <?php echo $part['max_stock'] > 0 ? ($part['min_stock'] / $part['max_stock']) * 100 : 0; ?>%; top: 0; bottom: 0; width: 2px; background-color: #dc3545;"></div>
-                        <div class="position-absolute" style="left: <?php echo $part['max_stock'] > 0 ? ($part['reorder_point'] / $part['max_stock']) * 100 : 0; ?>%; top: 0; bottom: 0; width: 2px; background-color: #ffc107;"></div>
+                        <div class="progress-bar <?php echo $progressClass; ?>" 
+                             style="width: <?php echo min(100, $percentage); ?>%">
+                            <?php echo number_format($percentage, 1); ?>%
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between mt-1">
-                        <small class="text-muted">0</small>
-                        <small class="text-danger">Min: <?php echo number_format($part['min_stock'], 0); ?></small>
-                        <small class="text-warning">Reorder: <?php echo number_format($part['reorder_point'], 0); ?></small>
-                        <small class="text-muted">Max: <?php echo number_format($part['max_stock'], 0); ?></small>
-                    </div>
+                    <!-- Markers -->
+                    <?php if ($part['max_stock'] > 0): ?>
+                    <div class="progress-marker bg-danger" 
+                         style="left: <?php echo ($part['min_stock'] / $part['max_stock']) * 100; ?>%;" 
+                         title="Min: <?php echo number_format($part['min_stock'], 0); ?>"></div>
+                    <div class="progress-marker bg-warning" 
+                         style="left: <?php echo ($part['reorder_point'] / $part['max_stock']) * 100; ?>%;" 
+                         title="Reorder: <?php echo number_format($part['reorder_point'], 0); ?>"></div>
+                    <?php endif; ?>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <small class="text-danger">
+                        <i class="fas fa-flag"></i> Min: <?php echo number_format($part['min_stock'], 0); ?>
+                    </small>
+                    <small class="text-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Reorder: <?php echo number_format($part['reorder_point'], 0); ?>
+                    </small>
+                    <small class="text-success">
+                        <i class="fas fa-check"></i> Max: <?php echo number_format($part['max_stock'], 0); ?>
+                    </small>
                 </div>
             </div>
         </div>
 
-        <!-- Management Info -->
+        <!-- Usage Forecast -->
+        <?php if ($part['estimated_annual_usage'] > 0): ?>
+        <div class="card mb-4 info-card">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    Dự báo sử dụng
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="p-2">
+                            <i class="fas fa-calendar-year fa-2x text-primary mb-2"></i>
+                            <h5><?php echo number_format($part['estimated_annual_usage'], 0); ?></h5>
+                            <small class="text-muted"><?php echo $part['unit']; ?>/năm</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2">
+                            <i class="fas fa-calendar fa-2x text-info mb-2"></i>
+                            <h5><?php echo number_format($monthlyUsage, 2); ?></h5>
+                            <small class="text-muted"><?php echo $part['unit']; ?>/tháng</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2">
+                            <i class="fas fa-calendar-week fa-2x text-success mb-2"></i>
+                            <h5><?php echo number_format($weeklyUsage, 2); ?></h5>
+                            <small class="text-muted"><?php echo $part['unit']; ?>/tuần</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2">
+                            <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                            <?php if ($part['months_remaining']): ?>
+                                <h5><?php echo number_format($part['months_remaining'], 1); ?></h5>
+                                <small class="text-muted">tháng còn lại</small>
+                            <?php else: ?>
+                                <h5>-</h5>
+                                <small class="text-muted">Không xác định</small>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Management & Supplier Info -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="card-title mb-0">
+                <h6 class="mb-0">
                     <i class="fas fa-users me-2"></i>
-                    Thông tin quản lý & Nhà cung cấp
-                </h5>
+                    Quản lý & Nhà cung cấp
+                </h6>
             </div>
             <div class="card-body">
                 <div class="row">
-             <div class="col-md-6">
-    <h6>Người quản lý</h6>
-    <?php if ($part['manager_name']): ?>
-        <p><strong><?php echo htmlspecialchars($part['manager_name']); ?></strong></p>
-    <?php else: ?>
-        <p class="text-muted">Chưa được phân công</p>
-    <?php endif; ?>
-</div>
+                    <div class="col-md-6">
+                        <h6>Người quản lý</h6>
+                        <?php if ($part['manager_name']): ?>
+                            <p><i class="fas fa-user-tie me-2"></i><strong><?php echo htmlspecialchars($part['manager_name']); ?></strong></p>
+                        <?php else: ?>
+                            <p class="text-muted"><i class="fas fa-user-slash me-2"></i>Chưa phân công</p>
+                        <?php endif; ?>
+                    </div>
                     
                     <div class="col-md-6">
-                        <h6>Nhà cung cấp chính</h6>
+                        <h6>Nhà cung cấp</h6>
                         <?php if ($part['supplier_name']): ?>
-                            <p><strong><?php echo htmlspecialchars($part['supplier_name']); ?></strong></p>
+                            <p><i class="fas fa-industry me-2"></i><strong><?php echo htmlspecialchars($part['supplier_name']); ?></strong></p>
                             <p><small>Mã: <?php echo htmlspecialchars($part['supplier_code']); ?></small></p>
                             <p><small>Lead time: <?php echo $part['lead_time_days']; ?> ngày</small></p>
                         <?php else: ?>
-                            <p class="text-muted">Chưa có thông tin nhà cung cấp</p>
+                            <p class="text-muted"><i class="fas fa-question-circle me-2"></i>Chưa có thông tin</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -279,13 +381,10 @@ $purchaseRequests = $db->fetchAll(
         <!-- Recent Transactions -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
+                <h6 class="mb-0">
                     <i class="fas fa-exchange-alt me-2"></i>
-                    Lịch sử giao dịch gần đây
-                </h5>
-                <a href="/modules/inventory/transactions.php?item_code=<?php echo urlencode($part['item_code']); ?>" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-list me-1"></i>Xem tất cả
-                </a>
+                    Lịch sử giao dịch
+                </h6>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -304,75 +403,23 @@ $purchaseRequests = $db->fetchAll(
                             <tr>
                                 <td colspan="5" class="text-center py-3 text-muted">
                                     <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
-                                    Không có giao dịch gần đây
+                                    Không có giao dịch
                                 </td>
                             </tr>
                             <?php else: ?>
                             <?php foreach ($recentTransactions as $trans): ?>
                             <tr>
-                                <td><?php echo formatDateTime($trans['TransactionDate']); ?></td>
+                                <td><?php echo date('d/m/Y H:i', strtotime($trans['TransactionDate'])); ?></td>
                                 <td>
-                                    <span class="badge <?php echo getTransactionTypeClass($trans['TransactionType'] ?? ''); ?>">
-                                        <?php echo htmlspecialchars($trans['TransactionType'] ?? ''); ?>
+                                    <span class="badge bg-secondary">
+                                        <?php echo htmlspecialchars($trans['TransactionType'] ?? 'N/A'); ?>
                                     </span>
                                 </td>
                                 <td class="<?php echo ($trans['TransactedQty'] ?? 0) > 0 ? 'text-success' : 'text-danger'; ?>">
                                     <?php echo number_format($trans['TransactedQty'] ?? 0, 2); ?> <?php echo htmlspecialchars($trans['UOM'] ?? ''); ?>
                                 </td>
                                 <td><?php echo formatVND($trans['TotalAmount'] ?? 0); ?></td>
-                                <td><?php echo htmlspecialchars($trans['Reason'] ?? ''); ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Purchase Requests -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-shopping-cart me-2"></i>
-                    Lịch sử đề xuất mua hàng
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>Mã đề xuất</th>
-                                <th>Số lượng</th>
-                                <th>Ngày tạo</th>
-                                <th>Trạng thái</th>
-                                <th>Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($purchaseRequests)): ?>
-                            <tr>
-                                <td colspan="5" class="text-center py-3 text-muted">
-                                    Chưa có đề xuất mua hàng nào
-                                </td>
-                            </tr>
-                            <?php else: ?>
-                            <?php foreach ($purchaseRequests as $request): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($request['request_code']); ?></td>
-                                <td><?php echo number_format($request['requested_qty'], 2); ?> <?php echo htmlspecialchars($request['unit']); ?></td>
-                                <td><?php echo formatDate($request['created_at']); ?></td>
-                                <td>
-                                    <span class="badge <?php echo getPurchaseStatusClass($request['status']); ?>">
-                                        <?php echo getPurchaseStatusText($request['status']); ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <a href="purchase_request.php?id=<?php echo $request['id']; ?>" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </td>
+                                <td><?php echo htmlspecialchars($trans['Reason'] ?? '-'); ?></td>
                             </tr>
                             <?php endforeach; ?>
                             <?php endif; ?>
@@ -395,22 +442,22 @@ $purchaseRequests = $db->fetchAll(
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <?php if (hasPermission('spare_parts', 'edit')): ?>
-                    <a href="edit.php?id=<?php echo $id; ?>" class="btn btn-outline-warning btn-sm">
+                    <a href="edit.php?id=<?php echo $id; ?>" class="btn btn-outline-warning">
                         <i class="fas fa-edit me-2"></i>Chỉnh sửa
                     </a>
                     <?php endif; ?>
                     
                     <?php if ($part['suggested_order_qty'] > 0): ?>
-                    <a href="purchase_request.php?spare_part_id=<?php echo $id; ?>" class="btn btn-outline-success btn-sm">
+                    <a href="purchase_request.php?spare_part_id=<?php echo $id; ?>" class="btn btn-outline-success">
                         <i class="fas fa-shopping-cart me-2"></i>Tạo đề xuất mua hàng
                     </a>
                     <?php endif; ?>
                     
-                    <button onclick="copyItemCode()" class="btn btn-outline-info btn-sm">
+                    <button onclick="copyItemCode()" class="btn btn-outline-info">
                         <i class="fas fa-copy me-2"></i>Copy mã vật tư
                     </button>
                     
-                    <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                    <button onclick="window.print()" class="btn btn-outline-secondary">
                         <i class="fas fa-print me-2"></i>In thông tin
                     </button>
                 </div>
@@ -418,10 +465,10 @@ $purchaseRequests = $db->fetchAll(
         </div>
         
         <!-- Technical Info -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
+                    <i class="fas fa-cog me-2"></i>
                     Thông tin kỹ thuật
                 </h6>
             </div>
@@ -429,40 +476,40 @@ $purchaseRequests = $db->fetchAll(
                 <?php if ($part['specifications']): ?>
                     <p><strong>Thông số kỹ thuật:</strong></p>
                     <p class="small"><?php echo nl2br(htmlspecialchars($part['specifications'])); ?></p>
+                    <hr>
                 <?php endif; ?>
                 
                 <?php if ($part['notes']): ?>
                     <p><strong>Ghi chú:</strong></p>
                     <p class="small"><?php echo nl2br(htmlspecialchars($part['notes'])); ?></p>
+                    <hr>
                 <?php endif; ?>
                 
-                <hr>
-                <div class="row text-center">
+                <div class="row text-center small">
                     <div class="col-6">
-                        <small class="text-muted">Tạo lúc</small>
-                        <div class="small"><?php echo formatDateTime($part['created_at']); ?></div>
+                        <div class="text-muted">Tạo lúc</div>
+                        <div><?php echo date('d/m/Y H:i', strtotime($part['created_at'])); ?></div>
                     </div>
                     <div class="col-6">
-                        <small class="text-muted">Cập nhật</small>
-                        <div class="small"><?php echo formatDateTime($part['updated_at']); ?></div>
+                        <div class="text-muted">Cập nhật</div>
+                        <div><?php echo date('d/m/Y H:i', strtotime($part['updated_at'])); ?></div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Stock Alert -->
+        <?php if ($part['stock_status'] === 'Reorder' || $part['stock_status'] === 'Low' || $part['stock_status'] === 'Out of Stock'): ?>
+        <div class="alert alert-<?php echo $part['stock_status'] === 'Out of Stock' ? 'danger' : 'warning'; ?>">
+            <h6><i class="fas fa-exclamation-triangle me-2"></i>Cảnh báo tồn kho</h6>
+            <p class="mb-2"><?php echo getStockStatusText($part['stock_status']); ?></p>
+            <p class="mb-0 small">Đề xuất đặt hàng: <strong><?php echo number_format($part['suggested_order_qty'], 0); ?> <?php echo $part['unit']; ?></strong></p>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
 <script>
-function exportSparePart(id, format) {
-    const params = new URLSearchParams({
-        action: 'export_spare_part',
-        format: format,
-        id: id
-    });
-    
-    window.open('api/export.php?' + params, '_blank');
-}
-
 function copyItemCode() {
     const itemCode = '<?php echo $part['item_code']; ?>';
     
@@ -479,39 +526,6 @@ function copyItemCode() {
         document.body.removeChild(textArea);
         CMMS.showToast('Đã copy mã vật tư: ' + itemCode, 'success');
     }
-}
-
-// Helper functions for transaction types
-function getTransactionTypeClass(type) {
-    const classes = {
-        'IN': 'bg-success',
-        'OUT': 'bg-danger',
-        'ADJUST': 'bg-warning',
-        'TRANSFER': 'bg-info'
-    };
-    return classes[type] || 'bg-secondary';
-}
-
-function getPurchaseStatusClass(status) {
-    const classes = {
-        'pending': 'bg-warning',
-        'approved': 'bg-success', 
-        'rejected': 'bg-danger',
-        'ordered': 'bg-info',
-        'completed': 'bg-dark'
-    };
-    return classes[status] || 'bg-secondary';
-}
-
-function getPurchaseStatusText(status) {
-    const texts = {
-        'pending': 'Chờ duyệt',
-        'approved': 'Đã duyệt',
-        'rejected': 'Từ chối',
-        'ordered': 'Đã đặt hàng',
-        'completed': 'Hoàn thành'
-    };
-    return texts[status] || status;
 }
 </script>
 

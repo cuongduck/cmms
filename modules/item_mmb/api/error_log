@@ -1,0 +1,1 @@
+[03-Oct-2025 13:35:20 Asia/Ho_Chi_Minh] Failed to log activity: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'pnlekoychosting_cmms.activity_logs' doesn't exist

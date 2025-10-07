@@ -113,21 +113,12 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                     
  <!-- Thay thế section category trong edit.php -->
 <div class="row">
-    <div class="col-md-6 mb-3">
-        <label class="form-label">Danh mục (tự động phân loại)</label>
-        <div class="form-control bg-light d-flex justify-content-between align-items-center" id="auto_category_display">
-            <span class="current-category"><?php echo htmlspecialchars($part['category'] ?: 'Chưa phân loại'); ?></span>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="reclassifyCategory()">
-                <i class="fas fa-sync-alt"></i> Phân loại lại
-            </button>
-        </div>
-        <input type="hidden" id="category" name="category" value="<?php echo htmlspecialchars($part['category']); ?>">
-        <div id="category_confidence" class="form-text">
-            <?php if ($part['category']): ?>
-            Danh mục hiện tại: <?php echo htmlspecialchars($part['category']); ?>
-            <?php endif; ?>
-        </div>
-    </div>
+    <div class="col-md-4 mb-3">
+    <label class="form-label">Danh mục (Tự động)</label>
+    <input type="text" class="form-control" id="autoCategory" readonly 
+           value="<?php echo htmlspecialchars($part['auto_category'] ?? 'Chưa xác định'); ?>">
+    <small class="text-muted">Tự động phân loại dựa trên tên vật tư</small>
+</div>
     
     <div class="col-md-3 mb-3">
         <label for="unit" class="form-label">Đơn vị tính</label>
@@ -143,7 +134,7 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
     <div class="col-md-3 mb-3">
         <label for="standard_cost" class="form-label">Giá chuẩn (VNĐ)</label>
         <input type="number" id="standard_cost" name="standard_cost" class="form-control" 
-               min="0" step="0.01" value="<?php echo $part['standard_cost']; ?>">
+               min="0" step="1" value="<?php echo $part['standard_cost']; ?>">
     </div>
 </div>
                     
@@ -177,7 +168,17 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                             <input type="number" id="max_stock" name="max_stock" class="form-control" 
                                    min="0" step="0.1" value="<?php echo $part['max_stock']; ?>">
                         </div>
-                        
+                        <div class="col-md-4 mb-3">
+    <label for="estimated_annual_usage" class="form-label">
+        Dự kiến sử dụng/năm
+        <i class="fas fa-info-circle text-muted" 
+           data-bs-toggle="tooltip" 
+           title="Số lượng dự kiến sử dụng trong 1 năm"></i>
+    </label>
+    <input type="number" id="estimated_annual_usage" name="estimated_annual_usage" 
+           class="form-control" min="0" step="1" placeholder="0">
+    <small class="text-muted">Giúp tính toán nhu cầu mua hàng</small>
+</div>
                         <div class="col-md-4 mb-3">
                             <label for="reorder_point" class="form-label">Điểm đặt hàng lại</label>
                             <input type="number" id="reorder_point" name="reorder_point" class="form-control" 
@@ -554,6 +555,17 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 </script>
+<script>
+// Auto detect category khi nhập tên
+document.getElementById('item_name').addEventListener('input', function() {
+    autoDetectCategory(this.value, function(data) {
+        if (data && data.category) {
+            document.getElementById('autoCategory').value = data.category;
+        } else {
+            document.getElementById('autoCategory').value = 'Chưa xác định';
+        }
+    });
+});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>
