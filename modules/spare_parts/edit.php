@@ -1,6 +1,6 @@
 <?php
 /**
- * Spare Parts Edit Page
+ * Spare Parts Edit Page - FIXED VERSION
  * /modules/spare_parts/edit.php
  */
 
@@ -111,41 +111,33 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                         </div>
                     </div>
                     
- <!-- Thay thế section category trong edit.php -->
-<div class="row">
-    <div class="col-md-4 mb-3">
-    <label class="form-label">Danh mục (Tự động)</label>
-    <input type="text" class="form-control" id="autoCategory" readonly 
-           value="<?php echo htmlspecialchars($part['auto_category'] ?? 'Chưa xác định'); ?>">
-    <small class="text-muted">Tự động phân loại dựa trên tên vật tư</small>
-</div>
-    
-    <div class="col-md-3 mb-3">
-        <label for="unit" class="form-label">Đơn vị tính</label>
-        <select id="unit" name="unit" class="form-select">
-            <?php foreach ($units as $unit): ?>
-                <option value="<?php echo $unit; ?>" <?php echo ($part['unit'] === $unit) ? 'selected' : ''; ?>>
-                    <?php echo $unit; ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <label for="standard_cost" class="form-label">Giá chuẩn (VNĐ)</label>
-        <input type="number" id="standard_cost" name="standard_cost" class="form-control" 
-               min="0" step="1" value="<?php echo $part['standard_cost']; ?>">
-    </div>
-</div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="unit" class="form-label">Đơn vị tính</label>
+                            <select id="unit" name="unit" class="form-select">
+                                <?php foreach ($units as $unit): ?>
+                                    <option value="<?php echo $unit; ?>" <?php echo ($part['unit'] === $unit) ? 'selected' : ''; ?>>
+                                        <?php echo $unit; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="standard_cost" class="form-label">Giá chuẩn (VNĐ)</label>
+                            <input type="number" id="standard_cost" name="standard_cost" class="form-control" 
+                                   min="0" step="1" value="<?php echo $part['standard_cost']; ?>">
+                        </div>
+                    </div>
                     
                     <div class="mb-3">
                         <label for="description" class="form-label">Mô tả</label>
-                        <textarea id="description" name="description" class="form-control" rows="3"><?php echo htmlspecialchars($part['description']); ?></textarea>
+                        <textarea id="description" name="description" class="form-control" rows="3"><?php echo htmlspecialchars($part['description'] ?? ''); ?></textarea>
                     </div>
                     
                     <div class="mb-3">
                         <label for="specifications" class="form-label">Thông số kỹ thuật</label>
-                        <textarea id="specifications" name="specifications" class="form-control" rows="2"><?php echo htmlspecialchars($part['specifications']); ?></textarea>
+                        <textarea id="specifications" name="specifications" class="form-control" rows="2"><?php echo htmlspecialchars($part['specifications'] ?? ''); ?></textarea>
                     </div>
                 </div>
                 
@@ -160,45 +152,51 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                         <div class="col-md-4 mb-3">
                             <label for="min_stock" class="form-label">Mức tồn tối thiểu <span class="text-danger">*</span></label>
                             <input type="number" id="min_stock" name="min_stock" class="form-control" 
-                                   min="0" step="0.1" required value="<?php echo $part['min_stock']; ?>">
+                                   min="0" step="1" required value="<?php echo $part['min_stock']; ?>">
                         </div>
                         
                         <div class="col-md-4 mb-3">
                             <label for="max_stock" class="form-label">Mức tồn tối đa</label>
                             <input type="number" id="max_stock" name="max_stock" class="form-control" 
-                                   min="0" step="0.1" value="<?php echo $part['max_stock']; ?>">
+                                   min="0" step="1" value="<?php echo $part['max_stock']; ?>">
                         </div>
+                        
                         <div class="col-md-4 mb-3">
-    <label for="estimated_annual_usage" class="form-label">
-        Dự kiến sử dụng/năm
-        <i class="fas fa-info-circle text-muted" 
-           data-bs-toggle="tooltip" 
-           title="Số lượng dự kiến sử dụng trong 1 năm"></i>
-    </label>
-    <input type="number" id="estimated_annual_usage" name="estimated_annual_usage" 
-           class="form-control" min="0" step="1" placeholder="0">
-    <small class="text-muted">Giúp tính toán nhu cầu mua hàng</small>
-</div>
-                        <div class="col-md-4 mb-3">
-                            <label for="reorder_point" class="form-label">Điểm đặt hàng lại</label>
-                            <input type="number" id="reorder_point" name="reorder_point" class="form-control" 
-                                   min="0" step="0.1" value="<?php echo $part['reorder_point']; ?>">
+                            <label for="estimated_annual_usage" class="form-label">
+                                Dự kiến sử dụng/năm
+                                <i class="fas fa-info-circle text-muted" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Số lượng dự kiến sử dụng trong 1 năm"></i>
+                            </label>
+                            <input type="number" id="estimated_annual_usage" name="estimated_annual_usage" 
+                                   class="form-control" min="0" step="1" 
+                                   value="<?php echo $part['estimated_annual_usage'] ?? 0; ?>" 
+                                   placeholder="0">
+                            <small class="text-muted">Giúp tính toán nhu cầu mua hàng</small>
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-4 mb-3">
+                            <label for="reorder_point" class="form-label">Điểm đặt hàng lại</label>
+                            <input type="number" id="reorder_point" name="reorder_point" class="form-control" 
+                                   min="0" step="1" value="<?php echo $part['reorder_point']; ?>">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
                             <label for="storage_location" class="form-label">Vị trí lưu kho</label>
                             <input type="text" id="storage_location" name="storage_location" class="form-control" 
-                                   value="<?php echo htmlspecialchars($part['storage_location']); ?>">
+                                   value="<?php echo htmlspecialchars($part['storage_location'] ?? ''); ?>">
                         </div>
                         
                         <div class="col-md-4 mb-3">
                             <label for="lead_time_days" class="form-label">Lead time (ngày)</label>
                             <input type="number" id="lead_time_days" name="lead_time_days" class="form-control" 
-                                   min="0" value="<?php echo $part['lead_time_days']; ?>">
+                                   min="0" step="1" value="<?php echo $part['lead_time_days']; ?>">
                         </div>
-                        
+                    </div>
+                    
+                    <div class="row">
                         <div class="col-md-4 mb-3 d-flex align-items-end">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="is_critical" name="is_critical" value="1" 
@@ -212,40 +210,40 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                 </div>
                 
                 <!-- Management & Supplier -->
-<div class="form-section">
-    <h5 class="form-section-title">
-        <i class="fas fa-users"></i>
-        Quản lý & Nhà cung cấp
-    </h5>
-    
-    <div class="row">
-        <div class="col-md-12 mb-3">
-            <label for="manager_user_id" class="form-label">Người quản lý</label>
-            <select id="manager_user_id" name="manager_user_id" class="form-select">
-                <option value="">-- Chọn người quản lý --</option>
-                <?php foreach ($users as $user): ?>
-                    <option value="<?php echo $user['id']; ?>" <?php echo ($part['manager_user_id'] == $user['id']) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($user['full_name']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </div>
-    
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
-            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
-                   value="<?php echo htmlspecialchars($part['supplier_code']); ?>">
-        </div>
-        
-        <div class="col-md-8 mb-3">
-            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
-            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
-                   value="<?php echo htmlspecialchars($part['supplier_name']); ?>">
-        </div>
-    </div>
-</div>
+                <div class="form-section">
+                    <h5 class="form-section-title">
+                        <i class="fas fa-users"></i>
+                        Quản lý & Nhà cung cấp
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="manager_user_id" class="form-label">Người quản lý</label>
+                            <select id="manager_user_id" name="manager_user_id" class="form-select">
+                                <option value="">-- Chọn người quản lý --</option>
+                                <?php foreach ($users as $user): ?>
+                                    <option value="<?php echo $user['id']; ?>" <?php echo ($part['manager_user_id'] == $user['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($user['full_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="supplier_code" class="form-label">Mã nhà cung cấp</label>
+                            <input type="text" id="supplier_code" name="supplier_code" class="form-control" 
+                                   value="<?php echo htmlspecialchars($part['supplier_code'] ?? ''); ?>">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="supplier_name" class="form-label">Tên nhà cung cấp</label>
+                            <input type="text" id="supplier_name" name="supplier_name" class="form-control" 
+                                   value="<?php echo htmlspecialchars($part['supplier_name'] ?? ''); ?>">
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Notes -->
                 <div class="form-section">
@@ -255,7 +253,7 @@ $users = $db->fetchAll("SELECT id, full_name FROM users WHERE status = 'active' 
                     </h5>
                     
                     <div class="mb-3">
-                        <textarea id="notes" name="notes" class="form-control" rows="3"><?php echo htmlspecialchars($part['notes']); ?></textarea>
+                        <textarea id="notes" name="notes" class="form-control" rows="3"><?php echo htmlspecialchars($part['notes'] ?? ''); ?></textarea>
                     </div>
                 </div>
             </div>
@@ -369,11 +367,9 @@ function createPurchaseRequest(sparePartId) {
 function viewStockHistory() {
     window.location.href = '/modules/inventory/transactions.php?item_code=<?php echo urlencode($part['item_code']); ?>';
 }
-// Thêm vào script section
-<script>
+
 // Event listener cho tự động phân loại khi thay đổi tên
 document.getElementById('item_name').addEventListener('input', CMMS.utils.debounce(function() {
-    // Chỉ auto-detect nếu người dùng thay đổi tên đáng kể
     const originalName = '<?php echo addslashes($part['item_name']); ?>';
     const currentName = this.value;
     
@@ -426,7 +422,6 @@ function showCategoryChangeSuggestion(oldCategory, newCategory, confidence) {
 function acceptReclassification(newCategory) {
     document.getElementById('category').value = newCategory;
     
-    // Cập nhật hiển thị
     const categoryDisplay = document.getElementById('auto_category_display');
     categoryDisplay.innerHTML = `
         <div class="d-flex justify-content-between align-items-center">
@@ -435,9 +430,7 @@ function acceptReclassification(newCategory) {
         </div>
     `;
     
-    // Xóa gợi ý
     dismissSuggestion();
-    
     CMMS.showToast(`Đã thay đổi danh mục thành: ${newCategory}`, 'success');
 }
 
@@ -447,97 +440,6 @@ function dismissSuggestion() {
     const currentCategory = document.getElementById('category').value;
     confidenceDiv.innerHTML = `Danh mục hiện tại: ${currentCategory}`;
 }
-
-// Function phân loại lại thủ công
-function reclassifyCategory() {
-    const itemName = document.getElementById('item_name').value;
-    if (!itemName) {
-        CMMS.showToast('Vui lòng nhập tên vật tư', 'warning');
-        return;
-    }
-    
-    // Hiển thị loading
-    const categoryDisplay = document.getElementById('auto_category_display');
-    categoryDisplay.innerHTML = '<span class="text-info"><i class="fas fa-spinner fa-spin me-1"></i>Đang phân loại lại...</span>';
-    
-    CMMS.ajax({
-        url: 'api/spare_parts.php?action=detect_category&item_name=' + encodeURIComponent(itemName),
-        method: 'GET',
-        success: (data) => {
-            if (data.success && data.data.category) {
-                const category = data.data.category;
-                const confidence = data.data.confidence;
-                
-                // Cập nhật category
-                document.getElementById('category').value = category;
-                
-                // Cập nhật hiển thị
-                let confidenceClass = confidence >= 70 ? 'success' : confidence >= 40 ? 'warning' : 'danger';
-                
-                categoryDisplay.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge bg-${confidenceClass} fs-6">${category}</span>
-                        <div>
-                            <small class="text-${confidenceClass} me-2">${confidence}% tin cậy</small>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="reclassifyCategory()">
-                                <i class="fas fa-sync-alt"></i> Phân loại lại
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                document.getElementById('category_confidence').innerHTML = 
-                    `<i class="fas fa-check-circle text-success me-1"></i>Đã phân loại lại: <strong>${category}</strong>`;
-                
-                CMMS.showToast(`Đã phân loại lại: ${category} (${confidence}% tin cậy)`, 'success');
-            } else {
-                categoryDisplay.innerHTML = '<span class="text-danger">Không thể phân loại</span>';
-                CMMS.showToast('Không thể phân loại danh mục', 'error');
-            }
-        },
-        error: () => {
-            categoryDisplay.innerHTML = '<span class="text-danger">Lỗi phân loại</span>';
-            CMMS.showToast('Có lỗi xảy ra khi phân loại', 'error');
-        }
-    });
-}
-
-// Form submit với force reclassify nếu cần
-document.getElementById('sparePartsEditForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    if (!this.checkValidity()) {
-        this.classList.add('was-validated');
-        return;
-    }
-    
-    const formData = new FormData(this);
-    formData.append('action', 'update');
-    
-    // Kiểm tra xem có thay đổi tên không để force reclassify
-    const originalName = '<?php echo addslashes($part['item_name']); ?>';
-    const currentName = formData.get('item_name');
-    
-    if (currentName !== originalName) {
-        formData.append('force_reclassify', '1');
-    }
-    
-    CMMS.ajax({
-        url: 'api/spare_parts.php',
-        method: 'POST',
-        body: formData,
-        success: (data) => {
-            if (data.success) {
-                CMMS.showToast(data.message, 'success');
-                setTimeout(() => {
-                    window.location.href = 'view.php?id=<?php echo $id; ?>';
-                }, 1500);
-            } else {
-                CMMS.showToast(data.message, 'error');
-            }
-        }
-    });
-});
 
 // CSS cho alert nhỏ
 const style = document.createElement('style');
@@ -554,18 +456,6 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-</script>
-<script>
-// Auto detect category khi nhập tên
-document.getElementById('item_name').addEventListener('input', function() {
-    autoDetectCategory(this.value, function(data) {
-        if (data && data.category) {
-            document.getElementById('autoCategory').value = data.category;
-        } else {
-            document.getElementById('autoCategory').value = 'Chưa xác định';
-        }
-    });
-});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

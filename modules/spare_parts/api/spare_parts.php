@@ -1,15 +1,20 @@
 <?php
 /**
- * Spare Parts API Handler
+ * Spare Parts API Handler - FIXED VERSION
  * /modules/spare_parts/api/spare_parts.php
  */
 
-// Bật error reporting để debug
-ini_set('display_errors', 0); // Không hiển thị lỗi ra màn hình
+// Tắt display errors, chỉ log
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-// Bắt mọi output k
+// Clean output buffer ngay từ đầu
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 header('Content-Type: application/json; charset=utf-8');
 
 require_once '../../../config/config.php';
@@ -184,7 +189,6 @@ function handleSave() {
     $data = [
         'item_code' => trim($_POST['item_code']),
         'item_name' => trim($_POST['item_name']),
-        // BỎ dòng này: 'category' => trim($_POST['category'] ?? ''),
         'unit' => trim($_POST['unit']),
         'min_stock' => floatval($_POST['min_stock'] ?? 0),
         'max_stock' => floatval($_POST['max_stock'] ?? 0),
@@ -203,7 +207,6 @@ function handleSave() {
         'created_by' => $_SESSION['user_id']
     ];
     
-    // BỎ category khỏi SQL
     $sql = "INSERT INTO spare_parts 
             (item_code, item_name, unit, min_stock, max_stock, 
              estimated_annual_usage, reorder_point, standard_cost,
@@ -215,7 +218,6 @@ function handleSave() {
     $params = [
         $data['item_code'], 
         $data['item_name'], 
-        // BỎ $data['category'],
         $data['unit'],
         $data['min_stock'], 
         $data['max_stock'], 
@@ -250,7 +252,6 @@ function handleUpdate() {
     
     $id = intval($_POST['id']);
     
-    // BỎ category khỏi SQL
     $sql = "UPDATE spare_parts SET 
             item_code = ?, item_name = ?, unit = ?,
             min_stock = ?, max_stock = ?, estimated_annual_usage = ?,
@@ -264,7 +265,6 @@ function handleUpdate() {
     $params = [
         trim($_POST['item_code']),
         trim($_POST['item_name']),
-        // BỎ trim($_POST['category'] ?? ''),
         trim($_POST['unit']),
         floatval($_POST['min_stock'] ?? 0),
         floatval($_POST['max_stock'] ?? 0),
@@ -293,24 +293,57 @@ function handleUpdate() {
 }
 
 function handleDelete() {
-    requirePermission('spare_parts', 'delete');
-    global $db;
+    // Clean output buffer
+    if (ob_get_length()) ob_clean();
     
-    $id = intval($_POST['id']);
-    
-    // KIỂM TRA QUYỀN
-    $part = $db->fetch("SELECT manager_user_id FROM spare_parts WHERE id = ?", [$id]);
-    
-    if ($_SESSION['role'] !== 'Admin' && $part['manager_user_id'] != $_SESSION['user_id']) {
-        throw new Exception('Bạn không có quyền xóa spare part này');
+    try {
+        requirePermission('spare_parts', 'delete');
+        global $db;
+        
+        $id = intval($_POST['id'] ?? 0);
+        
+        if (!$id) {
+            throw new Exception('ID không hợp lệ');
+        }
+        
+        // KIỂM TRA QUYỀN - FIX: Dùng user_role
+        $part = $db->fetch("SELECT manager_user_id, item_code FROM spare_parts WHERE id = ?", [$id]);
+        
+        if (!$part) {
+            throw new Exception('Không tìm thấy spare part');
+        }
+        
+        // Fix: Sử dụng user_role thay vì role
+        $userRole = $_SESSION['user_role'] ?? '';
+        $userId = $_SESSION['user_id'] ?? 0;
+        
+        if ($userRole !== 'Admin' && $part['manager_user_id'] != $userId) {
+            throw new Exception('Bạn không có quyền xóa spare part này');
+        }
+        
+        // Xóa
+        $db->execute("DELETE FROM spare_parts WHERE id = ?", [$id]);
+        
+        // Log activity
+        logActivity('delete_spare_part', 'spare_parts', "Deleted spare part: {$part['item_code']} (ID: {$id})");
+        
+        // Trả về JSON
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => true,
+            'message' => 'Đã xóa thành công'
+        ], JSON_UNESCAPED_UNICODE);
+        
+    } catch (Exception $e) {
+        error_log("Delete error: " . $e->getMessage());
+        
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE);
     }
     
-    $db->execute("DELETE FROM spare_parts WHERE id = ?", [$id]);
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Đã xóa thành công'
-    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

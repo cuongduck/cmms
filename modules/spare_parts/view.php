@@ -1,6 +1,6 @@
 <?php
 /**
- * Spare Parts View Page
+ * Spare Parts View Page - FIXED VERSION
  * /modules/spare_parts/view.php
  */
 
@@ -60,16 +60,18 @@ $breadcrumb = [
     ['title' => htmlspecialchars($part['item_name']), 'url' => '']
 ];
 
-// Page actions
+// ===== FIX: Phân quyền đúng với user_role =====
 $pageActions = '';
-// Check quyền edit/delete
+$userRole = $_SESSION['user_role'] ?? '';
+$userId = $_SESSION['user_id'] ?? 0;
+
 $canEdit = false;
 $canDelete = false;
 
-if ($_SESSION['role'] === 'Admin') {
+if ($userRole === 'Admin') {
     $canEdit = true;
     $canDelete = true;
-} elseif ($part['manager_user_id'] == $_SESSION['user_id']) {
+} elseif ($part['manager_user_id'] == $userId) {
     $canEdit = true;
     $canDelete = true;
 }
@@ -441,7 +443,7 @@ $weeklyUsage = $part['estimated_annual_usage'] > 0 ? $part['estimated_annual_usa
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <?php if (hasPermission('spare_parts', 'edit')): ?>
+                    <?php if ($canEdit): ?>
                     <a href="edit.php?id=<?php echo $id; ?>" class="btn btn-outline-warning">
                         <i class="fas fa-edit me-2"></i>Chỉnh sửa
                     </a>
@@ -526,6 +528,43 @@ function copyItemCode() {
         document.body.removeChild(textArea);
         CMMS.showToast('Đã copy mã vật tư: ' + itemCode, 'success');
     }
+}
+
+function deleteSparePart(id, itemCode) {
+    if (!confirm(`⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn XÓA VĨNH VIỄN spare part "${itemCode}"?\n\n❌ Dữ liệu sẽ bị XÓA HOÀN TOÀN và KHÔNG THỂ KHÔI PHỤC!\n\nNhấn OK để xác nhận xóa vĩnh viễn.`)) {
+        return;
+    }
+    
+    if (!confirm(`Xác nhận lần cuối: Xóa vĩnh viễn "${itemCode}"?`)) {
+        return;
+    }
+    
+    CMMS.ajax({
+        url: 'api/spare_parts.php',
+        method: 'POST',
+        body: new URLSearchParams({
+            action: 'delete',
+            id: id
+        }),
+        success: function(data) {
+            if (data.success) {
+                CMMS.showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.href = 'index.php';
+                }, 1500);
+            } else {
+                CMMS.showToast(data.message || 'Có lỗi xảy ra', 'error');
+            }
+        },
+        error: function(error, response) {
+            console.error('Delete error:', error);
+            if (response && response.message) {
+                CMMS.showToast(response.message, 'error');
+            } else {
+                CMMS.showToast('Không thể xóa spare part', 'error');
+            }
+        }
+    });
 }
 </script>
 

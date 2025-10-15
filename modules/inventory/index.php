@@ -359,16 +359,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                 </select>
             </div>
             
-            <div class="col-md-2">
-                <label class="form-label">Trạng thái tồn</label>
-                <select class="form-select" name="status">
-                    <option value="">Tất cả</option>
-                    <option value="out_of_stock" <?php echo $status === 'out_of_stock' ? 'selected' : ''; ?>>Hết hàng</option>
-                    <option value="low_stock" <?php echo $status === 'low_stock' ? 'selected' : ''; ?>>Thiếu hàng</option>
-                    <option value="excess_stock" <?php echo $status === 'excess_stock' ? 'selected' : ''; ?>>Dư thừa</option>
-                    <option value="normal" <?php echo $status === 'normal' ? 'selected' : ''; ?>>Bình thường</option>
-                </select>
-            </div>
+
             
             <div class="col-md-2">
                 <label class="form-label">Loại vật tư</label>
@@ -425,14 +416,13 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         <th style="width: 120px;" class="text-end">Tổng giá trị</th>
                         <th style="width: 100px;">Loại vật tư</th>
                         <th style="width: 80px;">Ngành hàng</th> 
-                        <th style="width: 100px;">Trạng thái</th>
-                        <th style="width: 100px;" class="text-center">Thao tác</th>
+                                               <th style="width: 100px;" class="text-center">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($inventory)): ?>
                     <tr>
-                        <td colspan="13" class="text-center py-4 text-muted">
+                        <td colspan="12" class="text-center py-4 text-muted">
                             <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                             Không có dữ liệu tồn kho
                         </td>
@@ -488,11 +478,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                                 <?php echo htmlspecialchars($item['nganh_hang']); ?>
                             </span>
                         </td>    
-                        <td>
-                            <span class="badge <?php echo getStockStatusClass($item['stock_status']); ?>">
-                                <?php echo $item['stock_status']; ?>
-                            </span>
-                        </td>
+
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-outline-info" 

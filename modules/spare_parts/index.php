@@ -448,17 +448,28 @@ function getCategoryBadgeClass($category) {
                             <small class="text-muted">Chưa phân công</small>
                             <?php endif; ?>
                         </td>
-                        <td>
+                       <td>
+<?php
+    // Kiểm tra quyền cho từng dòng
+    $userRole = $_SESSION['user_role'] ?? ''; // ĐỔI TỪ 'role' THÀNH 'user_role'
+    $userId = $_SESSION['user_id'] ?? 0;
+    
+    $canEditRow = ($userRole === 'Admin' || $part['manager_user_id'] == $userId);
+    $canDeleteRow = ($userRole === 'Admin' || $part['manager_user_id'] == $userId);
+    ?>
+    
     <div class="btn-group btn-group-sm">
         <a href="view.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
             <i class="fas fa-eye"></i>
         </a>
-        <?php if (hasPermission('spare_parts', 'edit')): ?>
+        
+        <?php if ($canEditRow): ?>
         <a href="edit.php?id=<?php echo $part['id']; ?>" class="btn btn-outline-warning btn-sm" title="Chỉnh sửa">
             <i class="fas fa-edit"></i>
         </a>
         <?php endif; ?>
-        <?php if (hasPermission('spare_parts', 'delete')): ?>
+        
+        <?php if ($canDeleteRow): ?>
         <button onclick="deleteSparePart(<?php echo $part['id']; ?>, '<?php echo htmlspecialchars($part['item_code']); ?>')" 
                 class="btn btn-outline-danger btn-sm" title="Xóa">
             <i class="fas fa-trash"></i>

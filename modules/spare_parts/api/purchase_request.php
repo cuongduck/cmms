@@ -1,178 +1,212 @@
 <?php
 /**
- * Purchase Request API Handler
+ * Purchase Request API - FIXED VERSION
  * /modules/spare_parts/api/purchase_request.php
+ * Xuất Excel trực tiếp không qua PHPSpreadsheet
  */
-
-header('Content-Type: application/json; charset=utf-8');
 
 require_once '../../../config/config.php';
 require_once '../../../config/database.php';
 require_once '../../../config/auth.php';
-require_once '../../../config/functions.php';
-require_once '../config.php';
 
 // Check login
 try {
     requireLogin();
 } catch (Exception $e) {
-    errorResponse('Authentication required', 401);
+    http_response_code(401);
+    die('Authentication required');
 }
 
-$action = $_REQUEST['action'] ?? '';
+// Get request body
+$input = null;
+if (isset($_POST['data'])) {
+    $input = json_decode($_POST['data'], true);
+} else {
+    $input = json_decode(file_get_contents('php://input'), true);
+}
+
+$action = $input['action'] ?? '';
 
 try {
     switch ($action) {
-        case 'create':
-            handleCreate();
-            break;
-        
-        case 'approve':
-            handleApprove();
-            break;
-        
-        case 'reject':
-            handleReject();
-            break;
-        
-        case 'list':
-            handleList();
+        case 'export_excel':
+            handleExportExcel($input);
             break;
         
         default:
-            throw new Exception('Invalid action: ' . $action);
+            throw new Exception('Invalid action');
     }
 } catch (Exception $e) {
     error_log("Purchase Request API Error: " . $e->getMessage());
-    errorResponse($e->getMessage());
+    http_response_code(500);
+    die('Error: ' . $e->getMessage());
 }
 
-function handleCreate() {
-    requirePermission('spare_parts', 'purchase_request');
+function handleExportExcel($input) {
+    $items = $input['items'] ?? [];
+    
+    if (empty($items)) {
+        throw new Exception('Không có vật tư nào được chọn');
+    }
+    
+    // Generate filename
+    $prNumber = 'PR' . date('YmdHis');
+    
+    // Set headers for Excel download
+    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $prNumber . '.xls"');
+    header('Cache-Control: max-age=0');
+    
+    // Start XML Excel format
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
+    echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+    echo ' xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
+    echo ' xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
+    echo ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+    echo ' xmlns:html="http://www.w3.org/TR/REC-html40">' . "\n";
+    
+    // Styles
+    echo '<Styles>' . "\n";
+    
+    // Header style
+    echo '<Style ss:ID="header">' . "\n";
+    echo '<Font ss:Bold="1" ss:Size="11"/>' . "\n";
+    echo '<Interior ss:Color="#E0E0E0" ss:Pattern="Solid"/>' . "\n";
+    echo '<Alignment ss:Horizontal="Center" ss:Vertical="Center"/>' . "\n";
+    echo '<Borders>' . "\n";
+    echo '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '</Borders>' . "\n";
+    echo '</Style>' . "\n";
+    
+    // Data style with borders
+    echo '<Style ss:ID="data">' . "\n";
+    echo '<Borders>' . "\n";
+    echo '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '</Borders>' . "\n";
+    echo '</Style>' . "\n";
+    
+    // Number style (right align)
+    echo '<Style ss:ID="number">' . "\n";
+    echo '<Alignment ss:Horizontal="Right"/>' . "\n";
+    echo '<NumberFormat ss:Format="#,##0"/>' . "\n";
+    echo '<Borders>' . "\n";
+    echo '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '</Borders>' . "\n";
+    echo '</Style>' . "\n";
+    
+    // Center style
+    echo '<Style ss:ID="center">' . "\n";
+    echo '<Alignment ss:Horizontal="Center"/>' . "\n";
+    echo '<Borders>' . "\n";
+    echo '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+    echo '</Borders>' . "\n";
+    echo '</Style>' . "\n";
+    
+    // Total style
+    echo '<Style ss:ID="total">' . "\n";
+    echo '<Font ss:Bold="1"/>' . "\n";
+    echo '<Alignment ss:Horizontal="Right"/>' . "\n";
+    echo '<NumberFormat ss:Format="#,##0"/>' . "\n";
+    echo '</Style>' . "\n";
+    
+    echo '</Styles>' . "\n";
+    
+    // Worksheet
+    echo '<Worksheet ss:Name="Order">' . "\n";
+    echo '<Table>' . "\n";
+    
+    // Column widths
+    echo '<Column ss:Width="50"/>' . "\n";   // Line
+    echo '<Column ss:Width="120"/>' . "\n";  // Item
+    echo '<Column ss:Width="300"/>' . "\n";  // Description
+    echo '<Column ss:Width="80"/>' . "\n";   // Quantity
+    echo '<Column ss:Width="60"/>' . "\n";   // UOM
+    echo '<Column ss:Width="100"/>' . "\n";  // Price
+    echo '<Column ss:Width="120"/>' . "\n";  // Amount
+    echo '<Column ss:Width="100"/>' . "\n";  // Requester
+    
+    // Header row
+    $headers = ['Line', 'Item', 'Description', 'Quantity', 'UOM', 'Price', 'Amount', 'Requester'];
+    echo '<Row ss:Height="25">' . "\n";
+    foreach ($headers as $header) {
+        echo '<Cell ss:StyleID="header"><Data ss:Type="String">' . htmlspecialchars($header) . '</Data></Cell>' . "\n";
+    }
+    echo '</Row>' . "\n";
+    
+    // Data rows
+    $totalAmount = 0;
+    foreach ($items as $item) {
+        $totalAmount += $item['amount'];
+        
+        echo '<Row>' . "\n";
+        
+        // Line
+        echo '<Cell ss:StyleID="center"><Data ss:Type="Number">' . $item['line'] . '</Data></Cell>' . "\n";
+        
+        // Item Code
+        echo '<Cell ss:StyleID="data"><Data ss:Type="String">' . htmlspecialchars($item['item_code']) . '</Data></Cell>' . "\n";
+        
+        // Description
+        echo '<Cell ss:StyleID="data"><Data ss:Type="String">' . htmlspecialchars($item['item_name']) . '</Data></Cell>' . "\n";
+        
+        // Quantity
+        echo '<Cell ss:StyleID="number"><Data ss:Type="Number">' . $item['quantity'] . '</Data></Cell>' . "\n";
+        
+        // UOM
+        echo '<Cell ss:StyleID="center"><Data ss:Type="String">' . htmlspecialchars($item['uom']) . '</Data></Cell>' . "\n";
+        
+        // Price
+        echo '<Cell ss:StyleID="number"><Data ss:Type="Number">' . $item['price'] . '</Data></Cell>' . "\n";
+        
+        // Amount
+        echo '<Cell ss:StyleID="number"><Data ss:Type="Number">' . $item['amount'] . '</Data></Cell>' . "\n";
+        
+        // Requester
+        echo '<Cell ss:StyleID="center"><Data ss:Type="String">' . htmlspecialchars($item['requester']) . '</Data></Cell>' . "\n";
+        
+        echo '</Row>' . "\n";
+    }
+    
+    // Total row
+    echo '<Row>' . "\n";
+    echo '<Cell ss:Index="6" ss:StyleID="total"><Data ss:Type="String">TOTAL:</Data></Cell>' . "\n";
+    echo '<Cell ss:StyleID="total"><Data ss:Type="Number">' . $totalAmount . '</Data></Cell>' . "\n";
+    echo '<Cell/>' . "\n";
+    echo '</Row>' . "\n";
+    
+    echo '</Table>' . "\n";
+    echo '</Worksheet>' . "\n";
+    echo '</Workbook>';
+    
+    // Log activity
     global $db;
-    
-    $itemCode = trim($_POST['item_code'] ?? '');
-    $requestedQty = floatval($_POST['requested_qty'] ?? 0);
-    $priority = $_POST['priority'] ?? 'Medium';
-    $reason = trim($_POST['reason'] ?? '');
-    
-    // Validation
-    if (empty($itemCode)) {
-        throw new Exception('Vui lòng chọn vật tư');
+    $itemCodes = array_column($items, 'item_code');
+    $logMessage = "Created purchase request {$prNumber} with " . count($items) . " items: " . implode(', ', array_slice($itemCodes, 0, 5));
+    if (count($itemCodes) > 5) {
+        $logMessage .= ' and ' . (count($itemCodes) - 5) . ' more';
     }
-    
-    if ($requestedQty <= 0) {
-        throw new Exception('Số lượng phải lớn hơn 0');
-    }
-    
-    // Get spare part info
-    $sparePart = $db->fetch("
-        SELECT sp.*, COALESCE(oh.Onhand, 0) as current_stock
-        FROM spare_parts sp
-        LEFT JOIN onhand oh ON sp.item_code = oh.ItemCode
-        WHERE sp.item_code = ? AND sp.is_active = 1
-    ", [$itemCode]);
-    
-    if (!$sparePart) {
-        throw new Exception('Không tìm thấy vật tư');
-    }
-    
-    $db->beginTransaction();
     
     try {
-        $requestCode = generatePurchaseRequestCode();
-        $estimatedCost = $requestedQty * $sparePart['standard_cost'];
-        
-        $sql = "INSERT INTO purchase_requests 
-                (request_code, item_code, requested_qty, unit, current_stock, min_stock, 
-                 estimated_cost, priority, reason, requested_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
-        $params = [
-            $requestCode, $itemCode, $requestedQty, $sparePart['unit'],
-            $sparePart['current_stock'], $sparePart['min_stock'], $estimatedCost,
-            $priority, $reason, getCurrentUser()['id']
-        ];
-        
-        $db->execute($sql, $params);
-        $requestId = $db->lastInsertId();
-        
-        // Log activity
-        logActivity('create_purchase_request', 'spare_parts', "Created purchase request: $requestCode for $itemCode");
-        
-        $db->commit();
-        
-        successResponse(['id' => $requestId, 'code' => $requestCode], 'Tạo đề xuất mua hàng thành công');
-        
+        if (function_exists('logActivity')) {
+            logActivity('create_purchase_request', 'spare_parts', $logMessage);
+        }
     } catch (Exception $e) {
-        $db->rollback();
-        throw $e;
-    }
-}
-
-function handleApprove() {
-    requirePermission('spare_parts', 'edit');
-    global $db;
-    
-    $id = intval($_POST['id'] ?? 0);
-    if (!$id) {
-        throw new Exception('ID is required');
+        // Ignore logging errors
     }
     
-    $db->execute("
-        UPDATE purchase_requests 
-        SET status = 'approved', approved_by = ?, updated_at = NOW() 
-        WHERE id = ?
-    ", [getCurrentUser()['id'], $id]);
-    
-    logActivity('approve_purchase_request', 'spare_parts', "Approved purchase request ID: $id");
-    
-    successResponse([], 'Đã duyệt đề xuất mua hàng');
-}
-
-function handleReject() {
-    requirePermission('spare_parts', 'edit');
-    global $db;
-    
-    $id = intval($_POST['id'] ?? 0);
-    $reason = trim($_POST['reject_reason'] ?? '');
-    
-    if (!$id) {
-        throw new Exception('ID is required');
-    }
-    
-    $db->execute("
-        UPDATE purchase_requests 
-        SET status = 'rejected', approved_by = ?, reason = CONCAT(COALESCE(reason, ''), '\n\nLý do từ chối: ', ?), updated_at = NOW() 
-        WHERE id = ?
-    ", [getCurrentUser()['id'], $reason, $id]);
-    
-    logActivity('reject_purchase_request', 'spare_parts', "Rejected purchase request ID: $id");
-    
-    successResponse([], 'Đã từ chối đề xuất mua hàng');
-}
-
-function handleList() {
-    global $db;
-    
-    $status = $_GET['status'] ?? '';
-    $sql = "SELECT pr.*, sp.item_name, u.full_name as requested_by_name
-            FROM purchase_requests pr
-            JOIN spare_parts sp ON pr.item_code = sp.item_code
-            LEFT JOIN users u ON pr.requested_by = u.id
-            WHERE 1=1";
-    
-    $params = [];
-    
-    if ($status) {
-        $sql .= " AND pr.status = ?";
-        $params[] = $status;
-    }
-    
-    $sql .= " ORDER BY pr.created_at DESC";
-    
-    $requests = $db->fetchAll($sql, $params);
-    
-    successResponse($requests);
+    exit;
 }
 ?>
