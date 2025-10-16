@@ -1,6 +1,6 @@
 <?php
 /**
- * Inventory Management Main Page
+ * Inventory Management Main Page - WITH CATEGORY COLUMN
  * /modules/inventory/index.php
  */
 
@@ -24,6 +24,7 @@ function safeCurrencyFormat($amount) {
 // Get filter parameters
 $search = $_GET['search'] ?? '';
 $nganh_hang = $_GET['nganh_hang'] ?? ''; 
+$category = $_GET['category'] ?? ''; // THÊM MỚI
 $status = $_GET['status'] ?? '';
 $bom_status = $_GET['bom_status'] ?? '';
 $page = intval($_GET['page'] ?? 1);
@@ -54,6 +55,24 @@ if (!empty($nganh_hang)) {
     $baseFilterParams[] = $nganh_hang;
 }
 
+// THÊM FILTER THEO DANH MỤC
+if (!empty($category)) {
+    // Lấy keywords của category này
+    $keywords = $db->fetchAll(
+        "SELECT keyword FROM category_keywords WHERE category = ?",
+        [$category]
+    );
+    
+    if (!empty($keywords)) {
+        $keywordConditions = [];
+        foreach ($keywords as $kw) {
+            $keywordConditions[] = "oh.Itemname LIKE ?";
+            $baseFilterParams[] = '%' . $kw['keyword'] . '%';
+        }
+        $baseFilterSql .= " AND (" . implode(" OR ", $keywordConditions) . ")";
+    }
+}
+
 if (!empty($status)) {
     switch ($status) {
         case 'out_of_stock':
@@ -79,7 +98,7 @@ if (!empty($bom_status)) {
     }
 }
 
-// Build main SQL query
+// Build main SQL query - THÊM DANH MỤC TỰ ĐỘNG
 $sql = "SELECT 
     oh.ID,
     oh.ItemCode,
@@ -115,12 +134,19 @@ $sql = "SELECT
         WHEN oh.Locator LIKE 'D%' OR oh.Locator = 'FE01' THEN 'Chung'
         ELSE 'Khác'
     END as nganh_hang,
+    (
+        SELECT ck.category 
+        FROM category_keywords ck 
+        WHERE oh.Itemname LIKE CONCAT('%', ck.keyword, '%')
+        ORDER BY LENGTH(ck.keyword) DESC 
+        LIMIT 1
+    ) as auto_category,
     CASE 
         WHEN oh.Lotnumber IS NOT NULL AND LENGTH(oh.Lotnumber) >= 6 AND SUBSTRING(oh.Lotnumber, 1, 6) REGEXP '^[0-9]{6}$'
         THEN STR_TO_DATE(CONCAT(
-            '20', SUBSTRING(oh.Lotnumber, 5, 2), '-',  -- năm
-            SUBSTRING(oh.Lotnumber, 3, 2), '-',        -- tháng  
-            SUBSTRING(oh.Lotnumber, 1, 2)              -- ngày
+            '20', SUBSTRING(oh.Lotnumber, 5, 2), '-',
+            SUBSTRING(oh.Lotnumber, 3, 2), '-',
+            SUBSTRING(oh.Lotnumber, 1, 2)
         ), '%Y-%m-%d')
         ELSE NULL
     END as ngay_nhap_kho
@@ -156,7 +182,18 @@ try {
     $inventory = [];
 }
 
-// Get categories for filter
+// Get categories for filter - LẤY TỪ BẢNG category_keywords
+try {
+    $categories = $db->fetchAll("
+        SELECT DISTINCT category 
+        FROM category_keywords 
+        ORDER BY category ASC
+    ");
+} catch (Exception $e) {
+    $categories = [];
+}
+
+// Get nganh_hangs for filter
 try {
     $nganh_hangs = $db->fetchAll("
         SELECT DISTINCT 
@@ -183,18 +220,12 @@ try {
                      LEFT JOIN bom_items bi ON p.id = bi.part_id
                      WHERE 1=1" . $baseFilterSql;
 
-    // Tính các thống kê với filter
     $stats = [
         'total_items' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql, $baseFilterParams)['count'] ?? 0,
-        
         'in_bom_items' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND bi.part_id IS NOT NULL", $baseFilterParams)['count'] ?? 0,
-        
         'out_of_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND COALESCE(oh.Onhand, 0) <= 0", $baseFilterParams)['count'] ?? 0,
-        
         'low_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND p.min_stock > 0 AND COALESCE(oh.Onhand, 0) < p.min_stock AND COALESCE(oh.Onhand, 0) > 0", $baseFilterParams)['count'] ?? 0,
-        
         'total_value' => $db->fetch("SELECT SUM(COALESCE(oh.OH_Value, 0)) as total " . $statsBaseSql, $baseFilterParams)['total'] ?? 0,
-        
         'excess_stock' => $db->fetch("SELECT COUNT(DISTINCT oh.ItemCode) as count " . $statsBaseSql . " AND p.max_stock > 0 AND COALESCE(oh.Onhand, 0) > p.max_stock", $baseFilterParams)['count'] ?? 0
     ];
     
@@ -207,7 +238,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
 ?>
 
 <!-- Statistics Cards -->
-<div class="row mb-4">
+<!--<div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card stat-card bg-primary text-white">
             <div class="card-body">
@@ -269,15 +300,15 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                     <div>
                         <div class="stat-number"><?php echo safeCurrencyFormat($stats['total_value']); ?></div>
                         <div class="stat-label">VND</div>
-                                            </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</div>-->
 
 <!-- Thông báo khi có filter -->
-<?php if (!empty($search) || !empty($nganh_hang) || !empty($status) || !empty($bom_status)): ?>
+<?php if (!empty($search) || !empty($nganh_hang) || !empty($category) || !empty($status) || !empty($bom_status)): ?>
 <div class="alert alert-info alert-dismissible fade show">
     <i class="fas fa-filter me-2"></i>
     <strong>Bộ lọc đang áp dụng:</strong>
@@ -285,6 +316,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
     $filters = [];
     if (!empty($search)) $filters[] = "Tìm kiếm: \"$search\"";
     if (!empty($nganh_hang)) $filters[] = "Ngành hàng: $nganh_hang";
+    if (!empty($category)) $filters[] = "Danh mục: $category"; // THÊM MỚI
     if (!empty($status)) {
         $statusLabels = [
             'out_of_stock' => 'Hết hàng',
@@ -333,7 +365,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
     </div>
 </div>
 
-<!-- Filters Card -->
+<!-- Filters Card - THÊM SELECT DANH MỤC -->
 <div class="card mb-4">
     <div class="card-header">
         <h5 class="mb-0">
@@ -359,8 +391,19 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                 </select>
             </div>
             
+            <!-- THÊM SELECT DANH MỤC -->
+            <div class="col-md-2">
+                <label class="form-label">Danh mục</label>
+                <select class="form-select" name="category">
+                    <option value="">Tất cả</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?php echo htmlspecialchars($cat['category']); ?>" <?php echo $category === $cat['category'] ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($cat['category']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-            
             <div class="col-md-2">
                 <label class="form-label">Loại vật tư</label>
                 <select class="form-select" name="bom_status">
@@ -385,12 +428,14 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
     </div>
 </div>
 
-<!-- Inventory Table -->
+<!-- Inventory Table - THÊM CỘT DANH MỤC -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
             <i class="fas fa-warehouse me-2"></i>Tồn kho hiện tại
-            <span class="badge bg-secondary ms-2"><?php echo safeNumberFormat($total); ?> mặt hàng</span>
+            <span class="badge bg-primary ms-2"><?php echo safeNumberFormat($total); ?> item</span>
+                        <span class="badge bg-warning ms-2"><?php echo safeCurrencyFormat($stats['total_value']); ?> VND</span>
+
         </h5>
         
         <div class="btn-group">
@@ -407,6 +452,7 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                     <tr>
                         <th style="width: 100px;">Mã vật tư</th>
                         <th>Tên vật tư</th>
+                        <th style="width: 120px;">Danh mục</th> <!-- THÊM CỘT MỚI -->
                         <th style="width: 80px;">Vị trí</th>
                         <th style="width: 80px;">Lot</th>
                         <th style="width: 90px;">Ngày nhập</th>
@@ -416,13 +462,13 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         <th style="width: 120px;" class="text-end">Tổng giá trị</th>
                         <th style="width: 100px;">Loại vật tư</th>
                         <th style="width: 80px;">Ngành hàng</th> 
-                                               <th style="width: 100px;" class="text-center">Thao tác</th>
+                        <th style="width: 100px;" class="text-center">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($inventory)): ?>
                     <tr>
-                        <td colspan="12" class="text-center py-4 text-muted">
+                        <td colspan="13" class="text-center py-4 text-muted">
                             <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                             Không có dữ liệu tồn kho
                         </td>
@@ -435,6 +481,16 @@ $pagination = paginate($total, $page, $per_page, 'index.php');
                         </td>
                         <td>
                             <div class="fw-medium"><?php echo htmlspecialchars($item['Itemname']); ?></div>
+                        </td>
+                        <!-- CỘT DANH MỤC MỚI -->
+                        <td>
+                            <?php if (!empty($item['auto_category'])): ?>
+                                <span class="badge <?php echo getCategoryBadgeClass($item['auto_category']); ?>">
+                                    <?php echo htmlspecialchars($item['auto_category']); ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Chưa phân loại</span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <small class="text-muted"><?php echo htmlspecialchars($item['Locator'] ?? '-'); ?></small>
@@ -558,6 +614,32 @@ function getNganhHangClass($nganh_hang) {
     }
 }
 
+// THÊM FUNCTION MỚI: Màu badge cho danh mục
+function getCategoryBadgeClass($category) {
+    $categoryClasses = [
+        'Biến tần' => 'bg-primary',
+        'Servo' => 'bg-info',
+        'Vật tư điện' => 'bg-warning text-dark',
+        'PLC' => 'bg-success',
+        'Van điện từ' => 'bg-danger',
+        'Băng tải' => 'bg-secondary',
+        'Dao lược' => 'bg-dark',
+        'Điện trở' => 'bg-light text-dark',
+        'Dây belt' => 'bg-primary',
+        'Bạc đạn' => 'bg-info',
+        'Ống' => 'bg-warning text-dark',
+        'Xilanh' => 'bg-success',
+        'Cảm biến' => 'bg-danger',
+        'Motor' => 'bg-secondary',
+        'Dao thớt' => 'bg-dark',
+        'Nhông xích' => 'bg-primary',
+        'Đồng hồ' => 'bg-info',
+        'Vật tư khác' => 'bg-secondary'
+    ];
+    
+    return $categoryClasses[$category] ?? 'bg-secondary';
+}
+
 function getStockStatusClass($status) {
     switch ($status) {
         case 'Hết hàng': return 'bg-danger';
@@ -582,7 +664,6 @@ function parseNgayNhapKho($lotnumber) {
     $month = substr($dateStr, 2, 2);
     $year = '20' . substr($dateStr, 4, 2);
     
-    // Kiểm tra tính hợp lệ của ngày
     if (!checkdate($month, $day, $year)) {
         return null;
     }
@@ -590,7 +671,6 @@ function parseNgayNhapKho($lotnumber) {
     return $year . '-' . $month . '-' . $day;
 }
 
-// Helper function để format ngày hiển thị
 function formatNgayNhapKho($ngayNhapKho) {
     if (empty($ngayNhapKho)) {
         return '-';
@@ -604,7 +684,6 @@ function formatNgayNhapKho($ngayNhapKho) {
     }
 }
 
-// Helper function để tính số ngày từ ngày nhập
 function tinhSoNgayTuNgayNhap($ngayNhapKho) {
     if (empty($ngayNhapKho)) {
         return null;
@@ -621,11 +700,8 @@ function tinhSoNgayTuNgayNhap($ngayNhapKho) {
 }
 ?>
 
-
-
 <script>
 function viewItemDetails(itemCode) {
-    // Show loading
     const loadingHtml = `
         <div class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
@@ -639,7 +715,6 @@ function viewItemDetails(itemCode) {
     const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
     modal.show();
     
-    // Fetch data
     fetch(`api/item_details.php?item_code=${encodeURIComponent(itemCode)}`)
         .then(response => {
             const contentType = response.headers.get('content-type');
@@ -672,13 +747,11 @@ function viewItemDetails(itemCode) {
 }
 
 function showItemTransactions(itemCode) {
-    // Chuyển hướng đến trang transactions với search
     const url = `/modules/transactions/?search=${encodeURIComponent(itemCode)}&search_all=1`;
     window.open(url, '_blank');
 }
 
 function showAllTransactions() {
-    // Chuyển hướng đến trang transactions
     window.open('/modules/transactions/', '_blank');
 }
 
@@ -700,14 +773,12 @@ function performQuickSearch() {
     }
 }
 
-// Quick search với suggestions
 let searchTimeout;
 document.addEventListener('DOMContentLoaded', function() {
     const quickSearch = document.getElementById('quickSearch');
     const suggestions = document.getElementById('searchSuggestions');
     
     if (quickSearch) {
-        // Input event cho suggestions
         quickSearch.addEventListener('input', function(e) {
             clearTimeout(searchTimeout);
             const query = e.target.value.trim();
@@ -722,7 +793,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         });
 
-        // Enter key support
         quickSearch.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 suggestions.style.display = 'none';
@@ -730,7 +800,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Click outside để ẩn suggestions
         document.addEventListener('click', function(e) {
             if (!e.target.closest('#quickSearch') && !e.target.closest('#searchSuggestions')) {
                 suggestions.style.display = 'none';
@@ -763,7 +832,6 @@ async function fetchSearchSuggestions(query) {
         suggestions.innerHTML = html;
         suggestions.style.display = 'block';
 
-        // Bind click events
         suggestions.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -788,12 +856,10 @@ function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Counter animation cho số liệu
 function animateValue(element, targetText, duration) {
     const originalText = targetText;
     let startValue = 0;
     
-    // Parse số từ text đã format
     let endValue = 0;
     if (targetText.includes('tỷ')) {
         endValue = parseFloat(targetText.replace(/[^\d.,]/g, '').replace(',', '.')) * 1000000000;
@@ -816,7 +882,6 @@ function animateValue(element, targetText, duration) {
         const progress = Math.min(elapsed / duration, 1);
         const currentValue = startValue + ((endValue - startValue) * progress);
         
-        // Format current value theo cùng cách với PHP
         let displayText;
         if (currentValue >= 1000000000) {
             const value = currentValue / 1000000000;
@@ -836,32 +901,16 @@ function animateValue(element, targetText, duration) {
         if (progress < 1) {
             requestAnimationFrame(step);
         } else {
-            // Đảm bảo hiển thị chính xác text cuối
             element.textContent = originalText;
         }
     };
     requestAnimationFrame(step);
 }
 
-
-function formatNumber(num) {
-    if (num >= 1000000000) {
-        return (num / 1000000000).toFixed(2) + 'T';
-    } else if (num >= 1000000) {
-        return (num / 1000000).toFixed(2) + 'M';
-    } else if (num >= 1000) {
-        return (num / 1000).toFixed(2) + 'K';
-    }
-    return num.toString();
-}
-
-// Initialize animations khi trang load
-// Initialize animations khi trang load - FIXED VERSION
 window.addEventListener('load', function() {
     document.querySelectorAll('.stat-number').forEach(element => {
         const originalText = element.textContent;
         
-        // Chỉ animate nếu có số
         if (originalText && originalText !== '0') {
             element.textContent = '0';
             setTimeout(() => {
@@ -870,7 +919,6 @@ window.addEventListener('load', function() {
         }
     });
 });
-
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>
